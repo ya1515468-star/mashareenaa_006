@@ -1,0 +1,170 @@
+name: mashareena
+description: "مشاريعنا | Mashareena — منصة متكاملة (Auth + RBAC + Profile foundation)"
+publish_to: 'none'
+
+version: 0.1.0+1
+
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+
+
+dependencies:
+
+
+  flutter:
+    sdk: flutter
+
+
+  cupertino_icons: ^1.0.6
+
+
+
+
+
+
+
+
+  # ===========================
+  # Agora Real-Time Communication
+  # Voice Calls
+  # Video Calls
+  # Live Streaming
+  # ===========================
+  agora_rtc_engine: 6.5.4
+
+
+
+  # ===========================
+  # Media System
+  # Image Picker
+  # Video Picker
+  # Camera Capture
+  # Chat Attachments
+  # ===========================
+  image_picker: ^1.1.2
+  file_picker: ^11.0.2
+  audio_meta: ^2.0.1
+  audioplayers: ^6.8.1
+  camera: ^0.11.0
+
+
+
+  # ===========================
+  # State Management
+  # ===========================
+  flutter_riverpod: ^2.5.1
+
+
+
+  # ===========================
+  # Dependency Injection
+  # ===========================
+  get_it: ^7.7.0
+
+
+
+  # ===========================
+  # Functional Programming
+  # ===========================
+  dartz: ^0.10.1
+  equatable: ^2.0.5
+
+
+
+  # ===========================
+  # Utilities
+  # ===========================
+  uuid: ^4.4.0
+  connectivity_plus: ^6.0.5
+
+
+  # ===========================
+  # Auth UX Additions (Phase 1)
+  # Remember Me / Quick PIN persistence
+  # Username+PIN hashing
+  # Social Login (Google / Apple)
+  # Email verification code (Cloud Functions callable)
+  # ===========================
+  shared_preferences: ^2.3.2
+  flutter_secure_storage: ^9.2.2
+  crypto: ^3.0.5
+  google_sign_in: ^6.2.1
+  sign_in_with_apple: ^6.1.3
+  webview_flutter: ^4.14.1
+
+  permission_handler: ^12.0.3
+  url_launcher: ^6.3.1
+  record: ^5.1.2
+  path_provider: ^2.1.4
+  geolocator: ^13.0.1
+  supabase_flutter: ^2.17.1
+  http: ^1.5.0
+  video_player: ^2.9.2
+  cached_network_image: ^3.4.1
+  shimmer: ^3.0.0
+  share_plus: ^10.1.4
+  # Pure-Dart Supabase client used only by the local E2E runner.
+  supabase: ^2.16.1
+  model_viewer_plus: ^1.9.3
+  web: ^1.1.1
+  webview_flutter_web: ^0.2.3+4
+  youtube_player_iframe: ^5.2.2
+  lottie: ^3.3.1
+
+
+
+
+dev_dependencies:
+
+
+  flutter_test:
+    sdk: flutter
+  test: ^1.26.3
+  integration_test:
+    sdk: flutter
+
+
+  flutter_lints: ^4.0.0
+
+
+
+
+flutter:
+
+
+  uses-material-design: true
+  # Decorative Arabic fonts — used only for username/status/message content.
+  fonts:
+    - family: MashareenaAmiri
+      fonts:
+        - asset: assets/fonts/decorative/MashareenaAmiri-Regular.ttf
+    - family: MashareenaNaskh
+      fonts:
+        - asset: assets/fonts/decorative/MashareenaNaskh-Regular.ttf
+    - family: MashareenaKufi
+      fonts:
+        - asset: assets/fonts/decorative/MashareenaKufi-Regular.ttf
+
+  assets:
+    - images/frame_preview_placeholder.png
+    - assets/chat/3d/reply_anchor.glb
+    - assets/chat/kolobok/
+    - assets/chat/kolobok/stickers/
+    - assets/chat/welcome/
+    - assets/audio/royal/
+    - assets/fonts/decorative/
+    - assets/brand/
+    - assets/login_variants/
+    - assets/store_gifs/currency/
+    - assets/store_gifs/glow/
+    - assets/store_gifs/background/
+    - assets/store_gifs/membership/
+    - assets/garment_studio/
+    - assets/name_templates/
+    - assets/name_animations/
+    - assets/name_animations/animals/
+    - assets/brand/
+    - assets/garment_categories/
+    - assets/garment_categories/icons/

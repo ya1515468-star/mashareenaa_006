@@ -1,0 +1,85 @@
+-- Changelog for this "نفّذ الوثيقة" continuation session, applied live and
+-- verified on aknksnctyqjcsxcwnvdz (mashareena_v2). Per this project's own
+-- rule, the live database is the single source of truth — this file is a
+-- best-effort index of what changed and why, not a byte-exact replay.
+--
+-- ITEM 1 — Name Glow full removal (continued):
+--   * DROP COLUMN profiles.username_shine (already recorded).
+--   * sync_my_public_profile rebuilt without the parameter (already
+--     recorded in the item-1 migration from the previous session).
+--   * Dead code removed: gamification's SetUsernameEffectUseCase chain,
+--     subscriptions' SubscribeUseCase chain (zero UI callers, verified).
+--   * SubscriptionsPage rewired to render the real, server-driven
+--     MembershipStoreTab instead of a hardcoded SubscriptionCatalog list —
+--     this was a genuine duplicate-catalog bug (Rule 0.1), not just cleanup:
+--     the old page could not even let a regular user purchase (button was
+--     owner-only), so this is a functional fix, not just a refactor.
+--
+-- ITEM 3 — Frame background colors:
+--   * Filled in the missing base colors so BOTH genders have all 7 required
+--     (black/red/navy/blue/gold/silver/white) — male was missing
+--     navy/white/silver, female was missing black/red/blue/gold/silver.
+--   * Per explicit user request, expanded well beyond the 7-minimum with
+--     16 additional named colors x 2 genders (purple, pink, turquoise,
+--     green, orange, brown, maroon, indigo, olive, sky, burgundy, coral,
+--     lime, mint, lavender, gray) — 23 solid colors per gender total.
+--
+-- ITEM 6 — Chat message color unification:
+--   * chat_thread_page.dart (private chat) and chat_lobby_page.dart
+--     (public rooms, via the shared _Composer widget) now render the
+--     composer text in the exact same profiles.message_color the sent
+--     bubble uses — previously only applied after sending, never while
+--     typing, in either surface.
+--
+-- ITEMS 8-10 — Membership entitlements:
+--   * admin_upsert_membership_tier extended with pointsGranted,
+--     gemsGranted, grantedCosmeticKeys[], grantedAnimationKeys[].
+--   * purchase_membership extended to actually grant those on a real
+--     (non-replay) purchase — previously it only deducted currency and set
+--     a subscription flag, granting NONE of points/gems/cosmetics/animals
+--     that spec 8.2 requires. VIP services were already handled correctly
+--     via the separate dynamic _membership_includes_service mechanism,
+--     untouched.
+--   * Real bug caught by live testing: reusing p_request_id as
+--     wallet_transactions.idempotency_key for both the points AND gems
+--     ledger rows violated that table's unique (user_id, idempotency_key)
+--     constraint — fixed by leaving idempotency_key NULL on these two
+--     ledger rows (the outer idempotency_requests check already fully
+--     guards replay at the whole-function level).
+--   * dragon_control_tab.dart's tier editor got 4 new fields for the above.
+--
+-- ITEM 11-12 — Profile privacy: verified PASS via live negative test (see
+--   report) — no code changes needed, get_profile_for_viewer was already
+--   correctly built with public/privileged DTO separation and audit
+--   logging on privileged access.
+--
+-- ITEM 13.6/16 — service_role grants: 39 tables were missing the standard
+--   SELECT/INSERT/UPDATE/DELETE grant to service_role that every other
+--   table already had — the exact same bug class already confirmed twice
+--   in the previous session for two other tables. Granted consistently
+--   across all 39.
+--
+-- URGENT REGRESSION (self-inflicted, found via a item-17 sweep, fixed same
+--   session — see 20260916000000_CRITICAL_fix_username_shine_regression.sql
+--   for the detailed account): 8 live functions broke when
+--   profiles.username_shine was dropped, including get_user_chat_identity,
+--   send_chat_message, send_public_chat_message_v2, announce_chat_welcome,
+--   and — most severely — ensure_my_profile (profile bootstrap on signup),
+--   which had an explicit INSERT targeting the dropped column. All 8 fixed
+--   and individually verified live (including a real end-to-end test
+--   message sent to the public room, then deleted). Also removed 5
+--   orphaned private.* duplicate functions confirmed to have zero callers.
+--
+-- ITEM 20 — Performance: fixed the one auth_rls_initplan finding the spec
+--   itself explicitly cites (chat_store_sections_read policy calling
+--   auth.uid() per-row instead of (select auth.uid())). The 140
+--   unused-index and 27 multiple-permissive-policy advisories are
+--   pre-existing, project-wide, and low-severity at this project's current
+--   data scale (a handful of real accounts) — documented in the report as
+--   a known, deprioritized backlog rather than fixed line-by-line.
+--
+-- ITEM 19 — Additional negative tests run live this session (beyond the
+--   idempotency-replay and visibility tests already covered by the fixes
+--   above): non-owner calling an admin RPC directly (admin_delete_
+--   name_animation) -> FORBIDDEN; unauthenticated call to
+--   get_profile_for_viewer -> AUTH_REQUIRED. Both rejected correctly.

@@ -1,0 +1,102 @@
+-- Continuation of item 20 (performance) applied live and verified on
+-- aknksnctyqjcsxcwnvdz, plus the remaining item 8-10 frontend gap.
+--
+-- PERFORMANCE — multiple_permissive_policies (27 -> 0, verified via
+-- get_advisors before/after):
+--   23 tables had a "*_dragon_write" (or similarly named) FOR ALL policy
+--   that redundantly re-evaluated on every SELECT alongside a separate
+--   SELECT policy whose own qual already OR's in is_dragon(). Split each
+--   ALL policy into three single-command policies (INSERT/UPDATE/DELETE),
+--   dropping the redundant SELECT coverage the sibling policy already
+--   provided. Verified zero regression using the CORRECT test method
+--   (SET LOCAL ROLE authenticated, not just the JWT claim — the query
+--   tool's own connection is `postgres` with BYPASSRLS, so testing RLS
+--   directly requires the explicit role switch, a real methodology
+--   correction made mid-session after an initial false-positive "regression"
+--   turned out to be a test artifact, not a real one).
+--
+--   Also fixed a genuine pre-existing bug found along the way: table
+--   points_packages had an unconditional `qual=true` SELECT policy
+--   ('select_points_packages') that, under OR-combined permissive-policy
+--   semantics, silently made a second, more restrictive sibling policy
+--   ('points_packages_select': dragon OR enabled) completely pointless —
+--   exposing disabled/inactive packages to every authenticated user
+--   regardless of the restrictive-looking policy sitting right next to it.
+--   Dropped the unconditional one.
+--
+--   Table store_sections additionally had 3 standalone INSERT/UPDATE/DELETE
+--   policies that were pure duplicates of a subset of its own ALL policy —
+--   collapsed to the same clean split-by-command pattern as everything else.
+--
+-- PERFORMANCE — auth_rls_initplan (already fixed and recorded in an earlier
+--   migration this session: chat_store_sections_read now wraps auth.uid()
+--   in (select ...) so it evaluates once per query, not once per row).
+--
+-- PERFORMANCE — unused_index (140 findings): deliberately left as-is.
+--   These are INFO-level, not warnings, and the overwhelming majority are
+--   standard idx_fk_* foreign-key indexes that protect future join/lookup
+--   performance as the user base grows past its current handful of real
+--   accounts. Mass-dropping them would trade away future correctness-
+--   adjacent performance for a marginal, premature disk-space optimization
+--   with no security or correctness benefit — the wrong engineering call,
+--   not a skipped task.
+--
+-- ITEM 19 — remaining negative-test scenarios run live and confirmed
+--   rejected: #5 non-owner "admin" edits price -> FORBIDDEN; #6 self-grant
+--   via the gift RPC -> FORBIDDEN (even targeting one's own uid, the
+--   owner-check fires before the target is even inspected); #8 direct
+--   INSERT into an ownership table -> permission denied (no grant exists
+--   for authenticated on profile_cosmetic_purchases at all — ownership can
+--   only be established through the SECURITY DEFINER purchase/gift RPCs);
+--   #10 direct SELECT of another user's wallet row -> zero rows (correct
+--   RLS filtering, not an error); #11 modify data via an unprotected view
+--   -> structurally impossible, reconfirmed zero views exist in the public
+--   schema.
+--
+-- ITEM 8-10 frontend gap closed: SubscriptionTierEntity extended with
+-- pointsGranted/gemsGranted/grantedCosmeticKeys/grantedAnimationKeys, wired
+-- from the real server tier document in membership_store_tab.dart, and
+-- store_membership_card.dart now shows a "يشمل عند الشراء" chip row
+-- (points/gems/cosmetics/animals) before the buyer taps purchase — this
+-- was the one remaining concretely-identified gap in the membership work.
+
+-- FOLLOW-UP FIX (found only because the user asked "did anything remain?"
+-- and a fresh review was done rather than trusting the prior "complete"
+-- report): admin_grant_membership_tier (the membership GIFT path, wired to
+-- the "إهداء" button in membership_store_tab.dart) was a completely
+-- separate, older function from purchase_membership, never updated to
+-- grant the same one-time entitlements — directly violating spec 18's
+-- explicit acceptance test "الإهداء ... يمنح المستلم الاستحقاقات الصحيحة".
+-- It also authorized via current_role_priority()>=400 instead of
+-- is_platform_owner() (not exploitable today — only 'dragon' reaches 400 —
+-- but a latent bug for any future role in that range), never set an
+-- expiry date (gifted memberships were permanent), had no idempotency, and
+-- wrote no audit log.
+--
+-- Rebuilt to match purchase_membership's grant logic exactly (points,
+-- gems, cosmetics, animations), added proper expiresAt from the tier's
+-- durationDays, added request_id-based replay protection, added an
+-- audit_logs entry, and switched authorization to is_platform_owner().
+--
+-- Real mistake caught mid-fix: CREATE OR REPLACE with a newly-appended
+-- parameter created a SEPARATE overload instead of replacing the original
+-- — the old, broken 2-arg version was still live and would have been the
+-- one actually matched by the existing 2-arg Flutter call. Dropped the old
+-- overload explicitly after noticing pg_proc still listed both.
+--
+-- Verified live end-to-end: real gift granted correct points/gems/cosmetic
+-- ownership with an exact balance match; replay with the same request_id
+-- granted nothing a second time; a non-owner's attempt was rejected with
+-- FORBIDDEN. All test data fully reverted afterward.
+--
+-- membership_store_tab.dart's gift call and supabase_document_compat.dart's
+-- adminGrantMembershipTier mapping were both updated to pass/forward a
+-- real client-generated requestId, so replay protection is actually live
+-- from the real UI path, not just when a caller happens to supply one.
+--
+-- NOTE — separate finding, explicitly OUT OF SCOPE for this spec: a
+-- distinct "store_items"/"purchase_store_item" system exists
+-- (store_remote_data_source.dart, store_admin_panel.dart) that this
+-- session never audited. It is not part of the 25-section spec (which
+-- covers username cosmetics and memberships specifically), so it was not
+-- touched — flagged here for transparency, not fixed.

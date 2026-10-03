@@ -1,0 +1,12 @@
+{
+  "name": "Kolobok",
+  "type": "chat_stickers",
+  "count": 500,
+  "format": [
+    "gif",
+    "png",
+    "webp"
+  ],
+  "location": "assets/chat/kolobok/stickers",
+  "expandable": true
+}

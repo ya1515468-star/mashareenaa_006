@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="مشاريعنا | Mashareena — منصة متكاملة (Auth + RBAC + Profile foundation)">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Mashareena">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Mashareena | مشاريعنا</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    html, body {
+      height: 100%;
+      background-color: #0A0A0C;
+    }
+  </style>
+</head>
+<body>
+    <!-- Agora Web SDK — required for voice/video calls on Flutter Web.
+       agora_rtc_engine does not bundle its web engine; without this script the
+       plugin fails with:
+         TypeError: Cannot read properties of undefined (reading 'createIrisApiEngine')
+
+       This exact version was taken from the installed plugin's own example
+       (agora_rtc_engine 6.5.4 -> example/web/index.html), so it is guaranteed
+       to match. If the plugin is ever upgraded, re-read that file and update
+       this line to the version it ships. -->
+  <script src="https://download.agora.io/sdk/release/iris-web-rtc_n450_w4220_0.8.6.js"></script>
+
+  <script>
+    // Surfaces a missing/blocked SDK clearly instead of letting the plugin
+    // throw a cryptic error from deep inside its own code.
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        if (typeof window.createIrisApiEngine === 'undefined' &&
+            typeof window.IrisApiEngine === 'undefined') {
+          console.warn(
+            '[MASHAREENA] Agora Web SDK did not load (blocked or offline). ' +
+            'Voice/video calls will not work in this browser session.'
+          );
+          window.__mashareenaAgoraWebMissing = true;
+        }
+      }, 1500);
+    });
+  </script>
+
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+-- URGENT REGRESSION FIX, applied live and verified on aknksnctyqjcsxcwnvdz.
+--
+-- Context: dropping profiles.username_shine (item 1, "Name Glow" removal)
+-- broke 8 live functions that still referenced it directly, including
+-- get_user_chat_identity, send_chat_message, send_public_chat_message_v2,
+-- announce_chat_welcome — meaning chat messaging (public rooms AND private)
+-- and the welcome-bot message were failing with
+-- "column p.username_shine does not exist" until this fix.
+-- Most severe: ensure_my_profile (profile bootstrap on signup) had an
+-- explicit INSERT targeting the dropped column, which would hard-fail.
+--
+-- Each fix below either removes the broken column reference (keeping the
+-- 'username_shine' JSON *key* hardcoded to false where it was part of an
+-- established output shape, for backward compatibility) or, for
+-- ensure_my_profile, simply drops the column from the INSERT column list.
+--
+-- Also fixed in the same pass: admin_get_user_details had a *separate,
+-- pre-existing* bug (unrelated to this session) reading username_effect
+-- from profiles directly, when that column actually lives on
+-- gamification_stats — not used by any Flutter screen currently, fixed for
+-- correctness regardless.
+--
+-- Also removed: 4 orphaned private.* duplicate functions (send_chat_message,
+-- send_public_chat_message_v2, sync_my_public_profile, get_public_profile)
+-- confirmed to have zero callers from any public function — dead code left
+-- over from an earlier refactor, cleaned up per spec section 16.
+--
+-- See the corresponding CREATE OR REPLACE statements applied live via
+-- Supabase MCP for the exact fixed bodies (each verified with a live call
+-- immediately after fixing, including a real end-to-end test message sent
+-- and then deleted). This file exists so the local migration history
+-- matches production reality, per this project's own established rule.
