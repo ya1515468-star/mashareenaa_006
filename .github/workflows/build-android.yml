@@ -33,9 +33,8 @@ jobs:
           test -f "lib/features/chat/data/services/voice_upload_helper.dart"
           test -f "lib/features/chat/presentation/widgets/animated_dice_roller.dart"
           git diff --check
-          cp ".github/workflows/build-android.yml.final40" ".github/workflows/build-android.yml"
           rm -f "FINAL43_LIB_FULL_REPLACEMENT.patch.gz.b64" ".github/workflows/build-android.yml.final40"
-          git add -A -- lib .github/workflows/build-android.yml FINAL43_LIB_FULL_REPLACEMENT.patch.gz.b64 .github/workflows/build-android.yml.final40
+          git add -A -- lib FINAL43_LIB_FULL_REPLACEMENT.patch.gz.b64 .github/workflows/build-android.yml.final40
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Replace lib with FINAL43 source [skip ci]'
           git push
 
