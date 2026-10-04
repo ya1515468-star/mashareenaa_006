@@ -1,0 +1,127 @@
+name: FINAL45 Full Sync and ARM64 Production Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply FINAL45 full source replacement
+        shell: bash
+        run: |
+          set -e
+          test -f ".final45-parts/part-001.patch"
+          for f in .final45-parts/part-*.patch; do
+            cat "$f"
+            printf '\n'
+          done > /tmp/final45.patch
+          git apply --whitespace=nowarn /tmp/final45.patch
+
+          test ! -f "lib/features/chat/presentation/widgets/voice_recorder_sheet.dart"
+          test -f "lib/features/chat/presentation/providers/unread_dm_provider.dart"
+
+          echo "FINAL45 source replacement applied."
+          git diff --check
+
+      - name: Commit FINAL45 source only
+        shell: bash
+        run: |
+          set -e
+          git add -A -- lib android assets supabase
+          rm -rf .final45-parts
+          git add -A -- .final45-parts
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m 'Upload FINAL45 full source [skip ci]'
+          git push
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+
+      - name: Align CI-only dependency compatibility
+        run: |
+          sed -i -E 's/record:[[:space:]]+\^?5\.1\.2/record: 6.2.1/' pubspec.yaml
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Flutter analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Flutter tests
+        run: flutter test
+
+      - name: Verify release signing secrets
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_B64" || (echo "ANDROID_KEYSTORE_BASE64 is missing" && exit 1)
+          test -n "$KEYSTORE_PASSWORD" || (echo "ANDROID_KEYSTORE_PASSWORD is missing" && exit 1)
+          test -n "$KEY_ALIAS" || (echo "ANDROID_KEY_ALIAS is missing" && exit 1)
+          test -n "$KEY_PASSWORD" || (echo "ANDROID_KEY_PASSWORD is missing" && exit 1)
+
+      - name: Configure release keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > android/app/mashareena-upload.jks
+          cat > android/key.properties <<EOF2
+          storeFile=mashareena-upload.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF2
+          chmod 600 android/app/mashareena-upload.jks android/key.properties
+
+      - name: Build signed ARM64
+        run: |
+          flutter build apk --release \
+            --target-platform android-arm64 \
+            --split-per-abi
+
+      - name: Verify APK architecture and signature
+        shell: bash
+        run: |
+          set -e
+          APK=build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          test -f "$APK"
+          unzip -l "$APK" | grep -q 'lib/arm64-v8a/'
+          ! unzip -l "$APK" | grep -qE 'lib/(armeabi-v7a|x86|x86_64)/'
+          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner" verify --verbose "$APK"
+          mkdir -p out
+          cp "$APK" "out/MASHAREENA-final45-arm64-${GITHUB_SHA::7}.apk"
+          ls -lh out/
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MASHAREENA-final45-arm64-release
+          path: out/*.apk
+          retention-days: 30
