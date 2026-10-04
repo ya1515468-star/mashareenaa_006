@@ -33,10 +33,12 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
       if (mounted) setState(() => _duration = d);
     });
     _player.onPlayerComplete.listen((_) {
-      if (mounted) setState(() {
-        _playing = false;
-        _position = Duration.zero;
-      });
+      if (mounted) {
+        setState(() {
+          _playing = false;
+          _position = Duration.zero;
+        });
+      }
     });
   }
 

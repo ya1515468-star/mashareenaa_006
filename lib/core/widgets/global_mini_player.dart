@@ -178,7 +178,7 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
               color: const Color(0xFF67E8F9),
               size: 31,
             ),
-            onPressed: !value.isReady
+            onPressed: _blocked
                 ? null
                 : () => playing ? controller.pauseVideo() : controller.playVideo(),
           );

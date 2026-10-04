@@ -373,6 +373,7 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
   }
 
   Widget _seat(Map<String, dynamic> s, Set<int> speaking) {
+    final control = _state?['can_control'] == true;
     final occupant = s['user_id']?.toString();
     final locked = s['locked'] == true;
     final muted = s['muted'] == true || s['self_muted'] == true;

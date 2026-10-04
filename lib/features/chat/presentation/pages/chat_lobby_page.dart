@@ -4420,7 +4420,7 @@ class _Composer extends StatelessWidget {
     Widget actionButton({
       required IconData icon,
       required VoidCallback onPressed,
-      Color color,
+      required Color color,
       String? tooltip,
     }) {
       return IconButton(
