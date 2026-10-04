@@ -7,7 +7,6 @@ import '../../../../core/services/media_upload_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/chat_message_entity.dart';
 import '../../data/gif_catalog.dart';
-import 'voice_recorder_sheet.dart';
 
 class ReplyPreviewBar extends StatelessWidget {
   final ChatMessageEntity replyingTo;
@@ -213,16 +212,6 @@ class AttachmentMenu extends StatelessWidget {
             label: 'كاميرا',
             color: Colors.blueAccent,
             onTap: () => _pickImage(context, ImageSource.camera)),
-        _AttachmentAction(
-            icon: Icons.mic_none_outlined,
-            label: 'رسالة صوتية',
-            color: Colors.orangeAccent,
-            onTap: () {
-              Navigator.pop(context);
-              VoiceRecorderSheet.show(context,
-                  onUploaded: (url) =>
-                      onPicked(MessageType.audio, url, 'voice.m4a'));
-            }),
         _AttachmentAction(
             icon: Icons.gif_box_outlined,
             label: 'GIF',

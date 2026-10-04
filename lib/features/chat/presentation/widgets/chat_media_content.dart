@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../domain/entities/chat_message_entity.dart';
+import 'voice_message_player.dart';
 
 class ChatMediaContent extends StatelessWidget {
   final ChatMessageEntity message;
@@ -73,10 +74,11 @@ class ChatMediaContent extends StatelessWidget {
       case MessageType.video:
         return _VideoPreview(url: url, width: maxWidth);
       case MessageType.audio:
-        return _OpenCard(
-            icon: Icons.graphic_eq,
-            label: message.text.isEmpty ? 'رسالة صوتية' : message.text,
-            url: url);
+        // كانت تُفتح خارج التطبيق عبر launchUrl — لا مشغّل داخلي إطلاقًا.
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: VoiceMessagePlayer(url: url),
+        );
       case MessageType.file:
         return _OpenCard(
             icon: Icons.insert_drive_file,

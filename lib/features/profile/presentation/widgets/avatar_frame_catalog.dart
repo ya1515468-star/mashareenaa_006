@@ -18,6 +18,14 @@ class AvatarFrameDefinition {
   final int? maxRankLevel;
   final String frameEffect;
   final AvatarFrameMetrics metrics;
+  // كان العميل يحسب "مقفل" من الملكية فقط (شراء)، متجاهلًا ١٠٠ إطار من
+  // أصل ٢٠٢ مجانية فعليًا حسب منطق الخادم (بلا سعر ولا قيد رتبة) — فتظهر
+  // مقفلة أبديًا. الخادم الآن يحسب الإتاحة الحقيقية بنفسه ويرسلها هنا
+  // مباشرة، فلا حساب منفصل ناقص في التطبيق.
+  final bool canActivate;
+  final bool isOwned;
+  final int pricePoints;
+  final int priceGems;
 
   const AvatarFrameDefinition({
     required this.key,
@@ -29,6 +37,10 @@ class AvatarFrameDefinition {
     required this.allowedRoleCodes,
     required this.minRankLevel,
     required this.maxRankLevel,
+    this.canActivate = false,
+    this.isOwned = false,
+    this.pricePoints = 0,
+    this.priceGems = 0,
     this.frameEffect = 'pulse_glow',
     this.metrics = const AvatarFrameMetrics(
       innerOpeningRatio: 0.74,
@@ -54,6 +66,10 @@ class AvatarFrameDefinition {
           : const <String>[],
       minRankLevel: (map['min_rank_level'] as num?)?.toInt() ?? 0,
       maxRankLevel: (map['max_rank_level'] as num?)?.toInt(),
+      canActivate: map['can_activate'] == true,
+      isOwned: map['is_owned'] == true,
+      pricePoints: (map['price_points'] as num?)?.toInt() ?? 0,
+      priceGems: (map['price_gems'] as num?)?.toInt() ?? 0,
       frameEffect: _normalizeEffect(map['frame_effect'] ?? map['palette_key']),
       metrics: AvatarFrameMetrics.fromMap(
         map['frame_metrics'] is Map

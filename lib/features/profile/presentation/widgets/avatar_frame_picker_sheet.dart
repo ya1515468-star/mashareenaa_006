@@ -29,7 +29,6 @@ class AvatarFramePickerSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final current = ref.watch(currentProfileProvider).valueOrNull?.avatarFrameKey;
-    final owned = ref.watch(myProfileCosmeticOwnershipProvider).valueOrNull ?? const <String>{};
     return SafeArea(
       child: Container(
         constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .88),
@@ -57,7 +56,7 @@ class AvatarFramePickerSheet extends ConsumerWidget {
                   itemBuilder: (_,i){
                     final f=frames[i];
                     final selected=f.key==current;
-                    final unlocked=owned.contains(f.key);
+                    final unlocked=f.canActivate;
                     return Card(child:Padding(padding:const EdgeInsets.all(10),child:Column(children:[
                       Expanded(child:DynamicAvatarFrame(frameKey:f.key,radius:30,child:const CircleAvatar(radius:30,backgroundColor:Color(0xFF2A2535),child:Icon(Icons.person,color:Colors.white54)))),
                       Text(f.nameAr,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontWeight:FontWeight.w800)),

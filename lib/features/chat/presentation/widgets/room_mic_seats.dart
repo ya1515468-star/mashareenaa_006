@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/dynamic_avatar_frame.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -26,6 +27,7 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
   RealtimeChannel? _channel;
   final _voice = _RoomVoice();
   bool _busy = false;
+  bool _isOwner = false;
 
   String? get _me => _db.auth.currentUser?.id;
 
@@ -41,6 +43,9 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
   @override
   void initState() {
     super.initState();
+    _db.rpc('is_my_platform_owner').then((v) {
+      if (mounted) setState(() => _isOwner = v == true);
+    }).catchError((_) {});
     _load();
     _channel = _db.channel('room_mic:${widget.roomId}')
       ..onPostgresChanges(
@@ -119,6 +124,8 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
     if (t.contains('SEAT_UNAVAILABLE')) return 'هذا الكرسي غير متاح.';
     if (t.contains('NO_FREE_SEAT')) return 'لا يوجد كرسي فارغ.';
     if (t.contains('MIC_DISABLED')) return 'المايك متوقف في هذه الغرفة.';
+    if (t.contains('INSUFFICIENT_GEMS')) return 'رصيدك من الجواهر لا يكفي للصعود.';
+    if (t.contains('INSUFFICIENT_POINTS')) return 'رصيدك من النقاط لا يكفي للصعود.';
     if (t.contains('TARGET_ROLE_TOO_HIGH') || t.contains('FORBIDDEN')) return 'لا تملك صلاحية هذا الإجراء.';
     return 'تعذّر التنفيذ: $t';
   }
@@ -147,6 +154,32 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
     if (!mic.isGranted) {
       _toast('اسمح بالوصول إلى الميكروفون للصعود للمايك.');
       return;
+    }
+    // السعر يُفرض ويُحصَّل خادميًا في take_mic_seat؛ هذا عرض واضح قبل الضغط
+    // فقط. لا يُسأل من كان جالسًا أصلًا (النقل مجاني) ولا المالك.
+    if (_mySeat == null && !_isOwner) {
+      try {
+        final price = await _db.from('mic_seat_pricing').select().maybeSingle();
+        if (price != null && price['is_enabled'] == true) {
+          final gems = (price['gems_cost'] as num?)?.toInt() ?? 0;
+          final points = (price['points_cost'] as num?)?.toInt() ?? 0;
+          if (!mounted) return;
+          final ok = await showDialog<bool>(
+            context: context,
+            builder: (d) => AlertDialog(
+              title: const Text('الصعود إلى المايك'),
+              content: Text(gems > 0
+                  ? 'سيُخصم $gems جوهرة من رصيدك عند كل صعود.'
+                  : 'سيُخصم $points نقطة من رصيدك عند كل صعود.'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('إلغاء')),
+                FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('ادفع واصعد')),
+              ],
+            ),
+          );
+          if (ok != true) return;
+        }
+      } catch (_) {}
     }
     await _rpc('take_mic_seat', {'p_room': widget.roomId, 'p_seat': seat});
   }
@@ -206,6 +239,52 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
     if (chosen != null) await actions[chosen].$3();
   }
 
+  /// سعر الصعود للمايك (المالك فقط): بالجواهر أو النقاط، بلا مدة زمنية،
+  /// ودائم حتى يغيّره المالك. يُحصَّل خادميًا داخل take_mic_seat.
+  Future<void> _editPrice() async {
+    Map<String, dynamic>? cur;
+    try {
+      cur = await _db.from('mic_seat_pricing').select().maybeSingle();
+    } catch (_) {}
+    final gems = TextEditingController(text: '${cur?['gems_cost'] ?? 0}');
+    final points = TextEditingController(text: '${cur?['points_cost'] ?? 0}');
+    var enabled = cur?['is_enabled'] == true;
+    if (!mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => StatefulBuilder(
+        builder: (d, setLocal) => AlertDialog(
+          title: const Text('سعر الصعود إلى المايك'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('تفعيل الدفع عند كل صعود'),
+              value: enabled,
+              onChanged: (v) => setLocal(() => enabled = v),
+            ),
+            TextField(controller: gems, keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'جواهر 💎')),
+            TextField(controller: points, keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'نقاط ⭐ (تُستعمل إن كانت الجواهر 0)')),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('حفظ')),
+          ],
+        ),
+      ),
+    );
+    if (ok == true) {
+      await _rpc('owner_set_mic_seat_pricing', {
+        'p_enabled': enabled,
+        'p_points_cost': int.tryParse(points.text.trim()) ?? 0,
+        'p_gems_cost': int.tryParse(gems.text.trim()) ?? 0,
+      });
+    }
+    gems.dispose();
+    points.dispose();
+  }
+
   Future<void> _settings() async {
     final count = (_state?['seat_count'] as num?)?.toInt() ?? 8;
     final enabled = _state?['enabled'] == true;
@@ -228,6 +307,11 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
             ]),
           ]),
           actions: [
+            if (_isOwner)
+              TextButton(
+                onPressed: () => Navigator.pop(c, 'price'),
+                child: const Text('سعر الصعود'),
+              ),
             TextButton(
               onPressed: () => Navigator.pop(c, enabled ? 'disable' : 'enable'),
               child: Text(enabled ? 'إيقاف المايك' : 'تشغيل المايك',
@@ -238,6 +322,10 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
         ),
       ),
     );
+    if (r == 'price') {
+      await _editPrice();
+      return;
+    }
     if (r == 'save' && newCount != count) await _admin('set_count', value: newCount);
     if (r == 'enable' || r == 'disable') await _admin(r!);
   }
@@ -297,29 +385,42 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
         width: 58,
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Stack(clipBehavior: Clip.none, children: [
+            // البند ٦: كانت الصورة هنا دائرة عادية بلا أي إطار ملوّن، رغم
+            // أن نفس العضو يظهر بإطاره في كل مكان آخر بالغرفة. مؤشر
+            // "يتحدث الآن" الأخضر يبقى طبقة خارجية مستقلة حول الإطار.
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: 48,
-              height: 48,
+              padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: .10),
                 border: Border.all(
-                    color: talking ? const Color(0xFF22C55E) : Colors.white24,
-                    width: talking ? 3 : 1.2),
+                    color: talking ? const Color(0xFF22C55E) : Colors.transparent,
+                    width: talking ? 3 : 0),
                 boxShadow: talking
                     ? const [BoxShadow(color: Color(0x8822C55E), blurRadius: 12, spreadRadius: 2)]
                     : null,
-                image: occupant != null && avatar.isNotEmpty
-                    ? DecorationImage(image: NetworkImage(avatar), fit: BoxFit.cover)
-                    : null,
               ),
-              child: occupant != null && avatar.isNotEmpty
-                  ? null
-                  : Icon(
-                      locked ? Icons.lock_rounded : (occupant == null ? Icons.add_rounded : Icons.person),
-                      color: Colors.white60,
-                      size: 22),
+              child: occupant != null
+                  ? DynamicAvatarFrame(
+                      frameKey: s['avatar_frame_key']?.toString(),
+                      userId: occupant,
+                      radius: 24,
+                      child: avatar.isNotEmpty
+                          ? CircleAvatar(radius: 24, backgroundImage: NetworkImage(avatar))
+                          : const CircleAvatar(radius: 24, child: Icon(Icons.person, color: Colors.white60)),
+                    )
+                  : Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: .10),
+                      ),
+                      child: Icon(
+                          locked ? Icons.lock_rounded : Icons.add_rounded,
+                          color: Colors.white60,
+                          size: 22),
+                    ),
             ),
             if (occupant != null && muted)
               const Positioned(

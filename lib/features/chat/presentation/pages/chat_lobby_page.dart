@@ -1,4 +1,7 @@
 import '../widgets/room_mic_seats.dart';
+import '../widgets/animated_dice_roller.dart';
+import '../widgets/forward_message_sheet.dart';
+import '../widgets/voice_message_player.dart';
 import '../../../../core/widgets/song_search_sheet.dart';
 import '../../../../core/providers/mini_player_provider.dart';
 import '../widgets/voice_hold_button.dart';
@@ -214,6 +217,10 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       ..subscribe();
     unawaited(_loadRoomControls());
     unawaited(_loadVisualSizeAccess());
+    // لم تكن هناك أي ذاكرة لآخر غرفة دخلها المستخدم (البند ٨)؛ كل دخول
+    // فعلي لغرفة يُسجَّل خادميًا فيعود إليها العضو تلقائيًا في زيارته
+    // التالية (get_entry_room في home_shell.dart تقرأ هذا الحقل).
+    unawaited(_db.rpc('set_my_last_room', params: {'p_room_id': _roomId}).catchError((_) {}));
     // Register presence FIRST, then load the header — _markRoomPresence
     // refreshes the header itself once the write lands, so the count is
     // computed after this account is actually recorded as present in the room.
@@ -537,7 +544,12 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
           kind: 'text',
           replyToId: reply?['id']?.toString(),
           replyToSenderUid: reply?['user_id']?.toString(),
-          replyToPreview: (reply?['body'] ?? reply?['message'])?.toString(),
+          // كانت تحفظ نص الرسالة الأصلية وحده بلا اسم مرسِلها؛ بطاقة
+          // الاقتباس تحتاج الاثنين معًا (المرسل + المحتوى) لا المحتوى فقط.
+          // شكل مُشفَّر بفاصل: اسم المرسل|نص المعاينة|رابط مصغّرة (قد يكون
+          // فارغاً). البطاقة تعرض الصورة الفعلية حين يتوفر الرابط، لا
+          // النص الوصفي وحده.
+          replyToPreview: reply == null ? null : '${reply['display_name']?.toString().trim().isNotEmpty == true ? reply!['display_name'] : 'عضو'}|${_replySourcePreviewText(reply)}|${_replySourceThumbnail(reply)}',
           replyMode: reply == null ? 'none' : _replyMode,
         );
       }
@@ -709,13 +721,53 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     );
   }
 
+  /// القاعدة: اللعب حصرًا ضد الكمبيوتر أو ضد لاعب حقيقي. كانت اللعبة
+  /// السابقة لا هذا ولا ذاك فعليًا — تبادل لمس على نفس الجهاز بلا ذكاء
+  /// اصطناعي وبلا أي اتصال بالخادم. صار يُختار الوضع صراحة أولًا.
   Future<void> _openXoPanel() async {
-    await showModalBottomSheet<void>(
+    final mode = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: const Color(0xFF171126),
       showDragHandle: true,
-      builder: (_) => const _XoPanel(),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('XO', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 14),
+            ListTile(
+              leading: const Icon(Icons.smart_toy_outlined, color: Color(0xFFDFA8FF)),
+              title: const Text('ضد الكمبيوتر', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('ذكاء اصطناعي محلي، بلا رهان', style: TextStyle(color: Colors.white54, fontSize: 12)),
+              onTap: () => Navigator.pop(sheetContext, 'computer'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.people_alt_outlined, color: Color(0xFFDFA8FF)),
+              title: const Text('لاعب حقيقي', style: TextStyle(color: Colors.white)),
+              subtitle: const Text('مزامنة فورية عبر الخادم، برهان نقاط اختياري', style: TextStyle(color: Colors.white54, fontSize: 12)),
+              onTap: () => Navigator.pop(sheetContext, 'real'),
+            ),
+          ]),
+        ),
+      ),
     );
+    if (mode == null || !mounted) return;
+    if (mode == 'computer') {
+      await showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: const Color(0xFF171126),
+        showDragHandle: true,
+        builder: (_) => const _XoPanel(),
+      );
+    } else {
+      await showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: const Color(0xFF171126),
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (_) => _XoMultiplayerPanel(roomId: _roomId),
+      );
+    }
   }
 
   /// نرد سريع محلي (1-6) يُنشر النتيجة كرسالة عادية في الشات — إن
@@ -724,7 +776,12 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   /// الزر هو "الرمية السريعة" الظاهرة داخل الشات نفسه.
   Future<void> _rollDiceInChat() async {
     if (_user == null || _sending) return;
-    final roll = 1 + (DateTime.now().microsecondsSinceEpoch % 6);
+    // النتيجة تُحدَّد هنا أولاً، ثم تُعرَض نفسها حرفياً في حوار النرد
+    // المتحرك؛ الحركة تنتهي على هذا الرقم بعينه فلا يحدث تضارب أبداً
+    // بين الوجه الذي يراه المستخدم والرقم الذي يُرسَل في الرسالة.
+    final roll = 1 + math.Random().nextInt(6);
+    await AnimatedDiceRoller.show(context, roll);
+    if (!mounted) return;
     const faces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
     try {
       await _insertPublicMessage(
@@ -921,6 +978,34 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
 
 
 
+  /// نص معاينة للرسالة المُقتبَسة: كان يتحقق من body قبل kind، وbody
+  /// لرسائل السمايل/الصورة/الصوت يحمل مسار المرفق نفسه (غير فارغ أبدًا)،
+  /// فكانت معاينة الرد على سمايل متحرك تعرض مسار الملف الخام بدل تسمية
+  /// مفهومة أو الصورة الفعلية — هذا سبب "يظهر gif بدل ظهوره". فحص النوع
+  /// أولاً لكل نوع له عرض خاص، والنص الخام فقط لرسائل نصية حقيقية.
+  String _replySourcePreviewText(Map<String, dynamic> row) {
+    switch (row['kind']?.toString()) {
+      case 'image': return '📷 صورة';
+      case 'video': return '🎬 فيديو';
+      case 'audio': return '🎙️ رسالة صوتية';
+      case 'gif': return '✨ سمايل متحرك';
+      case 'file': return '📎 ملف';
+      case 'gift': return '🎁 هدية';
+    }
+    final body = row['body']?.toString().trim() ?? '';
+    return body.isNotEmpty ? body : (row['message']?.toString() ?? '');
+  }
+
+  /// رابط الصورة/السمايل الأصلي (إن وُجد) ليُعرَض مصغّراً فعلياً داخل
+  /// بطاقة الاقتباس، لا نصاً وصفياً فقط.
+  String _replySourceThumbnail(Map<String, dynamic> row) {
+    final kind = row['kind']?.toString();
+    if (kind == 'gif' || kind == 'image') {
+      return row['attachment_url']?.toString() ?? row['body']?.toString() ?? '';
+    }
+    return '';
+  }
+
   void _setReplyTo(Map<String, dynamic> row, {String mode = 'reply'}) {
     setState(() {
       _replyingTo = row;
@@ -1066,6 +1151,17 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
               onTap: () {
                 Navigator.pop(sheetContext);
                 _setReplyTo(row, mode: 'quote');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.forward_rounded, color: Colors.white),
+              title: const Text('إعادة توجيه', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                ForwardMessageSheet.show(context,
+                    body: body,
+                    kind: row['kind']?.toString() ?? 'text',
+                    attachmentUrl: row['attachment_url']?.toString());
               },
             ),
             ListTile(
@@ -2934,6 +3030,72 @@ class _ChatMessageRow extends ConsumerWidget {
   /// العضو من المتجر ويحفظه الخادم في profiles.message_color — وهو سبب
   /// شكوى "ألوان كتابة الرسائل لم تظهر في الغرفة". صار يُمرَّر من
   /// build() بعد قراءته من هوية المُرسِل الخادمية.
+  /// بطاقة الرسالة الأصلية كاملة (المرسل + المحتوى)، والضغط عليها يقفز
+  /// لتلك الرسالة إن كانت محمَّلة ضمن الشاشة (نفس آلية _jumpToPublicMessage
+  /// وonJumpToMessage الموجودتين أصلًا). replyToPreview مخزَّنة بصيغة
+  /// "اسم المرسل|المحتوى" (انظر _sendMessage)؛ قيمة قديمة بلا الفاصل
+  /// (من قبل هذا الإصلاح) تُعرض كمحتوى فقط بلا اسم.
+  Widget? _replyQuoteCard() {
+    final replyToId = row['reply_to_id']?.toString();
+    if (replyToId == null || replyToId.isEmpty) return null;
+    final raw = row['reply_to_preview']?.toString() ?? '';
+    // صيغة قديمة محتملة (قبل إضافة رابط المصغّرة): جزءان فقط بلا كسر.
+    final parts = raw.split('|');
+    final senderName = parts.isNotEmpty && parts[0].isNotEmpty ? parts[0] : 'عضو';
+    final content = parts.length > 1 ? parts[1] : (parts.isNotEmpty ? parts[0] : '');
+    final thumbUrl = parts.length > 2 ? parts[2] : '';
+    final isQuote = row['metadata'] is Map &&
+        ((row['metadata'] as Map)['reply_mode'] == 'quote' ||
+            (row['metadata'] as Map)['reply_mode'] == 'quote_3d');
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () => onJumpToMessage?.call(replyToId),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: .18),
+          borderRadius: BorderRadius.circular(8),
+          border: const Border(right: BorderSide(color: Color(0xFFFFD700), width: 2.5)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(isQuote ? 'اقتباس من $senderName' : senderName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: Color(0xFFFFD700), fontSize: 11.5, fontWeight: FontWeight.w800)),
+                  if (content.trim().isNotEmpty)
+                    Text(content,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white70, fontSize: 11.5)),
+                ],
+              ),
+            ),
+            // السمايل/الصورة الأصلية تُعرض مصغَّرة فعلياً هنا، لا وصفاً
+            // نصياً فقط — هذا بالضبط ما كان غائباً ("يظهر gif بدل ظهوره").
+            if (thumbUrl.isNotEmpty) ...[
+              const SizedBox(width: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: thumbUrl.startsWith('assets/')
+                    ? Image.asset(thumbUrl, width: 28, height: 28, fit: BoxFit.contain)
+                    : Image.network(thumbUrl, width: 28, height: 28, fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _content(double smileySize, Color textColor,
       {bool bold = false, bool italic = false, double scale = 1.0}) {
     final fw = bold ? FontWeight.w800 : FontWeight.w500;
@@ -2976,11 +3138,14 @@ class _ChatMessageRow extends ConsumerWidget {
         ),
       );
     }
-    if ((type == 'video' || type == 'audio' || type == 'file') &&
-        url.isNotEmpty) {
-      final icon = type == 'video'
-          ? Icons.play_circle_fill
-          : (type == 'audio' ? Icons.graphic_eq : Icons.insert_drive_file);
+    // كانت الرسائل الصوتية تُفتح خارج التطبيق عبر launchUrl تمامًا كالملفات
+    // والفيديو — لا مشغّل داخلي إطلاقًا. صوت الغرفة الآن يُشغَّل من الفقاعة
+    // نفسها حصرًا؛ الفيديو والملف يبقيان بفتح خارجي كما كانا.
+    if (type == 'audio' && url.isNotEmpty) {
+      return VoiceMessagePlayer(url: url);
+    }
+    if ((type == 'video' || type == 'file') && url.isNotEmpty) {
+      final icon = type == 'video' ? Icons.play_circle_fill : Icons.insert_drive_file;
       return InkWell(
         onTap: () async {
           final uri = Uri.tryParse(url);
@@ -3286,6 +3451,18 @@ class _ChatMessageRow extends ConsumerWidget {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                // بطاقة الاقتباس/الرد: البيانات كانت تُلتقَط
+                                // عند الإرسال (reply_to_id/preview) وtamam
+                                // _jumpToPublicMessage جاهزة ومُمرَّرة أصلًا
+                                // عبر onJumpToMessage — لكن build() هنا لم
+                                // يكن يرسم منها أي بطاقة إطلاقًا، فتصل
+                                // البيانات وتُفقَد بصمت. هذا هو العطل الذي
+                                // وصفته الوثيقة بالضبط.
+                                if (_replyQuoteCard() case final card?)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 6),
+                                    child: SizedBox(width: double.infinity, child: card),
+                                  ),
                                 SizedBox(
                                   width: double.infinity,
                                   child: Align(
@@ -4460,6 +4637,18 @@ class _PendingGifBar extends StatelessWidget {
   }
 }
 
+const _xoLines = <List<int>>[
+  [0, 1, 2], [3, 4, 5], [6, 7, 8],
+  [0, 3, 6], [1, 4, 7], [2, 5, 8],
+  [0, 4, 8], [2, 4, 6],
+];
+
+bool _xoWon(List<String> cells, String p) =>
+    _xoLines.any((line) => line.every((i) => cells[i] == p));
+
+/// ضد الكمبيوتر: المستخدم X دائمًا، والآلة O تلعب بخوارزمية Minimax كاملة
+/// (تفحص كل الاحتمالات حتى نهاية اللعبة) — لا عشوائية ولا "ذكاء مزيّف"؛
+/// أفضل ما يمكن لعبه فعليًا، فلا يُهزَم إلا بالتعادل في أحسن الأحوال.
 class _XoPanel extends StatefulWidget {
   const _XoPanel();
   @override
@@ -4468,47 +4657,86 @@ class _XoPanel extends StatefulWidget {
 
 class _XoPanelState extends State<_XoPanel> {
   final List<String> _cells = List.filled(9, '');
-  String _turn = 'X';
+  bool _userTurn = true;
+  bool _thinking = false;
 
-  bool _won(String p) {
-    const lines = <List<int>>[
-      [0, 1, 2],
-      [3, 4, 5],
-      [6, 7, 8],
-      [0, 3, 6],
-      [1, 4, 7],
-      [2, 5, 8],
-      [0, 4, 8],
-      [2, 4, 6],
-    ];
-    return lines.any((line) => line.every((i) => _cells[i] == p));
+  int? _bestMoveFor(List<String> cells, String player) {
+    final other = player == 'X' ? 'O' : 'X';
+    int? bestIdx;
+    var bestScore = -999;
+    for (var i = 0; i < 9; i++) {
+      if (cells[i].isNotEmpty) continue;
+      final next = List<String>.from(cells)..[i] = player;
+      final score = -_minimax(next, other, 1);
+      if (score > bestScore) {
+        bestScore = score;
+        bestIdx = i;
+      }
+    }
+    return bestIdx;
   }
 
-  void _play(int index) {
-    if (_cells[index].isNotEmpty || _won('X') || _won('O')) return;
+  int _minimax(List<String> cells, String player, int depth) {
+    final other = player == 'X' ? 'O' : 'X';
+    if (_xoWon(cells, other)) return -(10 - depth);
+    if (!cells.contains('')) return 0;
+    var best = -999;
+    for (var i = 0; i < 9; i++) {
+      if (cells[i].isNotEmpty) continue;
+      final next = List<String>.from(cells)..[i] = player;
+      final score = -_minimax(next, other, depth + 1);
+      if (score > best) best = score;
+    }
+    return best;
+  }
+
+  Future<void> _play(int index) async {
+    if (!_userTurn || _thinking || _cells[index].isNotEmpty) return;
+    if (_xoWon(_cells, 'X') || _xoWon(_cells, 'O')) return;
     setState(() {
-      _cells[index] = _turn;
-      _turn = _turn == 'X' ? 'O' : 'X';
+      _cells[index] = 'X';
+      _userTurn = false;
+    });
+    if (_xoWon(_cells, 'X') || !_cells.contains('')) return;
+    setState(() => _thinking = true);
+    // تأخير بسيط يجعل حركة الآلة محسوسة لا فورية صماء.
+    await Future.delayed(const Duration(milliseconds: 420));
+    if (!mounted) return;
+    final move = _bestMoveFor(_cells, 'O');
+    setState(() {
+      if (move != null) _cells[move] = 'O';
+      _thinking = false;
+      _userTurn = true;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final winner = _won('X') ? 'X فاز' : (_won('O') ? 'O فاز' : null);
+    final xWon = _xoWon(_cells, 'X');
+    final oWon = _xoWon(_cells, 'O');
+    final draw = !xWon && !oWon && !_cells.contains('');
+    final status = xWon
+        ? 'فزت! 🎉'
+        : oWon
+            ? 'فازت الآلة'
+            : draw
+                ? 'تعادل'
+                : _thinking
+                    ? 'الآلة تفكّر...'
+                    : 'دورك (X)';
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('XO',
+            const Text('XO — ضد الكمبيوتر',
                 style: TextStyle(
                     color: Colors.white,
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: FontWeight.w900)),
             const SizedBox(height: 6),
-            Text(winner ?? 'الدور: $_turn',
-                style: const TextStyle(color: Colors.white70)),
+            Text(status, style: const TextStyle(color: Colors.white70)),
             const SizedBox(height: 12),
             GridView.builder(
               shrinkWrap: true,
@@ -4523,8 +4751,8 @@ class _XoPanelState extends State<_XoPanel> {
                       borderRadius: BorderRadius.circular(12)),
                   alignment: Alignment.center,
                   child: Text(_cells[i],
-                      style: const TextStyle(
-                          color: Colors.white,
+                      style: TextStyle(
+                          color: _cells[i] == 'X' ? const Color(0xFFFFD700) : Colors.white,
                           fontSize: 32,
                           fontWeight: FontWeight.w900)),
                 ),
@@ -4536,12 +4764,269 @@ class _XoPanelState extends State<_XoPanel> {
                 for (var i = 0; i < _cells.length; i++) {
                   _cells[i] = '';
                 }
-                _turn = 'X';
+                _userTurn = true;
+                _thinking = false;
               }),
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('إعادة'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// ضد لاعب حقيقي: صالات مفتوحة في الغرفة نفسها (xo_lobbies)، الانضمام
+/// يخصم الرهان من الطرفين خادميًا، واللوحة بعدها متزامنة لحظيًا
+/// (xo_games) — كل حركة تُتحقَّق من الدور والخانة على الخادم، فلا غش
+/// ممكن من أي طرف مهما عُدِّل التطبيق محليًا.
+class _XoMultiplayerPanel extends StatefulWidget {
+  final String roomId;
+  const _XoMultiplayerPanel({required this.roomId});
+  @override
+  State<_XoMultiplayerPanel> createState() => _XoMultiplayerPanelState();
+}
+
+class _XoMultiplayerPanelState extends State<_XoMultiplayerPanel> {
+  final _db = Supabase.instance.client;
+  String? _myGameId;
+  String? _myLobbyId;
+
+  Stream<List<Map<String, dynamic>>> get _openLobbies => _db
+      .from('xo_lobbies')
+      .stream(primaryKey: ['id'])
+      .eq('room_id', widget.roomId)
+      .order('created_at', ascending: false);
+
+  Future<void> _openLobby() async {
+    final wagerCtrl = TextEditingController(text: '50');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        title: const Text('فتح صالة XO'),
+        content: TextField(
+          controller: wagerCtrl,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'الرهان (نقاط ⭐)'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('فتح')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final wager = int.tryParse(wagerCtrl.text.trim()) ?? 0;
+    if (wager <= 0) return;
+    final m = ScaffoldMessenger.of(context);
+    try {
+      final lobbyId = await _db.rpc('open_xo_lobby',
+          params: {'p_room_id': widget.roomId, 'p_wager_points': wager});
+      setState(() => _myLobbyId = lobbyId.toString());
+    } catch (e) {
+      final t = e.toString();
+      m.showSnackBar(SnackBar(content: Text(
+        t.contains('INSUFFICIENT_POINTS') ? 'رصيدك من النقاط لا يكفي لهذا الرهان.'
+        : t.contains('LOBBY_ALREADY_OPEN') ? 'لديك صالة مفتوحة أصلًا في هذه الغرفة.'
+        : 'تعذّر فتح الصالة: $e',
+      )));
+    }
+  }
+
+  Future<void> _join(String lobbyId) async {
+    final m = ScaffoldMessenger.of(context);
+    try {
+      final gameId = await _db.rpc('join_xo_lobby', params: {'p_lobby_id': lobbyId});
+      if (mounted) setState(() => _myGameId = gameId.toString());
+    } catch (e) {
+      final t = e.toString();
+      m.showSnackBar(SnackBar(content: Text(
+        t.contains('INSUFFICIENT_POINTS') ? 'رصيدك من النقاط لا يكفي.'
+        : t.contains('CANNOT_JOIN_OWN_LOBBY') ? 'لا يمكنك الانضمام لصالتك أنت.'
+        : t.contains('LOBBY_NOT_AVAILABLE') ? 'هذه الصالة لم تعد متاحة.'
+        : 'تعذّر الانضمام: $e',
+      )));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activeGameId = _myGameId;
+    if (activeGameId != null) {
+      return _XoLiveBoard(gameId: activeGameId, onExit: () => setState(() => _myGameId = null));
+    }
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('XO — لاعب حقيقي',
+              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 10),
+          if (_myLobbyId == null)
+            FilledButton.icon(
+              onPressed: _openLobby,
+              icon: const Icon(Icons.add_circle_outline),
+              label: const Text('افتح صالة جديدة'),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: const Color(0xFF2A1837), borderRadius: BorderRadius.circular(10)),
+              child: const Row(children: [
+                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                SizedBox(width: 10),
+                Expanded(child: Text('بانتظار انضمام لاعب آخر…', style: TextStyle(color: Colors.white70))),
+              ]),
+            ),
+          const Divider(color: Colors.white24, height: 28),
+          const Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Text('صالات مفتوحة الآن', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700))),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 220,
+            child: StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _openLobbies,
+              builder: (context, snap) {
+                final all = snap.data ?? const [];
+                final myUid = _db.auth.currentUser?.id;
+                // صالتي الخاصة قد تتحول لـactive بمجرد انضمام أحد — نلتقط
+                // ذلك فورًا وننتقل للوحة الحية.
+                if (_myLobbyId != null) {
+                  final mine = all.where((l) => l['id'] == _myLobbyId).firstOrNull;
+                  if (mine != null && mine['status'] == 'active' && mine['game_id'] != null) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) setState(() => _myGameId = mine['game_id'].toString());
+                    });
+                  }
+                }
+                final open = all.where((l) => l['status'] == 'open' && l['creator_uid'] != myUid).toList();
+                if (open.isEmpty) {
+                  return const Center(child: Text('لا صالات مفتوحة حاليًا', style: TextStyle(color: Colors.white38)));
+                }
+                return ListView.separated(
+                  itemCount: open.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 6),
+                  itemBuilder: (_, i) {
+                    final l = open[i];
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(color: const Color(0xFF2A1837), borderRadius: BorderRadius.circular(10)),
+                      child: Row(children: [
+                        Expanded(child: Text('رهان ${l['wager_points']} نقطة', style: const TextStyle(color: Colors.white))),
+                        FilledButton(onPressed: () => _join(l['id'].toString()), child: const Text('انضم')),
+                      ]),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// اللوحة الحية: تتزامن عبر Realtime مع صف xo_games — أي حركة من أي طرف
+/// تظهر فورًا عند الآخر بلا تحديث يدوي، لأن كل الحقيقة في قاعدة البيانات
+/// لا في حالة محلية.
+class _XoLiveBoard extends StatefulWidget {
+  final String gameId;
+  final VoidCallback onExit;
+  const _XoLiveBoard({required this.gameId, required this.onExit});
+  @override
+  State<_XoLiveBoard> createState() => _XoLiveBoardState();
+}
+
+class _XoLiveBoardState extends State<_XoLiveBoard> {
+  final _db = Supabase.instance.client;
+  bool _moving = false;
+
+  Future<void> _play(int cell) async {
+    if (_moving) return;
+    setState(() => _moving = true);
+    final m = ScaffoldMessenger.maybeOf(context);
+    try {
+      await _db.rpc('play_xo_move', params: {'p_game_id': widget.gameId, 'p_cell': cell});
+    } catch (e) {
+      final t = e.toString();
+      m?.showSnackBar(SnackBar(content: Text(
+        t.contains('NOT_YOUR_TURN') ? 'ليس دورك الآن.'
+        : t.contains('CELL_TAKEN') ? 'هذه الخانة مشغولة.'
+        : t.contains('GAME_NOT_ACTIVE') ? 'انتهت هذه اللعبة.'
+        : 'تعذّر تنفيذ الحركة: $e',
+      )));
+    } finally {
+      if (mounted) setState(() => _moving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final myUid = _db.auth.currentUser?.id;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+        child: StreamBuilder<List<Map<String, dynamic>>>(
+          stream: _db.from('xo_games').stream(primaryKey: ['id']).eq('id', widget.gameId),
+          builder: (context, snap) {
+            final rows = snap.data ?? const [];
+            if (rows.isEmpty) {
+              return const SizedBox(height: 240, child: Center(child: CircularProgressIndicator()));
+            }
+            final g = rows.first;
+            final board = (g['board'] as List?)?.map((e) => e?.toString() ?? '').toList() ?? List.filled(9, '');
+            final status = g['status']?.toString() ?? 'active';
+            final turnUid = g['turn_uid']?.toString();
+            final winnerUid = g['winner_uid']?.toString();
+            final isX = g['player_x_uid']?.toString() == myUid;
+            final mySymbol = isX ? 'X' : 'O';
+            final myTurn = status == 'active' && turnUid == myUid;
+            final statusText = status == 'finished'
+                ? (winnerUid == null ? 'تعادل — أُعيد الرهان لكما' : (winnerUid == myUid ? 'فزت! 🎉' : 'خسرت'))
+                : (myTurn ? 'دورك ($mySymbol)' : 'دور الخصم…');
+            return Column(mainAxisSize: MainAxisSize.min, children: [
+              Text('XO — لاعب حقيقي',
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 6),
+              Text(statusText, style: const TextStyle(color: Colors.white70)),
+              const SizedBox(height: 12),
+              GridView.builder(
+                shrinkWrap: true,
+                itemCount: 9,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3, mainAxisSpacing: 6, crossAxisSpacing: 6),
+                itemBuilder: (_, i) => InkWell(
+                  onTap: myTurn && board[i].isEmpty ? () => _play(i) : null,
+                  child: Container(
+                    decoration: BoxDecoration(
+                        color: const Color(0xFF2A1837), borderRadius: BorderRadius.circular(12)),
+                    alignment: Alignment.center,
+                    child: Text(board[i],
+                        style: TextStyle(
+                            color: board[i] == 'X' ? const Color(0xFFFFD700) : Colors.white,
+                            fontSize: 32,
+                            fontWeight: FontWeight.w900)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (status != 'active')
+                FilledButton(onPressed: widget.onExit, child: const Text('إغلاق'))
+              else
+                TextButton(
+                  onPressed: () async {
+                    try {
+                      await _db.rpc('abandon_xo_game', params: {'p_game_id': widget.gameId});
+                    } catch (_) {}
+                    widget.onExit();
+                  },
+                  child: const Text('الانسحاب', style: TextStyle(color: Colors.redAccent)),
+                ),
+            ]);
+          },
         ),
       ),
     );

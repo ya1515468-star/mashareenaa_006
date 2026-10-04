@@ -60,6 +60,19 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         error: (error, _) => const ErrorView(message: 'تعذر تحميل الملف الشخصي الآن. تحقق من الاتصال ثم أعد المحاولة.'),
         data: (profile) {
           if (profile == null) {
+            // سبب حقيقي خلف شكوى "زر الخروج يُظهر هذه الرسالة": عند
+            // الضغط على تسجيل الخروج تُمسح الجلسة فورًا، وcurrentProfileProvider
+            // يُرجع null حتمًا بلا مستخدم مسجَّل (هذا سلوكه المقصود)، لكن
+            // هذه الصفحة بقيت مرسومة لحظيًا قبل أن يُعيد موجّه التطبيق
+            // التوجيه لشاشة الدخول، فتظهر رسالة "لم يُعثر على الملف
+            // الشخصي" المُخيفة في لحظة خروج ناجح تمامًا، لا عطل فعلي.
+            // التمييز هنا بين "لا مستخدم مسجَّل أصلًا" (طبيعي، ريثما
+            // يُعاد التوجيه) و"مستخدم مسجَّل لكن بلا صف ملف شخصي" (عطل
+            // حقيقي يستحق الرسالة).
+            final signedIn = ref.watch(authControllerProvider).valueOrNull != null;
+            if (!signedIn) {
+              return const LoadingIndicator();
+            }
             return const ErrorView(message: 'لم يتم العثور على الملف الشخصي');
           }
 
@@ -773,10 +786,17 @@ Future<void> _pickAndUploadProfileImage(
         .read(profileControllerProvider.notifier)
         .updateProfile(updated);
     if (!ok) {
-      await ProfileStorageCleanup.deletePublicFile(
-        bucket: 'profile-avatars',
-        publicUrl: uploadedUrl,
-      );
+      // عطل حقيقي وُجد هنا: هذا الحذف كان خارج أي حماية خاصة به، بخلاف
+      // النمط الصحيح المتّبع في edit_profile_page.dart حيث كل حذف مُغلَّف
+      // بـtry/catch مستقل. فشل حذف الملف المرفوع (مؤقتًا، لفشل التحديث
+      // أصلًا) لا يجوز أن يُسقط بلوك try الرئيسي ويُظهر الرسالة العامة
+      // المضلِّلة بدل سبب فشل التحديث الحقيقي أعلاه.
+      try {
+        await ProfileStorageCleanup.deletePublicFile(
+          bucket: 'profile-avatars',
+          publicUrl: uploadedUrl,
+        );
+      } catch (_) {}
       if (!context.mounted) return;
       await _showUploadResult(
         context,
@@ -788,11 +808,19 @@ Future<void> _pickAndUploadProfileImage(
       return;
     }
 
+    // السبب الحقيقي للعطل المُبلَّغ: رفع الصورة وتحديث الملف الشخصي نجحا
+    // فعليًا في هذه المرحلة، لكن حذف الصورة القديمة (تنظيف لا ضرورة
+    // لنجاحه) لم يكن محميًّا بحماية خاصة به — أي استثناء هنا (ملف غير
+    // موجود أصلًا، رابط لا يطابق نمط هذا الحاوي...) كان يسقط إلى الـcatch
+    // العام أسفل الدالة فيظهر "تعذر إكمال العملية" رغم أن الصورة تغيّرت
+    // بنجاح فعلاً على الخادم.
     final previousUrl = cover ? profile.coverUrl : profile.avatarUrl;
-    await ProfileStorageCleanup.deletePublicFile(
-      bucket: 'profile-avatars',
-      publicUrl: previousUrl,
-    );
+    try {
+      await ProfileStorageCleanup.deletePublicFile(
+        bucket: 'profile-avatars',
+        publicUrl: previousUrl,
+      );
+    } catch (_) {}
 
     ref.invalidate(currentProfileProvider);
     ref.invalidate(profileByIdProvider(profile.uid));
@@ -808,11 +836,18 @@ Future<void> _pickAndUploadProfileImage(
       } catch (_) {}
     }
     if (!context.mounted) return;
+    final raw = e.toString();
     await _showUploadResult(
       context,
       success: false,
       label: label,
-      error: 'تعذر إكمال العملية الآن. تحقق من الاتصال ثم أعد المحاولة.',
+      // الرسالة العامة كانت تُخفي السبب الحقيقي دائمًا (حصة الصورة
+      // المستنفَدة، رفض تخزيني، انقطاع فعلي...)، فلا يعرف المستخدم هل
+      // يعيد المحاولة أم ينتظر الشهر القادم. السبب الخادمي (إن وُجد) يظهر
+      // الآن أولًا.
+      error: raw.contains('AVATAR_QUOTA_EXCEEDED')
+          ? raw.substring(raw.indexOf('AVATAR_QUOTA_EXCEEDED') + 'AVATAR_QUOTA_EXCEEDED:'.length).trim()
+          : 'تعذر إكمال العملية الآن. تحقق من الاتصال ثم أعد المحاولة.',
     );
   }
 }

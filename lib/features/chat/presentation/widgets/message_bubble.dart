@@ -2,6 +2,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../profile/presentation/widgets/arabic_font_catalog.dart';
+import 'forward_message_sheet.dart';
 import '../../../profile/presentation/providers/profile_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../rbac/presentation/widgets/server_chat_inline_message.dart';
@@ -153,6 +154,15 @@ class MessageBubble extends ConsumerWidget {
               onTap: () {
                 Navigator.pop(sheetContext);
                 onReplyMode?.call('quote_3d');
+              },
+            ),
+            _ActionTile(
+              icon: Icons.forward_rounded,
+              label: 'إعادة توجيه',
+              onTap: () {
+                Navigator.pop(sheetContext);
+                ForwardMessageSheet.show(context,
+                    body: message.text, kind: message.type.name, attachmentUrl: message.mediaUrl);
               },
             ),
             _ActionTile(

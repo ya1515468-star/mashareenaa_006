@@ -5,6 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../chat/presentation/widgets/mini_profile_popup.dart';
+import '../../rbac/presentation/widgets/server_username_display.dart';
+import '../../rbac/presentation/widgets/server_user_identity_badges.dart';
+import '../../../core/widgets/dynamic_avatar_frame.dart';
 
 final onlineNowProvider =
     StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
@@ -123,13 +126,13 @@ class OnlineNowPage extends ConsumerWidget {
                           : (row['username']?.toString() ?? 'عضو');
                   return ListTile(
                     leading: Stack(children: [
-                      CircleAvatar(
-                          backgroundImage: avatarUrl.isNotEmpty
-                              ? NetworkImage(avatarUrl)
-                              : null,
-                          child: avatarUrl.isEmpty
-                              ? const Icon(Icons.person)
-                              : null),
+                      // البند ٦: الإطار نفسه الذي يظهر على صورة العضو داخل الغرفة
+                      // يظهر هنا أيضًا (هوية الغرفة ذاتها)، لا دائرة عادية.
+                      uid.isEmpty
+                          ? CircleAvatar(
+                              backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                              child: avatarUrl.isEmpty ? const Icon(Icons.person) : null)
+                          : _OnlineFramedAvatar(uid: uid, roomId: roomId, avatarUrl: avatarUrl),
                       Positioned(
                           bottom: 0,
                           right: 0,
@@ -142,7 +145,20 @@ class OnlineNowPage extends ConsumerWidget {
                                   border: Border.all(
                                       color: p.background, width: 2)))),
                     ]),
-                    title: Text(title),
+                    // كان نصًا خامًا من display_name/username فقط — يتجاهل
+                    // اللون والشارة واللقب والتأثيرات التي قد يملكها العضو
+                    // داخل هذه الغرفة تحديدًا. نفس المكوّن المستعمل في كل
+                    // مكان آخر بالتطبيق يقرأ الهوية عبر get_user_chat_identity
+                    // بمعرّف الغرفة، فتطابق تمامًا ما يظهر داخلها.
+                    title: uid.isEmpty
+                        ? Text(title)
+                        : ServerUsernameDisplay(
+                            uid: uid,
+                            roomId: roomId,
+                            fallbackName: title,
+                            showBadges: true,
+                            compactBadges: true,
+                          ),
                     subtitle: Text(
                         hidden
                             ? 'متصل الآن • مخفي'
@@ -162,5 +178,31 @@ class OnlineNowPage extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+
+/// صورة عضو متصل بإطاره كما تُقرأ هويته داخل الغرفة نفسها.
+class _OnlineFramedAvatar extends ConsumerWidget {
+  final String uid;
+  final String? roomId;
+  final String avatarUrl;
+  const _OnlineFramedAvatar({required this.uid, required this.roomId, required this.avatarUrl});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final identity = (roomId == null
+                ? ref.watch(serverUserIdentityProvider(uid))
+                : ref.watch(serverUserIdentityInRoomProvider((uid: uid, roomId: roomId))))
+            .valueOrNull ??
+        const <String, dynamic>{};
+    final frameKey = identity['avatar_frame_key']?.toString();
+    final avatar = CircleAvatar(
+      radius: 20,
+      backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+      child: avatarUrl.isEmpty ? const Icon(Icons.person) : null,
+    );
+    if (frameKey == null || frameKey.isEmpty) return avatar;
+    return DynamicAvatarFrame(frameKey: frameKey, userId: uid, radius: 20, child: avatar);
   }
 }

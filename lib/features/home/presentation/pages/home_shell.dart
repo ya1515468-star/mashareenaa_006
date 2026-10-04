@@ -26,12 +26,16 @@ class HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<HomeShell> {
-  static const String _verifiedPublicRoomId =
-      'c4e16a4b-a014-4f03-a16d-8927bbdc9cfa';
+  // كان هنا معرّف غرفة مكتوب يدويًا كاحتياط — تحققت منه فوجدته لا يطابق
+  // أي غرفة حقيقية في قاعدة البيانات إطلاقًا (صفر صفوف)، وكان الحقل
+  // أدناه يُهيَّأ به منذ البداية، فجملة "??=" في معالج الاستثناء كانت
+  // بلا أثر فعلي أبدًا — أي استثناء عابر أثناء جلب الغرفة الحقيقية
+  // يُبقي المستخدم عالقًا على غرفة غير موجودة بلا أي تعافٍ. لا قيمة
+  // ميتة بعد الآن؛ أي احتياط يُستعلَم من البيانات الحيّة مباشرة.
 
   int _index = 0;
   bool _isOwner = false;
-  String? _currentRoomId = _verifiedPublicRoomId;
+  String? _currentRoomId;
   String? _roomError;
   bool _roomLoading = false;
   String? _handledCallId;
@@ -75,23 +79,16 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       _roomError = null;
     });
     try {
-      final response = await Supabase.instance.client
-          .from('chat_rooms')
-          .select('id')
-          .eq('is_active', true)
-          .eq('is_public', true)
-          .order('created_at', ascending: true)
-          .limit(1)
-          .maybeSingle()
-          .timeout(const Duration(seconds: 8));
-      if (!mounted) return;
-      final roomId = response?['id']?.toString();
+      // كانت تجلب الغرفة الأقدم تاريخ إنشاء دائمًا، بلا أي قرار من المالك
+      // وبلا أي ذاكرة لآخر غرفة دخلها المستخدم فعليًا — نفس الغرفة
+      // للجميع بالصدفة. get_entry_room تُرجع آخر غرفة صالحة للعضو العائد،
+      // وإلا الغرفة التي عيّنها المالك "افتراضية"، وإلا الأقدم كخط أخير.
+      final roomId = (await Supabase.instance.client
+              .rpc('get_entry_room')
+              .timeout(const Duration(seconds: 8)))
+          ?.toString();
       if (roomId == null || roomId.isEmpty) {
-        setState(() {
-          _currentRoomId = _verifiedPublicRoomId;
-          _roomError =
-              'تعذّر العثور على الغرفة العامة؛ استخدام الغرفة الافتراضية.';
-        });
+        await _fallbackToLiveRoom('تعذّر العثور على غرفة عامة نشطة حالياً.');
         return;
       }
       setState(() {
@@ -100,16 +97,38 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       });
     } catch (error) {
       if (!mounted) return;
+      await _fallbackToLiveRoom('تعذّر فتح الشات. تحقق من الاتصال.');
+    }
+  }
+
+  /// لا قيمة ميتة مكتوبة يدويًا بعد الآن؛ عند أي فشل في get_entry_room
+  /// يُستعلَم مباشرة عن أقدم غرفة عامة نشطة فعلية — بيانات حيّة دائمًا،
+  /// لا معرّف جامد قد يصبح غير موجود مع الوقت.
+  Future<void> _fallbackToLiveRoom(String errorMessage) async {
+    try {
+      final row = await Supabase.instance.client
+          .from('chat_rooms')
+          .select('id')
+          .eq('is_active', true)
+          .eq('is_public', true)
+          .order('created_at', ascending: true)
+          .limit(1)
+          .maybeSingle()
+          .timeout(const Duration(seconds: 8));
+      final liveId = row?['id']?.toString();
+      if (!mounted) return;
       setState(() {
-        _currentRoomId ??= _verifiedPublicRoomId;
-        _roomError = 'تعذّر فتح الشات. تحقق من الاتصال.';
+        _currentRoomId = (liveId != null && liveId.isNotEmpty) ? liveId : null;
+        _roomError = errorMessage;
       });
+    } catch (_) {
+      if (mounted) setState(() => _roomError = errorMessage);
     }
   }
 
   Widget _chatEntryPage() {
-    final roomId = _currentRoomId ?? _verifiedPublicRoomId;
-    if (roomId.isNotEmpty) return ChatLobbyPage(roomId: roomId);
+    final roomId = _currentRoomId;
+    if (roomId != null && roomId.isNotEmpty) return ChatLobbyPage(roomId: roomId);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),

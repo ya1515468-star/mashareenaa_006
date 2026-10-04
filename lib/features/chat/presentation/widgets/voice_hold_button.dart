@@ -5,13 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
-import 'voice_recorder_sheet.dart';
+import '../../data/services/voice_upload_helper.dart';
 
-/// زر التسجيل الصوتي بنمط واتساب:
-///   • اضغط مطوّلًا لبدء التسجيل، وحرّر للإرسال.
-///   • اسحب جانبًا للإلغاء.
-///   • اسحب للأعلى للقفل، فيستمر التسجيل بلا إمساك مع زرّي حذف وإرسال.
-///   • التسجيل الأقصر من ثانية يُلغى مع تلميح.
+/// زر تسجيل واضح بالنقر: اضغط لبدء التسجيل، اضغط مرة أخرى لإيقافه، ثم زر
+/// "إرسال" منفصل يرسل الفقاعة الصوتية — لا إرسال تلقائي عند مجرّد الإيقاف
+/// (كان الإصدار السابق يرسل فورًا عند تحرير ضغطة مطوّلة؛ البند ٩ من وثيقة
+/// التنفيذ يشترط خطوتين منفصلتين صراحة: إيقاف، ثم إرسال).
 class VoiceHoldButton extends StatefulWidget {
   final Future<void> Function(String url) onUploaded;
   final Color color;
@@ -28,20 +27,16 @@ class VoiceHoldButton extends StatefulWidget {
   State<VoiceHoldButton> createState() => _VoiceHoldButtonState();
 }
 
-class _VoiceHoldButtonState extends State<VoiceHoldButton> {
-  static const _cancelDistance = 110.0;
-  static const _lockDistance = 80.0;
+enum _VoiceStage { idle, recording, stopped }
 
+class _VoiceHoldButtonState extends State<VoiceHoldButton> {
   final _recorder = AudioRecorder();
   final _elapsed = ValueNotifier<Duration>(Duration.zero);
-  final _dragX = ValueNotifier<double>(0);
-  final _locked = ValueNotifier<bool>(false);
   Timer? _ticker;
   OverlayEntry? _overlay;
-  Offset _origin = Offset.zero;
-  bool _recording = false;
-  bool _finishing = false;
+  _VoiceStage _stage = _VoiceStage.idle;
   bool _uploading = false;
+  String? _recordedPath;
 
   @override
   void dispose() {
@@ -49,8 +44,6 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
     _removeOverlay();
     _recorder.dispose();
     _elapsed.dispose();
-    _dragX.dispose();
-    _locked.dispose();
     super.dispose();
   }
 
@@ -59,9 +52,8 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
         ?.showSnackBar(SnackBar(content: Text(text), duration: const Duration(seconds: 2)));
   }
 
-  Future<void> _begin(Offset origin) async {
-    if (_recording || _uploading) return;
-    _origin = origin;
+  Future<void> _start() async {
+    if (_stage != _VoiceStage.idle || _uploading) return;
     try {
       if (!await _recorder.hasPermission()) {
         _toast('اسمح بالوصول إلى الميكروفون من إعدادات الجهاز.');
@@ -74,68 +66,65 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
         await _recorder.stop();
         return;
       }
-      _recording = true;
-      _finishing = false;
       _elapsed.value = Duration.zero;
-      _dragX.value = 0;
-      _locked.value = false;
       _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
         _elapsed.value += const Duration(seconds: 1);
       });
+      setState(() => _stage = _VoiceStage.recording);
       _showOverlay();
-      setState(() {});
     } catch (e) {
       _toast('تعذّر بدء التسجيل: $e');
     }
   }
 
-  void _move(Offset position) {
-    if (!_recording || _locked.value) return;
-    final dx = position.dx - _origin.dx;
-    final dy = position.dy - _origin.dy;
-    if (dy < -_lockDistance) {
-      _locked.value = true;
-      _dragX.value = 0;
-      return;
-    }
-    _dragX.value = dx;
-    if (dx.abs() > _cancelDistance) unawaited(_finish(send: false));
-  }
-
-  Future<void> _release() async {
-    if (!_recording || _locked.value) return;
-    await _finish(send: true);
-  }
-
-  Future<void> _finish({required bool send}) async {
-    if (!_recording || _finishing) return;
-    _finishing = true;
+  /// الضغطة الثانية: توقف التسجيل فقط، بلا إرسال. يبقى الشريط ظاهرًا
+  /// بزرّي حذف وإرسال صريحين ريثما يقرر المستخدم.
+  Future<void> _stop() async {
+    if (_stage != _VoiceStage.recording) return;
     _ticker?.cancel();
-    final duration = _elapsed.value;
     String? path;
     try {
       path = await _recorder.stop();
     } catch (_) {}
-    _recording = false;
-    _removeOverlay();
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    if (path == null || path.isEmpty || _elapsed.value < const Duration(seconds: 1)) {
+      _toast(path == null || path.isEmpty ? 'تعذّر حفظ التسجيل.' : 'التسجيل قصير جدًا.');
+      _removeOverlay();
+      setState(() => _stage = _VoiceStage.idle);
+      return;
+    }
+    _recordedPath = path;
+    setState(() => _stage = _VoiceStage.stopped);
+    _showOverlay();
+  }
 
-    if (!send) return;
-    if (duration < const Duration(seconds: 1)) {
-      _toast('اضغط مطوّلًا للتسجيل، وحرّر للإرسال.');
-      return;
+  Future<void> _discard() async {
+    _ticker?.cancel();
+    if (_stage == _VoiceStage.recording) {
+      try {
+        await _recorder.stop();
+      } catch (_) {}
     }
-    if (path == null || path.isEmpty) {
-      _toast('تعذّر حفظ التسجيل.');
-      return;
-    }
-    setState(() => _uploading = true);
+    _recordedPath = null;
+    _removeOverlay();
+    if (mounted) setState(() => _stage = _VoiceStage.idle);
+  }
+
+  Future<void> _send() async {
+    final path = _recordedPath;
+    if (path == null) return;
+    _removeOverlay();
+    setState(() {
+      _stage = _VoiceStage.idle;
+      _uploading = true;
+    });
     try {
-      final url = await VoiceRecorderSheet.uploadRecording(path);
+      final url = await VoiceUploadHelper.uploadRecording(path);
       await widget.onUploaded(url);
     } catch (e) {
       _toast('تعذّر إرسال الرسالة الصوتية: $e');
     } finally {
+      _recordedPath = null;
       if (mounted) setState(() => _uploading = false);
     }
   }
@@ -153,6 +142,7 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
     final overlay = Overlay.of(context, rootOverlay: true);
     _overlay = OverlayEntry(builder: (ctx) {
       final bottom = MediaQuery.viewInsetsOf(ctx).bottom + 86;
+      final recording = _stage == _VoiceStage.recording;
       return Positioned(
         left: 10,
         right: 10,
@@ -161,52 +151,39 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
           color: Colors.transparent,
           child: Directionality(
             textDirection: TextDirection.rtl,
-            child: ValueListenableBuilder<bool>(
-              valueListenable: _locked,
-              builder: (_, locked, __) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1C1C2E),
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 12)],
-                ),
-                child: Row(children: [
-                  const _PulsingDot(),
-                  const SizedBox(width: 8),
-                  ValueListenableBuilder<Duration>(
-                    valueListenable: _elapsed,
-                    builder: (_, d, __) => Text(_fmt(d),
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
-                  ),
-                  const Spacer(),
-                  if (!locked)
-                    ValueListenableBuilder<double>(
-                      valueListenable: _dragX,
-                      builder: (_, x, __) => Opacity(
-                        opacity: (1 - x.abs() / _cancelDistance).clamp(.2, 1),
-                        child: const Row(children: [
-                          Icon(Icons.lock_outline, color: Colors.white54, size: 18),
-                          SizedBox(width: 4),
-                          Text('↑ للقفل  •  ↔ للإلغاء',
-                              style: TextStyle(color: Colors.white70, fontSize: 13)),
-                        ]),
-                      ),
-                    )
-                  else ...[
-                    IconButton(
-                      tooltip: 'حذف',
-                      icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
-                      onPressed: () => _finish(send: false),
-                    ),
-                    IconButton(
-                      tooltip: 'إرسال',
-                      icon: const Icon(Icons.send_rounded, color: Color(0xFF22C55E)),
-                      onPressed: () => _finish(send: true),
-                    ),
-                  ],
-                ]),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1C1C2E),
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 12)],
               ),
+              child: Row(children: [
+                if (recording) const _PulsingDot() else const Icon(Icons.graphic_eq_rounded, color: Colors.white54, size: 18),
+                const SizedBox(width: 8),
+                ValueListenableBuilder<Duration>(
+                  valueListenable: _elapsed,
+                  builder: (_, d, __) => Text(_fmt(d),
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                ),
+                const Spacer(),
+                if (recording)
+                  // النقر على الأيقونة نفسها مجددًا (أسفل) يوقف التسجيل؛
+                  // هذا النص توضيحي فقط ريثما يضغط المستخدم مرة أخرى.
+                  const Text('اضغط مجددًا للإيقاف', style: TextStyle(color: Colors.white54, fontSize: 12.5))
+                else ...[
+                  IconButton(
+                    tooltip: 'حذف',
+                    icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                    onPressed: _discard,
+                  ),
+                  IconButton(
+                    tooltip: 'إرسال',
+                    icon: const Icon(Icons.send_rounded, color: Color(0xFF22C55E)),
+                    onPressed: _send,
+                  ),
+                ],
+              ]),
             ),
           ),
         ),
@@ -227,21 +204,30 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
         ),
       );
     }
+    final recording = _stage == _VoiceStage.recording;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => _toast('اضغط مطوّلًا للتسجيل، وحرّر للإرسال.'),
-      onLongPressStart: (d) => _begin(d.globalPosition),
-      onLongPressMoveUpdate: (d) => _move(d.globalPosition),
-      onLongPressEnd: (_) => _release(),
-      onLongPressCancel: () => _finish(send: false),
+      // البند ٩ حرفيًا: ضغطة تبدأ، ضغطة تالية توقف — لا ضغط مطوّل، ولا
+      // إرسال تلقائي عند التحرير.
+      onTap: () {
+        if (_stage == _VoiceStage.idle) {
+          unawaited(_start());
+        } else if (_stage == _VoiceStage.recording) {
+          unawaited(_stop());
+        }
+      },
       child: Padding(
         padding: const EdgeInsets.all(8),
         child: AnimatedScale(
-          scale: _recording ? 1.4 : 1,
+          scale: recording ? 1.4 : 1,
           duration: const Duration(milliseconds: 150),
-          child: Icon(_recording ? Icons.mic : Icons.mic_none_rounded,
-              color: _recording ? const Color(0xFFEF4444) : widget.color,
-              size: widget.size),
+          child: Icon(
+            recording
+                ? Icons.stop_circle_rounded
+                : (_stage == _VoiceStage.stopped ? Icons.graphic_eq_rounded : Icons.mic_none_rounded),
+            color: recording ? const Color(0xFFEF4444) : widget.color,
+            size: widget.size,
+          ),
         ),
       ),
     );

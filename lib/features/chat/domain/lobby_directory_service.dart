@@ -72,22 +72,18 @@ class LobbyDirectoryService {
   }
 
   /// التواصل مع مدير المنصة يعتمد حصراً على حامل رتبة DRAGON.
+  /// كانت تقرأ roles ثم user_roles مباشرة؛ سياسة user_roles تمنع أي
+  /// عضو عادي من رؤية صف غيره، فيعود البحث فارغًا دائمًا له تحديدًا —
+  /// هذا هو السبب الحقيقي خلف "تعذّر العثور على حساب DRAGON" الذي كان
+  /// يظهر لكل عضو عادي يضغط الزر. get_platform_owner_uid موثوقة خادميًا
+  /// وتتجاوز هذا القيد لغرض واحد: معرفة من هو مالك المنصة.
   static Future<String?> findPlatformOwnerUid() async {
-    final db = Supabase.instance.client;
-    final roleRow = await db
-        .from('roles')
-        .select('id')
-        .eq('code', AppRoles.dragon)
-        .maybeSingle();
-    final roleId = roleRow?['id'];
-    if (roleId == null) return null;
-    final userRow = await db
-        .from('user_roles')
-        .select('user_id')
-        .eq('role_id', roleId)
-        .limit(1)
-        .maybeSingle();
-    return userRow?['user_id'] as String?;
+    try {
+      final uid = await Supabase.instance.client.rpc('get_platform_owner_uid');
+      return uid as String?;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// "العرش الملكي للعضويات المدفوعة" — أعلى الأعضاء عضويةً حاليًا

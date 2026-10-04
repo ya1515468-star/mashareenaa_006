@@ -1160,6 +1160,34 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
     }
   }
 
+  /// الغرفة الأساسية (البند ٨): عضو جديد يدخلها أول مرة، ولا يملك أي
+  /// عضو سواها قرارًا بديلًا إلا بعد زيارة غرفة أخرى فعليًا. لم يكن
+  /// هناك أي تحكّم بهذا إطلاقًا؛ كانت الغرفة الظاهرة للجميع هي الأقدم
+  /// تاريخ إنشاء بالصدفة لا بقرار.
+  Future<void> _setAsDefaultRoom() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('الغرفة الأساسية'),
+        content: const Text('ستصبح هذه الغرفة الوجهة الأولى لكل عضو جديد ينضم للمنصة.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('تعيين')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _busy = true);
+    try {
+      await _sb.rpc('owner_set_default_room', params: {'p_room_id': widget.roomId});
+      if (mounted) _publishCommandResult('تعيين الغرفة الأساسية', success: true);
+    } catch (e) {
+      if (mounted) _publishCommandResult('تعيين الغرفة الأساسية', success: false, detail: _commandError(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _deleteRoom() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -1734,6 +1762,14 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(onPressed: _busy ? null : _loadPermissions, icon: const Icon(Icons.download_rounded), label: const Text('تحميل الصلاحيات الحالية')),
+            if (canDelete) ...[
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _setAsDefaultRoom,
+                icon: const Icon(Icons.home_rounded),
+                label: const Text('اجعلها الغرفة الأساسية'),
+              ),
+            ],
             const SizedBox(height: 18),
             const Divider(color: Colors.white24),
             FilledButton.icon(
