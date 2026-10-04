@@ -3,6 +3,9 @@ import 'package:mashareena/features/chat/data/services/chat_media_url_resolver.d
 
 void main() {
   group('chat media storage contract', () {
+    test('room voice namespace remains public-media compatible', () {
+      expect(ChatMediaUrlResolver.bucketForPath('chat/voice_room/123/voice.m4a'), isNull);
+    });
     test('private voice paths resolve to chat-voice', () {
       expect(
         ChatMediaUrlResolver.bucketForPath(
