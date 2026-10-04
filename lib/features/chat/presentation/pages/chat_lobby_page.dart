@@ -825,8 +825,8 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       setState(() => _error = 'تعذر قراءة المرفق من الجهاز.');
       return;
     }
-    if (bytes.length > 25 * 1024 * 1024) {
-      setState(() => _error = 'الحد الأقصى للمرفقات في الشات 25MB.');
+    if (bytes.length > 10 * 1024 * 1024) {
+      setState(() => _error = 'الحد الأقصى للمرفقات في الغرفة 10MB.');
       return;
     }
     setState(() {
@@ -941,24 +941,29 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
 
   /// بحث أغنية/فيديو ← عند الاختيار: يُرسَل كرسالة يوتيوب عادية في الغرفة
   /// (فتُضمَّن في فقاعتها بمشغّل الفقاعة المحلي كأي رابط يُلصَق يدويًا)،
-  /// ويُشغَّل فورًا أيضًا في المشغّل المصغّر العائم (يستمر عبر التنقّل).
+  /// ويظهر تشغيله اختياريًا من زر "تشغيل" في المشغّل العائم.
   Future<void> _showSongSearch() async {
     if (_user == null) return;
-    await SongSearchSheet.show(context, onSelected: (videoId, title) async {
-      ref.read(miniPlayerProvider.notifier).state =
-          MiniPlayerTrack(videoId: videoId, title: title);
-      try {
-        await _insertPublicMessage(
+    await SongSearchSheet.show(
+      context,
+      onPreviewPlay: (videoId, title) {
+        ref.read(miniPlayerProvider.notifier).state =
+            MiniPlayerTrack(videoId: videoId, title: title);
+      },
+      onSelected: (videoId, title) async {
+        try {
+          await _insertPublicMessage(
           body: 'https://www.youtube.com/watch?v=$videoId',
           message: 'https://www.youtube.com/watch?v=$videoId',
           kind: 'text',
         );
-        if (!mounted) return;
-        _scrollToEnd();
-      } catch (e) {
-        if (mounted) setState(() => _error = _friendlyChatError(e));
-      }
-    });
+          if (!mounted) return;
+          _scrollToEnd();
+        } catch (e) {
+          if (mounted) setState(() => _error = _friendlyChatError(e));
+        }
+      },
+    );
   }
 
   Future<void> _sendVoice(String url) async {
@@ -4415,14 +4420,14 @@ class _Composer extends StatelessWidget {
     Widget actionButton({
       required IconData icon,
       required VoidCallback onPressed,
+      Color color,
       String? tooltip,
     }) {
       return IconButton(
         tooltip: tooltip,
         onPressed: sending ? null : onPressed,
         splashRadius: 22,
-        icon: Icon(icon, size: 21),
-        color: p.accentBright,
+        icon: Icon(icon, size: 21, color: color),
         disabledColor: p.textMuted,
       );
     }
@@ -4531,25 +4536,30 @@ class _Composer extends StatelessWidget {
           actionButton(
             icon: Icons.emoji_emotions_outlined,
             onPressed: onEmoji,
+            color: const Color(0xFFF59E0B),
             tooltip: 'الرموز',
           ),
           actionButton(
             icon: Icons.gif_box_outlined,
             onPressed: onGif,
+            color: const Color(0xFFEC4899),
             tooltip: 'GIF',
           ),
           actionButton(
             icon: Icons.music_note_rounded,
             onPressed: onSongSearch,
+            color: const Color(0xFF22D3EE),
             tooltip: 'بحث أغنية',
           ),
           actionButton(
             icon: Icons.add_circle_outline_rounded,
             onPressed: onAttach,
+            color: const Color(0xFF22C55E),
             tooltip: 'مرفق',
           ),
-          // تسجيل بنمط واتساب: اضغط مطوّلًا، حرّر للإرسال، اسحب للإلغاء أو للقفل.
-          VoiceHoldButton(onUploaded: onVoice),
+          // تسجيل بنمط واتساب: يبدأ بضغطة ويظل زر الميكروفون ظاهرًا، ثم
+          // يظهر شريط الموجة مع إيقاف مؤقت/إرسال/حذف صريح.
+          VoiceHoldButton(onUploaded: onVoice, privateChat: false),
         ],
       ),
     );

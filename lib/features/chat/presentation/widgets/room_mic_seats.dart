@@ -102,10 +102,13 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
       }
       if (shouldSpeak != _voice.publisher) {
         await _voice.refreshRole(widget.roomId);
-        if (_voice.publisher && _voice.uid != null) {
-          unawaited(_db.rpc('set_my_mic_agora_uid',
-              params: {'p_room': widget.roomId, 'p_agora_uid': _voice.uid}));
-        }
+      }
+      // سجّل معرّف Agora الحالي على الخادم حتى لو بدأ المستخدم بالفعل
+      // كمتحدّث عند أول تحميل الشاشة؛ من دون ذلك يبقى agora_uid فارغًا
+      // ولا يستطيع مؤشر "يتحدث الآن" مطابقة متحدثي Agora بالكرسي.
+      if (_voice.publisher && _voice.uid != null && mine != null) {
+        unawaited(_db.rpc('set_my_mic_agora_uid',
+            params: {'p_room': widget.roomId, 'p_agora_uid': _voice.uid}));
       }
       if (mine != null) {
         await _voice.setMuted(mine['self_muted'] == true || mine['muted'] == true);
@@ -376,7 +379,7 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
     final agoraUid = (s['agora_uid'] as num?)?.toInt();
     final isMe = occupant != null && occupant == _me;
     final talking = occupant != null && !muted &&
-        ((isMe && speaking.contains(0)) || (agoraUid != null && speaking.contains(agoraUid)));
+        (agoraUid != null && speaking.contains(agoraUid));
     final avatar = s['avatar']?.toString() ?? '';
 
     return GestureDetector(
@@ -430,6 +433,39 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
                   radius: 9,
                   backgroundColor: Color(0xFFEF4444),
                   child: Icon(Icons.mic_off, size: 11, color: Colors.white),
+                ),
+              ),
+            if (isMe)
+              Positioned(
+                top: -4,
+                right: -4,
+                child: _SeatQuickButton(
+                  icon: s['muted'] == true
+                      ? Icons.volume_off_rounded
+                      : (s['self_muted'] == true ? Icons.mic_off_rounded : Icons.mic_rounded),
+                  color: s['muted'] == true
+                      ? const Color(0xFFE11D48)
+                      : (s['self_muted'] == true ? const Color(0xFFE11D48) : const Color(0xFF16A34A)),
+                  onTap: _busy || s['muted'] == true
+                      ? null
+                      : () => _rpc('set_my_mic_muted', {
+                            'p_room': widget.roomId,
+                            'p_muted': s['self_muted'] != true,
+                          }),
+                ),
+              )
+            else if (control && occupant != null)
+              Positioned(
+                top: -4,
+                right: -4,
+                child: _SeatQuickButton(
+                  icon: muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                  color: muted ? const Color(0xFFE11D48) : const Color(0xFF7C3AED),
+                  onTap: _busy ? null : () => _rpc('room_mic_admin', {
+                    'p_room': widget.roomId,
+                    'p_action': muted ? 'unmute' : 'mute',
+                    'p_seat': (s['index'] as num).toInt(),
+                  }),
                 ),
               ),
           ]),
@@ -541,4 +577,23 @@ class _RoomVoice {
       await engine.release();
     } catch (_) {}
   }
+}
+
+
+class _SeatQuickButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final VoidCallback? onTap;
+  const _SeatQuickButton({required this.icon, required this.color, required this.onTap});
+  @override
+  Widget build(BuildContext context) => Material(
+        color: color,
+        shape: const CircleBorder(),
+        elevation: 3,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(width: 22, height: 22, child: Icon(icon, color: Colors.white, size: 12)),
+        ),
+      );
 }

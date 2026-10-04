@@ -1,6 +1,8 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
+import '../../data/services/chat_media_url_resolver.dart';
+
 /// مشغّل صوت داخلي حصراً ضمن الفقاعة نفسها — تشغيل/إيقاف وشريط تقدّم
 /// ومدة، بلا أي فتح لتطبيق خارجي. كانت الرسائل الصوتية (في الغرفة
 /// والخاص معاً) تُفتح عبر launchUrl(mode: externalApplication)، فيُغادر
@@ -52,7 +54,8 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
     }
     setState(() => _loading = true);
     try {
-      await _player.play(UrlSource(widget.url));
+      final resolved = await ChatMediaUrlResolver.resolve(widget.url);
+      await _player.play(UrlSource(resolved));
       if (mounted) setState(() => _playing = true);
     } catch (e) {
       if (mounted) {

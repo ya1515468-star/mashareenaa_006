@@ -1,31 +1,38 @@
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../../../core/services/media_upload_service.dart';
 
-/// رفع تسجيل صوتي من مساره المحلي وإرجاع رابطه. كانت هذه الدالة جزءًا من
-/// ورقة تسجيل منفصلة (VoiceRecorderSheet) أُزيلت بالكامل (البند ٩: لا
-/// صفحة صوتية منفصلة، زر تسجيل واحد واضح فقط) — استُخرجت هنا لتبقى
-/// مشتركة مع VoiceHoldButton دون إبقاء أي أثر لتلك الصفحة.
 class VoiceUploadHelper {
-  static Future<String> uploadRecording(String path) async {
+  static Future<String> uploadRecording(
+    String path, {
+    required bool privateChat,
+  }) async {
     final bytes = await XFile(path).readAsBytes();
     final uid = Supabase.instance.client.auth.currentUser?.id;
     if (uid == null) throw StateError('لا توجد جلسة مستخدم.');
-    final vipRaw = await Supabase.instance.client.rpc(
-      'get_profile_service_runtime',
-      params: {'p_feature_key': 'chat_media_plus'},
-    );
-    final vipPlus = vipRaw is Map && vipRaw['enabled'] == true;
-    if (bytes.length > (vipPlus ? 25 : 10) * 1024 * 1024) {
-      throw StateError(vipPlus
-          ? 'حد الوسائط Plus هو 25MB.'
-          : 'الحد الأساسي للوسائط الصوتية 10MB؛ فعّل وسائط Plus للوصول إلى 25MB.');
+    if (bytes.isEmpty) throw StateError('التسجيل الصوتي فارغ.');
+
+    final bucket = privateChat ? 'chat-voice' : 'media';
+    final maxBytes = 10 * 1024 * 1024;
+    if (bytes.length > maxBytes) {
+      throw StateError('حجم الرسالة الصوتية يتجاوز 10MB.');
     }
-    return MediaUploadService(bucket: vipPlus ? 'chat-media-plus' : 'media').uploadBytes(
+
+    // انتبه: MediaUploadService.uploadBytes() ينظف اسم المجلد كوحدة واحدة
+    // ويستبدل '/' بـ '_'، لذلك لا نمرر هنا مجلدًا يحتوي شرطات مائلة.
+    // المسار الصريح يطابق سياسات Supabase الجديدة حرفيًا للخاص،
+    // ويترك رسائل الغرف داخل bucket media العام.
+    final safeUid = uid.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    final unique = DateTime.now().microsecondsSinceEpoch;
+    final folder = privateChat ? 'voice_private' : 'voice_room';
+    final objectPath = 'chat/$folder/$safeUid/voice_$unique.m4a';
+
+    return MediaUploadService(bucket: bucket).uploadBytesAtPath(
       bytes: bytes,
-      fileName: 'voice_.m4a',
-      folder: 'chat/audio',
-      uid: uid,
+      fileName: 'voice.m4a',
+      path: objectPath,
+      contentType: 'audio/mp4',
     );
   }
 }

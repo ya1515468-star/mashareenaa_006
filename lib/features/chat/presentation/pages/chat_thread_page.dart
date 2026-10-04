@@ -312,21 +312,26 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
   }
 
   /// بحث أغنية/فيديو في الخاص: نفس منطق الغرفة — تُرسَل كرسالة نصّية
-  /// برابط يوتيوب (تُضمَّن تلقائيًا في الفقاعة)، وتُشغَّل فورًا أيضًا في
-  /// المشغّل المصغّر العائم المشترك بين الغرف والخاص معًا.
+  /// برابط يوتيوب (تُضمَّن تلقائيًا في الفقاعة)، بينما التشغيل اختياري
+  /// من زر "تشغيل" في المشغّل العائم المشترك بين الغرف والخاص.
   Future<void> _showSongSearch() async {
     final myUid = ref.read(authControllerProvider).valueOrNull?.uid;
     if (myUid == null) return;
-    await SongSearchSheet.show(context, onSelected: (videoId, title) async {
-      ref.read(miniPlayerProvider.notifier).state =
-          MiniPlayerTrack(videoId: videoId, title: title);
-      await ref.read(chatControllerProvider.notifier).sendMessage(
+    await SongSearchSheet.show(
+      context,
+      onPreviewPlay: (videoId, title) {
+        ref.read(miniPlayerProvider.notifier).state =
+            MiniPlayerTrack(videoId: videoId, title: title);
+      },
+      onSelected: (videoId, title) async {
+        await ref.read(chatControllerProvider.notifier).sendMessage(
             fromUid: myUid,
             toUid: widget.otherUid,
             text: 'https://www.youtube.com/watch?v=$videoId',
             type: MessageType.text,
           );
-    });
+      },
+    );
   }
 
   Future<void> _showGifPicker(BuildContext context) async {
@@ -844,13 +849,13 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: Icon(Icons.add_circle_outline, color: p.accent),
+                    icon: const Icon(Icons.add_circle_outline, color: Color(0xFF22C55E)),
                     tooltip: 'إرفاق',
                     onPressed: () =>
                         AttachmentMenu.show(context, onPicked: _sendAttachment),
                   ),
                   IconButton(
-                    icon: Icon(Icons.emoji_emotions_outlined, color: p.accent),
+                    icon: const Icon(Icons.emoji_emotions_outlined, color: Color(0xFFF59E0B)),
                     tooltip: 'إيموجي',
                     onPressed: () => EmojiPickerSheet.show(context, _sendEmoji),
                   ),
@@ -859,18 +864,20 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
                   // معاينة)، مطابقًا لنمط إرسال الإيموجي الفوري في هذه
                   // الشاشة أصلًا.
                   IconButton(
-                    icon: Icon(Icons.gif_box_outlined, color: p.accent),
+                    icon: const Icon(Icons.gif_box_outlined, color: Color(0xFFEC4899)),
                     tooltip: 'GIF',
                     onPressed: () => _showGifPicker(context),
                   ),
                   IconButton(
-                    icon: Icon(Icons.music_note_rounded, color: p.accent),
+                    icon: const Icon(Icons.music_note_rounded, color: Color(0xFF22D3EE)),
                     tooltip: 'بحث أغنية',
                     onPressed: _showSongSearch,
                   ),
-                  // تسجيل بنمط واتساب: اضغط مطوّلًا، حرّر للإرسال، اسحب للإلغاء أو للقفل.
+                  // تسجيل بنمط واتساب: يبدأ بضغطة ويظل زر الميكروفون ظاهرًا، ثم
+                  // يظهر شريط الموجة مع إيقاف مؤقت/إرسال/حذف صريح.
                   VoiceHoldButton(
                     color: p.accent,
+                    privateChat: true,
                     onUploaded: (url) async =>
                         _sendAttachment(MessageType.audio, url, 'voice.m4a'),
                   ),

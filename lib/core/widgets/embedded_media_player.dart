@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -178,21 +180,11 @@ class _InlineYoutubePlayer extends StatefulWidget {
 }
 
 class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
-  // ثلاث محاولات متتالية هنا أخطأت، وأوثّقها حتى لا تتكرر الدائرة نفسها:
-  //   ١) الإعداد الافتراضي للمكتبة → "This video is unavailable, 152-4".
-  //   ٢) ضبط origin على نطاق التطبيق، ظنًّا أنه Referer فقط → اتضح من
-  //      مصدر المكتبة (assets/player.html) أن نفس القيمة تُستعمل أيضًا
-  //      كـhost الذي يُحمَّل منه مشغّل يوتيوب نفسه، وهو نطاق وهمي غير
-  //      موجود، فلم يُحمَّل أي شيء — الصندوق الأسود.
-  //   ٣) إبقاء host الحقيقي، ثم إعادة تحميل المشغّل مرة واحدة بعد
-  //      جهوزيته بـbaseUrl مختلف لتصحيح الـReferer → هذه إعادة التحميل
-  //      نفسها قاطعت تهيئة جلسة يوتيوب في منتصفها، فأنتج يوتيوب خطأه
-  //      العام "An error occurred. (Playback ID: …)" — جلسة بدأت فعلًا
-  //      (host صحيح) لكن تعطّلت بسبب تدخّلي، لا بسبب يوتيوب.
-  //
-  // لا مزيد من التدخل اليدوي بمسار المصادقة. هذا هو الاستعمال القياسي
-  // للمكتبة بإعدادها الافتراضي تمامًا — نفس ما تستعمله غالبية التطبيقات
-  // المنشورة بهذه الحزمة بنجاح لفيديوهات يوتيوب العامة العادية.
+  StreamSubscription<YoutubePlayerValue>? _youtubeSubscription;
+  bool _blocked = false;
+  // مع youtube_player_iframe 6.x أصبح المضيف الداخلي متوافقًا مع مسار
+  // التضمين الحديث، لذلك لا نحقن origin وهميًا ولا نعيد تحميل iframe يدويًا.
+  // أي خطأ يمنع التشغيل يُحوّل إلى بطاقة آمنة، مع زر فتح في YouTube.
   late final YoutubePlayerController _controller = YoutubePlayerController.fromVideoId(
     videoId: widget.videoId,
     autoPlay: true,
@@ -203,6 +195,8 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
       // while YouTube's own controls allow the user to unmute.
       mute: true,
       strictRelatedVideos: false,
+      interfaceLanguage: 'ar',
+      privacyEnhancedMode: true,
     ),
   );
 
@@ -215,10 +209,25 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
   bool _disposed = false;
 
   @override
+  void initState() {
+    super.initState();
+    _youtubeSubscription = _controller.listen((value) {
+      if (!mounted || _disposed) return;
+      final code = value.error.code;
+      if (code != 0) {
+        setState(() => _blocked = true);
+      }
+    });
+  }
+
+  @override
   void didUpdateWidget(covariant _InlineYoutubePlayer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (_disposed) return;
     if (oldWidget.videoId != widget.videoId) {
+      setState(() {
+        _blocked = false;
+      });
       _controller.loadVideoById(videoId: widget.videoId);
     }
   }
@@ -226,6 +235,7 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
   @override
   void dispose() {
     _disposed = true;
+    unawaited(_youtubeSubscription?.cancel());
     _controller.close();
     super.dispose();
   }
@@ -233,6 +243,32 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
   @override
   Widget build(BuildContext context) {
     if (_disposed) return const SizedBox.shrink();
+    if (_blocked) {
+      return Container(
+        constraints: const BoxConstraints(minHeight: 200),
+        decoration: BoxDecoration(
+          color: const Color(0xFF18111F),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: .45)),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Icon(Icons.ondemand_video_rounded, color: Color(0xFFA78BFA), size: 34),
+          const SizedBox(height: 10),
+          const Text('هذا الفيديو لا يسمح يوتيوب بتشغيله داخل مشغّل مضمّن.', textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 6),
+          const Text('اختر نتيجة أخرى أو افتحه في يوتيوب.', textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white60, fontSize: 12)),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            onPressed: () => launchUrl(Uri.parse('https://www.youtube.com/watch?v=${widget.videoId}'), mode: LaunchMode.externalApplication),
+            icon: const Icon(Icons.open_in_new_rounded, size: 18),
+            label: const Text('فتح في يوتيوب'),
+          ),
+        ]),
+      );
+    }
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       // يوتيوب يشترط ألا يقل المشغّل المضمَّن عن 200×200 بكسل. في فقاعة الشات

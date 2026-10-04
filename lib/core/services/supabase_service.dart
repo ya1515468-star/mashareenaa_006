@@ -133,6 +133,8 @@ class SupabaseService {
   static const Set<String> _privateBuckets = {
     'profile-patterns',
     'profile-products',
+    'chat-media-plus',
+    'chat-voice',
   };
 
   static const Set<String> _publicBuckets = {
