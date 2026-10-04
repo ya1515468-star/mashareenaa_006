@@ -13,7 +13,16 @@ enum AppNotificationType {
   friendRejected,
   callIncoming,
   callEnded,
-  report
+  report,
+  // أحداث الحساب المهمة (مثل شات أحلى لمة والشات الملكي): كانت كلها تُعرض
+  // كإشعار «نظام» عام بأيقونة واحدة، والهدية بأيقونة «رسالة» خاطئة.
+  gift,
+  transfer,
+  moderation,
+  purchase,
+  membership,
+  membershipExpiring,
+  profileVisit
 }
 
 extension AppNotificationTypeX on AppNotificationType {
@@ -38,7 +47,19 @@ extension AppNotificationTypeX on AppNotificationType {
       case 'report':
         return AppNotificationType.report;
       case 'gift':
-        return AppNotificationType.message;
+        return AppNotificationType.gift;
+      case 'transfer':
+        return AppNotificationType.transfer;
+      case 'moderation':
+        return AppNotificationType.moderation;
+      case 'item_ownership':
+        return AppNotificationType.purchase;
+      case 'membership_started':
+        return AppNotificationType.membership;
+      case 'membership_expiring':
+        return AppNotificationType.membershipExpiring;
+      case 'profile_visit':
+        return AppNotificationType.profileVisit;
       default:
         return AppNotificationType.values.firstWhere((e) => e.wire == s,
             orElse: () => AppNotificationType.system);

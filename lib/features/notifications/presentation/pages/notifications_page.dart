@@ -58,6 +58,42 @@ class NotificationsPage extends ConsumerWidget {
         return Icons.call_end;
       case AppNotificationType.report:
         return Icons.flag_outlined;
+      case AppNotificationType.gift:
+        return Icons.card_giftcard_rounded;
+      case AppNotificationType.transfer:
+        return Icons.account_balance_wallet_rounded;
+      case AppNotificationType.moderation:
+        return Icons.gavel_rounded;
+      case AppNotificationType.purchase:
+        return Icons.shopping_bag_rounded;
+      case AppNotificationType.membership:
+        return Icons.workspace_premium_rounded;
+      case AppNotificationType.membershipExpiring:
+        return Icons.hourglass_bottom_rounded;
+      case AppNotificationType.profileVisit:
+        return Icons.visibility_rounded;
+    }
+  }
+
+  /// لون مميّز لكل فئة (مثل شات أحلى لمة والشات الملكي): الإدارة أحمر، الهدايا
+  /// وردي، المال أخضر، العضوية ذهبي، تنبيه الانتهاء برتقالي، الزوار أزرق.
+  Color? _colorFor(AppNotificationType type) {
+    switch (type) {
+      case AppNotificationType.moderation:
+        return const Color(0xFFE53935);
+      case AppNotificationType.gift:
+        return const Color(0xFFEC407A);
+      case AppNotificationType.transfer:
+      case AppNotificationType.purchase:
+        return const Color(0xFF43A047);
+      case AppNotificationType.membership:
+        return const Color(0xFFFFB300);
+      case AppNotificationType.membershipExpiring:
+        return const Color(0xFFFB8C00);
+      case AppNotificationType.profileVisit:
+        return const Color(0xFF1E88E5);
+      default:
+        return null;
     }
   }
 
@@ -179,11 +215,14 @@ class NotificationsPage extends ConsumerWidget {
                 }),
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: n.isRead ? p.surfaceHighlight : p.accent,
+                    backgroundColor: _colorFor(n.type)?.withValues(alpha: n.isRead ? .35 : 1) ??
+                        (n.isRead ? p.surfaceHighlight : p.accent),
                     child: Icon(
                       _iconFor(n.type),
                       size: 18,
-                      color: n.isRead ? p.textSecondary : p.background,
+                      color: _colorFor(n.type) != null
+                          ? Colors.white
+                          : (n.isRead ? p.textSecondary : p.background),
                     ),
                   ),
                   title: Text(

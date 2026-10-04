@@ -2,6 +2,7 @@ import '../widgets/room_mic_seats.dart';
 import '../widgets/animated_dice_roller.dart';
 import '../widgets/forward_message_sheet.dart';
 import '../widgets/voice_message_player.dart';
+import '../providers/unread_dm_provider.dart';
 import '../../../../core/widgets/song_search_sheet.dart';
 import '../../../../core/providers/mini_player_provider.dart';
 import '../widgets/voice_hold_button.dart';
@@ -2859,9 +2860,8 @@ class _TopBar extends ConsumerWidget {
     final unreadNotifications =
         ref.watch(unreadNotificationsCountProvider).valueOrNull ??
             notifications.where((n) => !n.isRead).length;
-    final messageCount = notifications
-        .where((n) => n.type == AppNotificationType.message && !n.isRead)
-        .length;
+    // من المحادثات الخاصة نفسها، لا من الإشعارات (انظر unread_dm_provider).
+    final messageCount = ref.watch(unreadDmCountProvider).valueOrNull ?? 0;
     final reportCount = notifications
         .where((n) => n.type == AppNotificationType.report && !n.isRead)
         .length;
