@@ -1,0 +1,300 @@
+diff -ruN orig45/MASHAREEN/lib/core/services/media_upload_service.dart work45/MASHAREEN/lib/core/services/media_upload_service.dart
+--- a/lib/core/services/media_upload_service.dart	2026-09-09 20:54:26.000000000 +0000
++++ b/lib/core/services/media_upload_service.dart	2026-10-04 21:51:46.782182348 +0000
+@@ -16,13 +16,14 @@
+   final String bucket;
+ 
+   static const Map<String, int> maxBytes = {
+-    'profile-avatars': 8 * 1024 * 1024,
++    'profile-avatars': 5 * 1024 * 1024,
+     'avatar-frames': 8 * 1024 * 1024,
+     'name-animations': 8 * 1024 * 1024,
+     'chat-sounds': 5 * 1024 * 1024,
+     'profile-music': 5 * 1024 * 1024,
+     'media': 10 * 1024 * 1024,
+     'chat-media-plus': 25 * 1024 * 1024,
++    'chat-voice': 10 * 1024 * 1024,
+     'chat-badges': 8 * 1024 * 1024,
+     'chat-welcome-images': 8 * 1024 * 1024,
+     'profile-patterns': 15 * 1024 * 1024,
+@@ -46,11 +47,12 @@
+     },
+     'chat-media-plus': {
+       'png', 'jpg', 'jpeg', 'webp', 'gif', 'mp4', 'webm', 'mov',
+-      'mp3', 'm4a', 'wav', 'ogg', 'aac', 'pdf', 'zip'
++      'mp3', 'm4a', 'wav', 'ogg', 'aac', 'pdf', 'zip', 'doc', 'docx', 'txt'
+     },
++    'chat-voice': {'m4a', 'mp3', 'wav', 'ogg', 'aac', 'webm'},
+     'media': {
+       'png', 'jpg', 'jpeg', 'webp', 'gif', 'mp4', 'webm', 'mov',
+-      'mp3', 'm4a', 'wav', 'ogg', 'aac', 'zip', 'pdf'
++      'mp3', 'm4a', 'wav', 'ogg', 'aac', 'zip', 'pdf', 'doc', 'docx', 'txt'
+     },
+   };
+ 
+@@ -248,6 +250,9 @@
+         'ogg' => 'audio/ogg',
+         'm4a' => 'audio/mp4',
+         'aac' => 'audio/aac',
++        'doc' => 'application/msword',
++        'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
++        'txt' => 'text/plain',
+         'zip' => 'application/zip',
+         'pdf' => 'application/pdf',
+         _ => 'application/octet-stream',
+diff -ruN orig45/MASHAREEN/lib/core/services/supabase_service.dart work45/MASHAREEN/lib/core/services/supabase_service.dart
+--- a/lib/core/services/supabase_service.dart	2026-09-09 20:51:02.000000000 +0000
++++ b/lib/core/services/supabase_service.dart	2026-10-04 21:45:53.006227771 +0000
+@@ -133,6 +133,8 @@
+   static const Set<String> _privateBuckets = {
+     'profile-patterns',
+     'profile-products',
++    'chat-media-plus',
++    'chat-voice',
+   };
+ 
+   static const Set<String> _publicBuckets = {
+diff -ruN orig45/MASHAREEN/lib/core/widgets/embedded_media_player.dart work45/MASHAREEN/lib/core/widgets/embedded_media_player.dart
+--- a/lib/core/widgets/embedded_media_player.dart	2026-10-03 19:49:32.000000000 +0000
++++ b/lib/core/widgets/embedded_media_player.dart	2026-10-04 21:57:28.983741877 +0000
+@@ -1,3 +1,5 @@
++import 'dart:async';
++
+ import 'package:flutter/foundation.dart';
+ import 'package:flutter/material.dart';
+ import 'package:url_launcher/url_launcher.dart';
+@@ -178,21 +180,11 @@
+ }
+ 
+ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
+-  // ثلاث محاولات متتالية هنا أخطأت، وأوثّقها حتى لا تتكرر الدائرة نفسها:
+-  //   ١) الإعداد الافتراضي للمكتبة → "This video is unavailable, 152-4".
+-  //   ٢) ضبط origin على نطاق التطبيق، ظنًّا أنه Referer فقط → اتضح من
+-  //      مصدر المكتبة (assets/player.html) أن نفس القيمة تُستعمل أيضًا
+-  //      كـhost الذي يُحمَّل منه مشغّل يوتيوب نفسه، وهو نطاق وهمي غير
+-  //      موجود، فلم يُحمَّل أي شيء — الصندوق الأسود.
+-  //   ٣) إبقاء host الحقيقي، ثم إعادة تحميل المشغّل مرة واحدة بعد
+-  //      جهوزيته بـbaseUrl مختلف لتصحيح الـReferer → هذه إعادة التحميل
+-  //      نفسها قاطعت تهيئة جلسة يوتيوب في منتصفها، فأنتج يوتيوب خطأه
+-  //      العام "An error occurred. (Playback ID: …)" — جلسة بدأت فعلًا
+-  //      (host صحيح) لكن تعطّلت بسبب تدخّلي، لا بسبب يوتيوب.
+-  //
+-  // لا مزيد من التدخل اليدوي بمسار المصادقة. هذا هو الاستعمال القياسي
+-  // للمكتبة بإعدادها الافتراضي تمامًا — نفس ما تستعمله غالبية التطبيقات
+-  // المنشورة بهذه الحزمة بنجاح لفيديوهات يوتيوب العامة العادية.
++  StreamSubscription<YoutubePlayerValue>? _youtubeSubscription;
++  bool _blocked = false;
++  // مع youtube_player_iframe 6.x أصبح المضيف الداخلي متوافقًا مع مسار
++  // التضمين الحديث، لذلك لا نحقن origin وهميًا ولا نعيد تحميل iframe يدويًا.
++  // أي خطأ يمنع التشغيل يُحوّل إلى بطاقة آمنة، مع زر فتح في YouTube.
+   late final YoutubePlayerController _controller = YoutubePlayerController.fromVideoId(
+     videoId: widget.videoId,
+     autoPlay: true,
+@@ -203,6 +195,8 @@
+       // while YouTube's own controls allow the user to unmute.
+       mute: true,
+       strictRelatedVideos: false,
++      interfaceLanguage: 'ar',
++      privacyEnhancedMode: true,
+     ),
+   );
+ 
+@@ -215,10 +209,25 @@
+   bool _disposed = false;
+ 
+   @override
++  void initState() {
++    super.initState();
++    _youtubeSubscription = _controller.listen((value) {
++      if (!mounted || _disposed) return;
++      final code = value.error.code;
++      if (code != 0) {
++        setState(() => _blocked = true);
++      }
++    });
++  }
++
++  @override
+   void didUpdateWidget(covariant _InlineYoutubePlayer oldWidget) {
+     super.didUpdateWidget(oldWidget);
+     if (_disposed) return;
+     if (oldWidget.videoId != widget.videoId) {
++      setState(() {
++        _blocked = false;
++      });
+       _controller.loadVideoById(videoId: widget.videoId);
+     }
+   }
+@@ -226,6 +235,7 @@
+   @override
+   void dispose() {
+     _disposed = true;
++    unawaited(_youtubeSubscription?.cancel());
+     _controller.close();
+     super.dispose();
+   }
+@@ -233,6 +243,32 @@
+   @override
+   Widget build(BuildContext context) {
+     if (_disposed) return const SizedBox.shrink();
++    if (_blocked) {
++      return Container(
++        constraints: const BoxConstraints(minHeight: 200),
++        decoration: BoxDecoration(
++          color: const Color(0xFF18111F),
++          borderRadius: BorderRadius.circular(14),
++          border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: .45)),
++        ),
++        padding: const EdgeInsets.all(16),
++        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
++          const Icon(Icons.ondemand_video_rounded, color: Color(0xFFA78BFA), size: 34),
++          const SizedBox(height: 10),
++          const Text('هذا الفيديو لا يسمح يوتيوب بتشغيله داخل مشغّل مضمّن.', textAlign: TextAlign.center,
++              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
++          const SizedBox(height: 6),
++          const Text('اختر نتيجة أخرى أو افتحه في يوتيوب.', textAlign: TextAlign.center,
++              style: TextStyle(color: Colors.white60, fontSize: 12)),
++          const SizedBox(height: 10),
++          FilledButton.icon(
++            onPressed: () => launchUrl(Uri.parse('https://www.youtube.com/watch?v=${widget.videoId}'), mode: LaunchMode.externalApplication),
++            icon: const Icon(Icons.open_in_new_rounded, size: 18),
++            label: const Text('فتح في يوتيوب'),
++          ),
++        ]),
++      );
++    }
+     return ClipRRect(
+       borderRadius: BorderRadius.circular(14),
+       // يوتيوب يشترط ألا يقل المشغّل المضمَّن عن 200×200 بكسل. في فقاعة الشات
+diff -ruN orig45/MASHAREEN/lib/core/widgets/global_mini_player.dart work45/MASHAREEN/lib/core/widgets/global_mini_player.dart
+--- a/lib/core/widgets/global_mini_player.dart	2026-10-03 10:25:02.000000000 +0000
++++ b/lib/core/widgets/global_mini_player.dart	2026-10-04 21:55:02.324614938 +0000
+@@ -1,58 +1,190 @@
++import 'dart:async';
++
+ import 'package:flutter/material.dart';
+ import 'package:flutter_riverpod/flutter_riverpod.dart';
++import 'package:url_launcher/url_launcher.dart';
+ import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+ 
+ import '../providers/mini_player_provider.dart';
+ 
+-/// شريط عائم ثابت فوق التطبيق كله (يُركَّب في MaterialApp.builder في
+-/// main.dart، لا داخل أي شاشة)، فيبقى حيًّا عبر كل تنقّل — بين الغرف،
+-/// الخاص، وأقسام المنصة الأخرى — حتى يُغلَق يدويًا. هذا يحقّق "يستمر
+-/// بالتشغيل عند الانتقال" مع إبقاء مشغّل الفيديو المضمَّن داخل فقاعة
+-/// الرسالة نفسه محليًّا (يتوقف تلقائيًا بمغادرة تلك الشاشة بحكم دورة
+-/// حياة الودجت العادية؛ هذان مشغّلان منفصلان تمامًا لا يتداخلان).
++/// مشغل يوتيوب عائم واحد مشترك بين الغرف والخاص.
++///
++/// يبقى مشغل YouTube الحقيقي mounted حتى أثناء التصغير، لكن يُقص بصريًا
++/// خلف شريط صغير. وعند وجود فيديو غير قابل للتضمين يظهر بديل واضح بدل ترك
++/// خطأ YouTube الخام داخل التطبيق.
+ class GlobalMiniPlayer extends ConsumerStatefulWidget {
+   const GlobalMiniPlayer({super.key});
++
+   @override
+   ConsumerState<GlobalMiniPlayer> createState() => _GlobalMiniPlayerState();
+ }
+ 
+ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
+   YoutubePlayerController? _controller;
++  StreamSubscription<YoutubePlayerValue>? _subscription;
+   String? _currentId;
++  bool _compact = true;
++  bool _blocked = false;
++  int? _errorCode;
++
++  static const _blockedCodes = <int>{2, 100, 101, 150, 152, 153};
++
++  void _disposeController() {
++    unawaited(_subscription?.cancel());
++    _subscription = null;
++    final old = _controller;
++    _controller = null;
++    if (old != null) unawaited(old.close());
++  }
++
++  void _attachController(YoutubePlayerController controller) {
++    _subscription = controller.listen((value) {
++      if (!mounted) return;
++      final code = value.error.code;
++      if (_blockedCodes.contains(code)) {
++        if (!_blocked || _errorCode != code) {
++          setState(() {
++            _blocked = true;
++            _errorCode = code;
++          });
++        }
++      }
++    });
++  }
+ 
+   void _syncController(MiniPlayerTrack? track) {
+     if (track == null) {
+-      _controller?.close();
+-      _controller = null;
++      if (_controller != null) _disposeController();
+       _currentId = null;
++      _blocked = false;
++      _errorCode = null;
+       return;
+     }
+-    if (_currentId == track.videoId) return;
++    if (_currentId == track.videoId && _controller != null) return;
++
+     _currentId = track.videoId;
++    _compact = true;
++    _blocked = false;
++    _errorCode = null;
+     if (_controller == null) {
+-      // نفس الإعداد الافتراضي الذي ثبت استقراره لمشغّل الفقاعة — بلا أي
+-      // origin مخصّص ولا إعادة تحميل، بعد ثلاث محاولات فاشلة هناك أثبتت
+-      // أن التدخل اليدوي في هذا المسار يكسر التشغيل أكثر مما يصلحه.
+-      _controller = YoutubePlayerController.fromVideoId(
++      final controller = YoutubePlayerController.fromVideoId(
+         videoId: track.videoId,
+         autoPlay: true,
+         params: const YoutubePlayerParams(
+           showControls: false,
+           mute: false,
+           strictRelatedVideos: false,
++          interfaceLanguage: 'ar',
++          privacyEnhancedMode: true,
+         ),
+       );
++      _controller = controller;
++      _attachController(controller);
+     } else {
+-      _controller!.loadVideoById(videoId: track.videoId);
++      unawaited(_controller!.loadVideoById(videoId: track.videoId));
+     }
+   }
+ 
+   @override
+   void dispose() {
+-    _controller?.close();
++    _disposeController();
+     super.dispose();
+   }
+ 
++  Future<void> _openInYoutube(String videoId) async {
++    final uri = Uri.parse('https://www.youtube.com/watch?v=$videoId');
++    if (await canLaunchUrl(uri)) {
++      await launchUrl(uri, mode: LaunchMode.externalApplication);
++    }
++  }
++
++  Widget _fallback(MiniPlayerTrack track) {
++    final code = _errorCode;
++    final ownerBlocked = code == 101 || code == 150 || code == 152;
++    final message = ownerBlocked
++        ? 'هذا الفيديو لا يسمح يوتيوب بتشغيله داخل مشغّل مضمّن.'
++        : 'تعذّر تشغيل فيديو يوتيوب داخل المشغّل.';
++    return Container(
++      width: double.infinity,
++      height: double.infinity,
++      padding: const EdgeInsets.symmetric(horizontal: 10),
++      decoration: const BoxDecoration(
++        gradient: LinearGradient(colors: [Color(0xFF221238), Color(0xFF111827)]),
++      ),

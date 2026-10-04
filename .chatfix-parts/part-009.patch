@@ -1,0 +1,18 @@
++        'chat-media-plus',
++      );
++    });
++
++    test('legacy public relative paths are not incorrectly signed', () {
++      expect(
++        ChatMediaUrlResolver.bucketForPath('chat/room/123/file.jpg'),
++        isNull,
++      );
++      expect(
++        ChatMediaUrlResolver.bucketForPath(
++          'https://example.supabase.co/storage/v1/object/public/media/x.jpg',
++        ),
++        isNull,
++      );
++    });
++  });
++}

@@ -1,0 +1,300 @@
+   final _recorder = AudioRecorder();
+   final _elapsed = ValueNotifier<Duration>(Duration.zero);
++  final _amplitude = ValueNotifier<double>(0);
+   Timer? _ticker;
++  StreamSubscription<Amplitude>? _amplitudeSub;
+   OverlayEntry? _overlay;
+   _VoiceStage _stage = _VoiceStage.idle;
+   bool _uploading = false;
+   String? _recordedPath;
+ 
+   @override
++  void initState() {
++    super.initState();
++    _amplitudeSub = _recorder
++        .onAmplitudeChanged(const Duration(milliseconds: 120))
++        .listen((a) {
++      final v = a.current.isFinite ? a.current : -60;
++      _amplitude.value = ((v + 60) / 60).clamp(0.0, 1.0);
++    });
++  }
++
++  @override
+   void dispose() {
+     _ticker?.cancel();
++    unawaited(_amplitudeSub?.cancel());
+     _removeOverlay();
+-    _recorder.dispose();
++    unawaited(_recorder.dispose());
+     _elapsed.dispose();
++    _amplitude.dispose();
+     super.dispose();
+   }
+ 
+   void _toast(String text) {
+-    ScaffoldMessenger.maybeOf(context)
+-        ?.showSnackBar(SnackBar(content: Text(text), duration: const Duration(seconds: 2)));
++    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
++      SnackBar(content: Text(text), duration: const Duration(seconds: 2)),
++    );
++  }
++
++  void _startTicker() {
++    _ticker?.cancel();
++    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
++      if (_stage == _VoiceStage.recording) {
++        _elapsed.value += const Duration(seconds: 1);
++        _refreshOverlay();
++      }
++    });
+   }
+ 
+   Future<void> _start() async {
+@@ -59,73 +85,122 @@
+         _toast('اسمح بالوصول إلى الميكروفون من إعدادات الجهاز.');
+         return;
+       }
+-      final name = 'chat_${DateTime.now().microsecondsSinceEpoch}.m4a';
+-      final path = kIsWeb ? '' : '${(await getTemporaryDirectory()).path}/$name';
++      if (kIsWeb) {
++        _toast('التسجيل الصوتي متاح في تطبيق الهاتف.');
++        return;
++      }
++      final dir = await getTemporaryDirectory();
++      final name = 'voice_${DateTime.now().microsecondsSinceEpoch}.m4a';
++      final path = '${dir.path}/$name';
+       await _recorder.start(const RecordConfig(), path: path);
+       if (!mounted) {
+         await _recorder.stop();
+         return;
+       }
+       _elapsed.value = Duration.zero;
+-      _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+-        _elapsed.value += const Duration(seconds: 1);
+-      });
++      _amplitude.value = 0;
++      _recordedPath = null;
+       setState(() => _stage = _VoiceStage.recording);
++      _startTicker();
+       _showOverlay();
+     } catch (e) {
+       _toast('تعذّر بدء التسجيل: $e');
+     }
+   }
+ 
+-  /// الضغطة الثانية: توقف التسجيل فقط، بلا إرسال. يبقى الشريط ظاهرًا
+-  /// بزرّي حذف وإرسال صريحين ريثما يقرر المستخدم.
+-  Future<void> _stop() async {
+-    if (_stage != _VoiceStage.recording) return;
++  Future<void> _pauseResume() async {
++    if (_stage == _VoiceStage.recording) {
++      try {
++        await _recorder.pause();
++        if (!mounted) return;
++        setState(() => _stage = _VoiceStage.paused);
++        _refreshOverlay();
++      } catch (e) {
++        _toast('تعذّر إيقاف التسجيل مؤقتًا: $e');
++      }
++      return;
++    }
++    if (_stage == _VoiceStage.paused) {
++      try {
++        await _recorder.resume();
++        if (!mounted) return;
++        setState(() => _stage = _VoiceStage.recording);
++        _refreshOverlay();
++      } catch (e) {
++        _toast('تعذّر استئناف التسجيل: $e');
++      }
++    }
++  }
++
++  Future<void> _stopForPreview() async {
++    if (!(_stage == _VoiceStage.recording || _stage == _VoiceStage.paused)) return;
+     _ticker?.cancel();
+     String? path;
+     try {
+       path = await _recorder.stop();
+-    } catch (_) {}
++    } catch (e) {
++      _toast('تعذّر حفظ التسجيل: $e');
++      return;
++    }
+     if (!mounted) return;
+     if (path == null || path.isEmpty || _elapsed.value < const Duration(seconds: 1)) {
+       _toast(path == null || path.isEmpty ? 'تعذّر حفظ التسجيل.' : 'التسجيل قصير جدًا.');
+-      _removeOverlay();
++      await _discardFile(path);
++      _recordedPath = null;
+       setState(() => _stage = _VoiceStage.idle);
++      _removeOverlay();
+       return;
+     }
+     _recordedPath = path;
+     setState(() => _stage = _VoiceStage.stopped);
+-    _showOverlay();
++    _refreshOverlay();
++  }
++
++  Future<void> _discardFile(String? path) async {
++    if (path == null || path.isEmpty || kIsWeb) return;
++    try {
++      // مجلد المؤقت سيُدار من النظام؛ لا حاجة لإبقاء الملف بعد الحذف المنطقي.
++    } catch (_) {}
+   }
+ 
+   Future<void> _discard() async {
+     _ticker?.cancel();
+-    if (_stage == _VoiceStage.recording) {
++    String? path = _recordedPath;
++    if (_stage == _VoiceStage.recording || _stage == _VoiceStage.paused) {
+       try {
+-        await _recorder.stop();
++        path = await _recorder.stop();
+       } catch (_) {}
+     }
++    await _discardFile(path);
+     _recordedPath = null;
+     _removeOverlay();
+     if (mounted) setState(() => _stage = _VoiceStage.idle);
+   }
+ 
+   Future<void> _send() async {
++    if (_stage == _VoiceStage.recording || _stage == _VoiceStage.paused) {
++      await _stopForPreview();
++    }
+     final path = _recordedPath;
+-    if (path == null) return;
+-    _removeOverlay();
+-    setState(() {
+-      _stage = _VoiceStage.idle;
+-      _uploading = true;
+-    });
++    if (path == null || path.isEmpty || _stage != _VoiceStage.stopped) return;
++    setState(() => _uploading = true);
++    _refreshOverlay();
+     try {
+-      final url = await VoiceUploadHelper.uploadRecording(path);
++      final url = await VoiceUploadHelper.uploadRecording(
++        path,
++        privateChat: widget.privateChat,
++      );
+       await widget.onUploaded(url);
++      _recordedPath = null;
++      _removeOverlay();
++      if (mounted) setState(() => _stage = _VoiceStage.idle);
+     } catch (e) {
+       _toast('تعذّر إرسال الرسالة الصوتية: $e');
+     } finally {
+-      _recordedPath = null;
+-      if (mounted) setState(() => _uploading = false);
++      if (mounted) {
++        setState(() => _uploading = false);
++        _refreshOverlay();
++      }
+     }
+   }
+ 
+@@ -134,6 +209,11 @@
+     _overlay = null;
+   }
+ 
++  void _refreshOverlay() {
++    if (_overlay == null) return;
++    _overlay!.markNeedsBuild();
++  }
++
+   String _fmt(Duration d) =>
+       '${d.inMinutes.toString().padLeft(2, '0')}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
+ 
+@@ -141,48 +221,90 @@
+     _removeOverlay();
+     final overlay = Overlay.of(context, rootOverlay: true);
+     _overlay = OverlayEntry(builder: (ctx) {
+-      final bottom = MediaQuery.viewInsetsOf(ctx).bottom + 86;
+-      final recording = _stage == _VoiceStage.recording;
++      final bottom = MediaQuery.viewInsetsOf(ctx).bottom + 74;
+       return Positioned(
+-        left: 10,
+-        right: 10,
++        left: 8,
++        right: 8,
+         bottom: bottom,
+         child: Material(
+           color: Colors.transparent,
+           child: Directionality(
+             textDirection: TextDirection.rtl,
+             child: Container(
+-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
++              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+               decoration: BoxDecoration(
+-                color: const Color(0xFF1C1C2E),
++                gradient: const LinearGradient(
++                  colors: [Color(0xFFF8F8FA), Color(0xFFEDEDF1)],
++                ),
+                 borderRadius: BorderRadius.circular(28),
+-                boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 12)],
++                boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 16, offset: Offset(0, 5))],
+               ),
+               child: Row(children: [
+-                if (recording) const _PulsingDot() else const Icon(Icons.graphic_eq_rounded, color: Colors.white54, size: 18),
+-                const SizedBox(width: 8),
+-                ValueListenableBuilder<Duration>(
+-                  valueListenable: _elapsed,
+-                  builder: (_, d, __) => Text(_fmt(d),
+-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
++                _RoundAction(
++                  icon: Icons.send_rounded,
++                  background: const Color(0xFF16A34A),
++                  foreground: Colors.white,
++                  onTap: _uploading ? null : _send,
+                 ),
+-                const Spacer(),
+-                if (recording)
+-                  // النقر على الأيقونة نفسها مجددًا (أسفل) يوقف التسجيل؛
+-                  // هذا النص توضيحي فقط ريثما يضغط المستخدم مرة أخرى.
+-                  const Text('اضغط مجددًا للإيقاف', style: TextStyle(color: Colors.white54, fontSize: 12.5))
+-                else ...[
+-                  IconButton(
+-                    tooltip: 'حذف',
+-                    icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+-                    onPressed: _discard,
+-                  ),
+-                  IconButton(
+-                    tooltip: 'إرسال',
+-                    icon: const Icon(Icons.send_rounded, color: Color(0xFF22C55E)),
+-                    onPressed: _send,
++                const SizedBox(width: 10),
++                Expanded(
++                  child: Container(
++                    height: 52,
++                    padding: const EdgeInsets.symmetric(horizontal: 10),
++                    decoration: BoxDecoration(
++                      color: Colors.white,
++                      borderRadius: BorderRadius.circular(26),
++                      border: Border.all(color: const Color(0xFFD9D9DF)),
++                    ),
++                    child: Row(children: [
++                      _RoundAction(
++                        icon: _stage == _VoiceStage.recording
++                            ? Icons.pause_rounded
++                            : Icons.play_arrow_rounded,
++                        background: const Color(0xFF111827),
++                        foreground: Colors.white,
++                        onTap: _uploading ? null : _pauseResume,
++                        size: 38,
++                      ),
++                      const SizedBox(width: 10),
++                      Expanded(
++                        child: ValueListenableBuilder<double>(
++                          valueListenable: _amplitude,
++                          builder: (_, level, __) => _Waveform(level: level),
++                        ),
++                      ),
++                      const SizedBox(width: 8),
++                      ValueListenableBuilder<Duration>(
++                        valueListenable: _elapsed,
++                        builder: (_, d, __) => Text(
++                          _fmt(d),
++                          style: const TextStyle(

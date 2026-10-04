@@ -1,0 +1,300 @@
++
++    // انتبه: MediaUploadService.uploadBytes() ينظف اسم المجلد كوحدة واحدة
++    // ويستبدل '/' بـ '_'، لذلك لا نمرر هنا مجلدًا يحتوي شرطات مائلة.
++    // المسار الصريح يطابق سياسات Supabase الجديدة حرفيًا للخاص،
++    // ويترك رسائل الغرف داخل bucket media العام.
++    final safeUid = uid.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
++    final unique = DateTime.now().microsecondsSinceEpoch;
++    final folder = privateChat ? 'voice_private' : 'voice_room';
++    final objectPath = 'chat/$folder/$safeUid/voice_$unique.m4a';
++
++    return MediaUploadService(bucket: bucket).uploadBytesAtPath(
+       bytes: bytes,
+-      fileName: 'voice_.m4a',
+-      folder: 'chat/audio',
+-      uid: uid,
++      fileName: 'voice.m4a',
++      path: objectPath,
++      contentType: 'audio/mp4',
+     );
+   }
+ }
+diff -ruN orig45/MASHAREEN/lib/features/chat/presentation/pages/chat_lobby_page.dart work45/MASHAREEN/lib/features/chat/presentation/pages/chat_lobby_page.dart
+--- a/lib/features/chat/presentation/pages/chat_lobby_page.dart	2026-10-04 17:53:51.000000000 +0000
++++ b/lib/features/chat/presentation/pages/chat_lobby_page.dart	2026-10-04 21:56:15.016598082 +0000
+@@ -825,8 +825,8 @@
+       setState(() => _error = 'تعذر قراءة المرفق من الجهاز.');
+       return;
+     }
+-    if (bytes.length > 25 * 1024 * 1024) {
+-      setState(() => _error = 'الحد الأقصى للمرفقات في الشات 25MB.');
++    if (bytes.length > 10 * 1024 * 1024) {
++      setState(() => _error = 'الحد الأقصى للمرفقات في الغرفة 10MB.');
+       return;
+     }
+     setState(() {
+@@ -941,24 +941,29 @@
+ 
+   /// بحث أغنية/فيديو ← عند الاختيار: يُرسَل كرسالة يوتيوب عادية في الغرفة
+   /// (فتُضمَّن في فقاعتها بمشغّل الفقاعة المحلي كأي رابط يُلصَق يدويًا)،
+-  /// ويُشغَّل فورًا أيضًا في المشغّل المصغّر العائم (يستمر عبر التنقّل).
++  /// ويظهر تشغيله اختياريًا من زر "تشغيل" في المشغّل العائم.
+   Future<void> _showSongSearch() async {
+     if (_user == null) return;
+-    await SongSearchSheet.show(context, onSelected: (videoId, title) async {
+-      ref.read(miniPlayerProvider.notifier).state =
+-          MiniPlayerTrack(videoId: videoId, title: title);
+-      try {
+-        await _insertPublicMessage(
++    await SongSearchSheet.show(
++      context,
++      onPreviewPlay: (videoId, title) {
++        ref.read(miniPlayerProvider.notifier).state =
++            MiniPlayerTrack(videoId: videoId, title: title);
++      },
++      onSelected: (videoId, title) async {
++        try {
++          await _insertPublicMessage(
+           body: 'https://www.youtube.com/watch?v=$videoId',
+           message: 'https://www.youtube.com/watch?v=$videoId',
+           kind: 'text',
+         );
+-        if (!mounted) return;
+-        _scrollToEnd();
+-      } catch (e) {
+-        if (mounted) setState(() => _error = _friendlyChatError(e));
+-      }
+-    });
++          if (!mounted) return;
++          _scrollToEnd();
++        } catch (e) {
++          if (mounted) setState(() => _error = _friendlyChatError(e));
++        }
++      },
++    );
+   }
+ 
+   Future<void> _sendVoice(String url) async {
+@@ -4415,14 +4420,14 @@
+     Widget actionButton({
+       required IconData icon,
+       required VoidCallback onPressed,
++      Color color,
+       String? tooltip,
+     }) {
+       return IconButton(
+         tooltip: tooltip,
+         onPressed: sending ? null : onPressed,
+         splashRadius: 22,
+-        icon: Icon(icon, size: 21),
+-        color: p.accentBright,
++        icon: Icon(icon, size: 21, color: color),
+         disabledColor: p.textMuted,
+       );
+     }
+@@ -4531,25 +4536,30 @@
+           actionButton(
+             icon: Icons.emoji_emotions_outlined,
+             onPressed: onEmoji,
++            color: const Color(0xFFF59E0B),
+             tooltip: 'الرموز',
+           ),
+           actionButton(
+             icon: Icons.gif_box_outlined,
+             onPressed: onGif,
++            color: const Color(0xFFEC4899),
+             tooltip: 'GIF',
+           ),
+           actionButton(
+             icon: Icons.music_note_rounded,
+             onPressed: onSongSearch,
++            color: const Color(0xFF22D3EE),
+             tooltip: 'بحث أغنية',
+           ),
+           actionButton(
+             icon: Icons.add_circle_outline_rounded,
+             onPressed: onAttach,
++            color: const Color(0xFF22C55E),
+             tooltip: 'مرفق',
+           ),
+-          // تسجيل بنمط واتساب: اضغط مطوّلًا، حرّر للإرسال، اسحب للإلغاء أو للقفل.
+-          VoiceHoldButton(onUploaded: onVoice),
++          // تسجيل بنمط واتساب: يبدأ بضغطة ويظل زر الميكروفون ظاهرًا، ثم
++          // يظهر شريط الموجة مع إيقاف مؤقت/إرسال/حذف صريح.
++          VoiceHoldButton(onUploaded: onVoice, privateChat: false),
+         ],
+       ),
+     );
+diff -ruN orig45/MASHAREEN/lib/features/chat/presentation/pages/chat_thread_page.dart work45/MASHAREEN/lib/features/chat/presentation/pages/chat_thread_page.dart
+--- a/lib/features/chat/presentation/pages/chat_thread_page.dart	2026-10-03 18:25:18.000000000 +0000
++++ b/lib/features/chat/presentation/pages/chat_thread_page.dart	2026-10-04 21:56:15.015704509 +0000
+@@ -312,21 +312,26 @@
+   }
+ 
+   /// بحث أغنية/فيديو في الخاص: نفس منطق الغرفة — تُرسَل كرسالة نصّية
+-  /// برابط يوتيوب (تُضمَّن تلقائيًا في الفقاعة)، وتُشغَّل فورًا أيضًا في
+-  /// المشغّل المصغّر العائم المشترك بين الغرف والخاص معًا.
++  /// برابط يوتيوب (تُضمَّن تلقائيًا في الفقاعة)، بينما التشغيل اختياري
++  /// من زر "تشغيل" في المشغّل العائم المشترك بين الغرف والخاص.
+   Future<void> _showSongSearch() async {
+     final myUid = ref.read(authControllerProvider).valueOrNull?.uid;
+     if (myUid == null) return;
+-    await SongSearchSheet.show(context, onSelected: (videoId, title) async {
+-      ref.read(miniPlayerProvider.notifier).state =
+-          MiniPlayerTrack(videoId: videoId, title: title);
+-      await ref.read(chatControllerProvider.notifier).sendMessage(
++    await SongSearchSheet.show(
++      context,
++      onPreviewPlay: (videoId, title) {
++        ref.read(miniPlayerProvider.notifier).state =
++            MiniPlayerTrack(videoId: videoId, title: title);
++      },
++      onSelected: (videoId, title) async {
++        await ref.read(chatControllerProvider.notifier).sendMessage(
+             fromUid: myUid,
+             toUid: widget.otherUid,
+             text: 'https://www.youtube.com/watch?v=$videoId',
+             type: MessageType.text,
+           );
+-    });
++      },
++    );
+   }
+ 
+   Future<void> _showGifPicker(BuildContext context) async {
+@@ -844,13 +849,13 @@
+               child: Row(
+                 children: [
+                   IconButton(
+-                    icon: Icon(Icons.add_circle_outline, color: p.accent),
++                    icon: const Icon(Icons.add_circle_outline, color: Color(0xFF22C55E)),
+                     tooltip: 'إرفاق',
+                     onPressed: () =>
+                         AttachmentMenu.show(context, onPicked: _sendAttachment),
+                   ),
+                   IconButton(
+-                    icon: Icon(Icons.emoji_emotions_outlined, color: p.accent),
++                    icon: const Icon(Icons.emoji_emotions_outlined, color: Color(0xFFF59E0B)),
+                     tooltip: 'إيموجي',
+                     onPressed: () => EmojiPickerSheet.show(context, _sendEmoji),
+                   ),
+@@ -859,18 +864,20 @@
+                   // معاينة)، مطابقًا لنمط إرسال الإيموجي الفوري في هذه
+                   // الشاشة أصلًا.
+                   IconButton(
+-                    icon: Icon(Icons.gif_box_outlined, color: p.accent),
++                    icon: const Icon(Icons.gif_box_outlined, color: Color(0xFFEC4899)),
+                     tooltip: 'GIF',
+                     onPressed: () => _showGifPicker(context),
+                   ),
+                   IconButton(
+-                    icon: Icon(Icons.music_note_rounded, color: p.accent),
++                    icon: const Icon(Icons.music_note_rounded, color: Color(0xFF22D3EE)),
+                     tooltip: 'بحث أغنية',
+                     onPressed: _showSongSearch,
+                   ),
+-                  // تسجيل بنمط واتساب: اضغط مطوّلًا، حرّر للإرسال، اسحب للإلغاء أو للقفل.
++                  // تسجيل بنمط واتساب: يبدأ بضغطة ويظل زر الميكروفون ظاهرًا، ثم
++                  // يظهر شريط الموجة مع إيقاف مؤقت/إرسال/حذف صريح.
+                   VoiceHoldButton(
+                     color: p.accent,
++                    privateChat: true,
+                     onUploaded: (url) async =>
+                         _sendAttachment(MessageType.audio, url, 'voice.m4a'),
+                   ),
+diff -ruN orig45/MASHAREEN/lib/features/chat/presentation/widgets/chat_media_content.dart work45/MASHAREEN/lib/features/chat/presentation/widgets/chat_media_content.dart
+--- a/lib/features/chat/presentation/widgets/chat_media_content.dart	2026-10-04 11:58:20.000000000 +0000
++++ b/lib/features/chat/presentation/widgets/chat_media_content.dart	2026-10-04 21:51:46.783498987 +0000
+@@ -2,6 +2,7 @@
+ import 'package:flutter/material.dart';
+ import 'package:url_launcher/url_launcher.dart';
+ import 'package:webview_flutter/webview_flutter.dart';
++import '../../data/services/chat_media_url_resolver.dart';
+ import '../../domain/entities/chat_message_entity.dart';
+ import 'voice_message_player.dart';
+ 
+@@ -9,89 +10,132 @@
+   final ChatMessageEntity message;
+   final double maxWidth;
+   final bool vipPlus;
+-
+-  /// يفتح قائمة الفقاعة (رد، اقتباس، مشاركة، حذف) من عارض الصورة.
+   final VoidCallback? onMore;
+-
+-  /// الضغط على سمايل متحرك مرسَل يرسله مرة أخرى فورًا (نفس السمايل، بلا
+-  /// نافذة اختيار) — الخاص يرسل فورًا بخلاف الغرفة التي تضعه في الصندوق أولًا.
+   final ValueChanged<String>? onGifTap;
+-  const ChatMediaContent(
+-      {super.key,
+-      required this.message,
+-      required this.maxWidth,
+-      this.vipPlus = false,
+-      this.onMore,
+-      this.onGifTap});
++  const ChatMediaContent({
++    super.key,
++    required this.message,
++    required this.maxWidth,
++    this.vipPlus = false,
++    this.onMore,
++    this.onGifTap,
++  });
++
+   bool get _asset => message.mediaUrl?.startsWith('assets/') == true;
++  bool _private(String value) => ChatMediaUrlResolver.bucketForPath(value) != null;
++
+   @override
+   Widget build(BuildContext context) {
+     final url = message.mediaUrl;
+     if (url == null || url.isEmpty) return const SizedBox.shrink();
++    if (_private(url)) {
++      return _ResolvedChatMedia(
++        rawUrl: url,
++        builder: (resolved) => _buildWithUrl(context, resolved),
++      );
++    }
++    return _buildWithUrl(context, url);
++  }
++
++  Widget _buildWithUrl(BuildContext context, String url) {
+     switch (message.type) {
+       case MessageType.gif:
+-        // Match the visual footprint of normal WhatsApp-style chat emojis.
+-        // GIF smileys are media, but their box stays the same compact size.
+         const smileySize = 22.0;
+         final tile = SizedBox(
+           width: smileySize,
+           height: smileySize,
+-          child: _box(_asset
+-              ? Image.asset(url, fit: BoxFit.contain)
+-              : Image.network(url, fit: BoxFit.contain)),
++          child: _box(
++            _asset
++                ? Image.asset(url, fit: BoxFit.contain)
++                : Image.network(url, fit: BoxFit.contain),
++          ),
++        );
++        final child = SizedBox(
++          width: 40,
++          height: 40,
++          child: Center(child: tile),
++        );
++        return Align(
++          alignment: Alignment.centerRight,
++          child: onGifTap == null
++              ? child
++              : GestureDetector(
++                  behavior: HitTestBehavior.opaque,
++                  onTap: () => onGifTap!(url),
++                  child: child,
++                ),
+         );
+-        // كان بلا أي onTap هنا؛ الميزة (الضغط على سمايل مرسَل يرسله مرة
+-        // أخرى فورًا) لم تكن موجودة في الخاص إطلاقًا، رغم وجودها في
+-        // الغرف. لقمة لمس 40×40 حول الصورة 22×22 حتى لا يحتاج الضغط دقة
+-        // بكسل.
+-        //
+-        final gifWidget = onGifTap == null
+-            ? tile
+-            : GestureDetector(
+-                behavior: HitTestBehavior.opaque,
