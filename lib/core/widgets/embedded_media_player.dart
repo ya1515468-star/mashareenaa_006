@@ -180,24 +180,20 @@ class _InlineYoutubePlayer extends StatefulWidget {
 }
 
 class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
+  static const _youtubeOrigin = 'https://com.mashareena.mashareena';
   StreamSubscription<YoutubePlayerValue>? _youtubeSubscription;
   bool _blocked = false;
-  // مع youtube_player_iframe 6.x أصبح المضيف الداخلي متوافقًا مع مسار
-  // التضمين الحديث، لذلك لا نحقن origin وهميًا ولا نعيد تحميل iframe يدويًا.
-  // أي خطأ يمنع التشغيل يُحوّل إلى بطاقة آمنة، مع زر فتح في YouTube.
-  late final YoutubePlayerController _controller = YoutubePlayerController.fromVideoId(
-    videoId: widget.videoId,
-    autoPlay: false,
+  bool _loading = true;
+  late final YoutubePlayerController _controller = YoutubePlayerController(
+    key: widget.videoId,
     params: const YoutubePlayerParams(
       showControls: true,
       showFullscreenButton: true,
-      // Browsers commonly block autoplay with sound; start muted so the link starts immediately,
-      // while YouTube's own controls allow the user to unmute.
       mute: false,
       strictRelatedVideos: false,
       interfaceLanguage: 'ar',
       privacyEnhancedMode: true,
-      origin: 'https://www.youtube-nocookie.com',
+      origin: _youtubeOrigin,
     ),
   );
 
@@ -209,6 +205,29 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
   // الحزمة نفسها.
   bool _disposed = false;
 
+  Future<void> _loadVideo() async {
+    try {
+      await _controller.cueVideoById(videoId: widget.videoId);
+      if (!mounted || _disposed) return;
+      setState(() => _loading = false);
+    } catch (_) {
+      if (!mounted || _disposed) return;
+      setState(() {
+        _loading = false;
+        _blocked = true;
+      });
+    }
+  }
+
+  Future<void> _retry() async {
+    if (_disposed || !mounted) return;
+    setState(() {
+      _blocked = false;
+      _loading = true;
+    });
+    await _loadVideo();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -216,8 +235,16 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
       if (!mounted || _disposed) return;
       final code = value.error.code;
       if (code != 0) {
-        setState(() => _blocked = true);
+        setState(() {
+          _blocked = true;
+          _loading = false;
+        });
+      } else if (value.isReady && _loading) {
+        setState(() => _loading = false);
       }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_disposed) unawaited(_loadVideo());
     });
   }
 
@@ -226,10 +253,10 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
     super.didUpdateWidget(oldWidget);
     if (_disposed) return;
     if (oldWidget.videoId != widget.videoId) {
-      setState(() {
-        _blocked = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _disposed) return;
+        unawaited(_retry());
       });
-      _controller.loadVideoById(videoId: widget.videoId);
     }
   }
 
@@ -244,6 +271,12 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
   @override
   Widget build(BuildContext context) {
     if (_disposed) return const SizedBox.shrink();
+    if (_loading) {
+      return const SizedBox(
+        height: 220,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
     if (_blocked) {
       return Container(
         constraints: const BoxConstraints(minHeight: 200),
