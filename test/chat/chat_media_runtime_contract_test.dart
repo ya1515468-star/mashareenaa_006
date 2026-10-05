@@ -28,14 +28,18 @@ void main() {
     expect(mini, contains('loadVideoById'));
   });
 
-  test('YouTube playback is not forced muted and uses a stable embed origin', () {
+  test('YouTube playback uses the app origin and safe initialization', () {
     final inline = source('lib/core/widgets/embedded_media_player.dart');
     final mini = source('lib/core/widgets/global_mini_player.dart');
-    expect(inline, contains('autoPlay: false'));
     expect(inline, contains('mute: false'));
+    expect(inline, contains('privacyEnhancedMode: true'));
+    expect(inline, contains("origin: _youtubeOrigin"));
     expect(mini, contains('showControls: true'));
     expect(mini, contains('mute: false'));
-    expect(mini, contains("origin: 'https://www.youtube-nocookie.com'"));
+    expect(
+      mini,
+      contains("origin: 'https://com.mashareena.mashareena'"),
+    );
   });
 
   test('room typing does not use the unauthorized private channel or heartbeat', () {
