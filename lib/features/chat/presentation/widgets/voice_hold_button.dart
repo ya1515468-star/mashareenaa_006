@@ -240,11 +240,13 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
                 boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 16, offset: Offset(0, 5))],
               ),
               child: Row(children: [
+                // RTL layout: delete stays on the right and send stays on the left,
+                // matching the WhatsApp-style recorder shown in the reference image.
                 _RoundAction(
-                  icon: Icons.send_rounded,
-                  background: const Color(0xFF16A34A),
-                  foreground: Colors.white,
-                  onTap: _uploading ? null : _send,
+                  icon: Icons.delete_outline_rounded,
+                  background: const Color(0xFFFFE8ED),
+                  foreground: const Color(0xFFE11D48),
+                  onTap: _uploading ? null : _discard,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -300,10 +302,10 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
                 ),
                 const SizedBox(width: 10),
                 _RoundAction(
-                  icon: Icons.delete_outline_rounded,
-                  background: const Color(0xFFFFE8ED),
-                  foreground: const Color(0xFFE11D48),
-                  onTap: _uploading ? null : _discard,
+                  icon: Icons.send_rounded,
+                  background: const Color(0xFF16A34A),
+                  foreground: Colors.white,
+                  onTap: _uploading ? null : _send,
                 ),
               ]),
             ),

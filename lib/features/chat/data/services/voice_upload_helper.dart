@@ -23,8 +23,7 @@ class VoiceUploadHelper {
 
     // انتبه: MediaUploadService.uploadBytes() ينظف اسم المجلد كوحدة واحدة
     // ويستبدل '/' بـ '_'، لذلك لا نمرر هنا مجلدًا يحتوي شرطات مائلة.
-    // المسار الصريح يطابق سياسات Supabase الجديدة حرفيًا للخاص،
-    // ويترك رسائل الغرف داخل bucket media العام.
+    // المسار الصريح يطابق سياسة chat-voice الخاصة للغرف والخاص معًا.
     final safeUid = uid.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
     final unique = DateTime.now().microsecondsSinceEpoch;
     const folder = 'voice_private';
