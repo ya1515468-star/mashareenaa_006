@@ -16,6 +16,17 @@ void main() {
     expect(s, contains('_recorder.cancel()'));
   });
 
+  test('safe YouTube controller initialization does not use fromVideoId', () {
+    final inline = source('lib/core/widgets/embedded_media_player.dart');
+    final mini = source('lib/core/widgets/global_mini_player.dart');
+    expect(inline, contains('YoutubePlayerController('));
+    expect(inline, isNot(contains('YoutubePlayerController.fromVideoId')));
+    expect(mini, contains('YoutubePlayerController('));
+    expect(mini, isNot(contains('YoutubePlayerController.fromVideoId')));
+    expect(inline, contains('cueVideoById'));
+    expect(mini, contains('loadVideoById'));
+  });
+
   test('YouTube playback is not forced muted and uses a stable embed origin', () {
     final inline = source('lib/core/widgets/embedded_media_player.dart');
     final mini = source('lib/core/widgets/global_mini_player.dart');
