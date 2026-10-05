@@ -13,7 +13,9 @@ class VoiceUploadHelper {
     if (uid == null) throw StateError('لا توجد جلسة مستخدم.');
     if (bytes.isEmpty) throw StateError('التسجيل الصوتي فارغ.');
 
-    final bucket = privateChat ? 'chat-voice' : 'media';
+    // Both room and private voice messages use the same private bucket.
+    // The previous room path used the public media bucket and caused 403 uploads.
+    const bucket = 'chat-voice';
     final maxBytes = 10 * 1024 * 1024;
     if (bytes.length > maxBytes) {
       throw StateError('حجم الرسالة الصوتية يتجاوز 10MB.');
@@ -25,7 +27,7 @@ class VoiceUploadHelper {
     // ويترك رسائل الغرف داخل bucket media العام.
     final safeUid = uid.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
     final unique = DateTime.now().microsecondsSinceEpoch;
-    final folder = privateChat ? 'voice_private' : 'voice_room';
+    const folder = 'voice_private';
     final objectPath = 'chat/$folder/$safeUid/voice_$unique.m4a';
 
     return MediaUploadService(bucket: bucket).uploadBytesAtPath(
