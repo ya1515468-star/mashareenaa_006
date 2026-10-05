@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
@@ -26,6 +28,11 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
   @override
   void initState() {
     super.initState();
+    unawaited(_player.setAudioContext(const AudioContextConfig(
+      route: AudioContextConfigRoute.speaker,
+      respectSilence: false,
+      stayAwake: true,
+    ).build()));
     _player.onPositionChanged.listen((p) {
       if (mounted) setState(() => _position = p);
     });

@@ -187,16 +187,17 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
   // أي خطأ يمنع التشغيل يُحوّل إلى بطاقة آمنة، مع زر فتح في YouTube.
   late final YoutubePlayerController _controller = YoutubePlayerController.fromVideoId(
     videoId: widget.videoId,
-    autoPlay: true,
+    autoPlay: false,
     params: const YoutubePlayerParams(
       showControls: true,
       showFullscreenButton: true,
       // Browsers commonly block autoplay with sound; start muted so the link starts immediately,
       // while YouTube's own controls allow the user to unmute.
-      mute: true,
+      mute: false,
       strictRelatedVideos: false,
       interfaceLanguage: 'ar',
       privacyEnhancedMode: true,
+      origin: 'https://www.youtube-nocookie.com',
     ),
   );
 

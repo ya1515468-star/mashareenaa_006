@@ -131,7 +131,6 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   final Map<String, BuildContext> _publicMessageContexts = <String, BuildContext>{};
   List<Map<String, dynamic>> _mentionSuggestions = const [];
   Timer? _mentionTimer;
-  Timer? _roomTypingHeartbeat;
   Timer? _roomTypingStopTimer;
   Timer? _roomPresenceHeartbeat;
   final Map<String, String> _mentionUserIds = <String, String>{};
@@ -212,7 +211,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     _controller.addListener(_handleRoomTypingChanged);
     _roomTypingChannel = _db.channel(
       'room:$_roomId:typing',
-      opts: const RealtimeChannelConfig(private: true),
+      // Broadcast channel عام؛ لا يحتاج ACL لقناة private ولا يمنع الرسائل بسبب صلاحيات topic.
     )
       ..onBroadcast(event: 'room_typing', callback: _onRoomTypingBroadcast)
       ..subscribe();
@@ -1535,8 +1534,8 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     final channel = _roomTypingChannel;
     if (uid == null || channel == null) return;
     final hasText = _controller.text.trim().isNotEmpty;
-    _roomTypingHeartbeat?.cancel();
     _roomTypingStopTimer?.cancel();
+
     if (hasText != _isRoomTyping) {
       _isRoomTyping = hasText;
       unawaited(channel.sendBroadcastMessage(
@@ -1549,19 +1548,8 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
         },
       ));
     }
+
     if (hasText) {
-      _roomTypingHeartbeat = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (!_isRoomTyping) return;
-        unawaited(channel.sendBroadcastMessage(
-          event: 'room_typing',
-          payload: <String, dynamic>{
-            'room_id': _roomId,
-            'user_id': uid,
-            'is_typing': true,
-            'ts': DateTime.now().toUtc().toIso8601String(),
-          },
-        ));
-      });
       _roomTypingStopTimer = Timer(const Duration(milliseconds: 3200), () {
         if (!_isRoomTyping) return;
         _isRoomTyping = false;
@@ -1638,7 +1626,6 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     _mentionTimer?.cancel();
     _controller.removeListener(_refreshMentionSuggestions);
     _controller.removeListener(_handleRoomTypingChanged);
-    _roomTypingHeartbeat?.cancel();
     _roomTypingStopTimer?.cancel();
     _roomPresenceHeartbeat?.cancel();
     final uid = _user?.id;

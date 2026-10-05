@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 import '../../data/services/voice_upload_helper.dart';
+import '../../data/services/voice_file_cleanup.dart';
 
 /// تسجيل صوتي بنمط WhatsApp: بدء واضح، إيقاف/استئناف مؤقت، حذف وإرسال صريح.
 /// الشريط يبقى ظاهرًا أثناء التسجيل ولا يستبدل زر الميكروفون بواجهة مخفية.
@@ -70,7 +71,7 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
 
   void _startTicker() {
     _ticker?.cancel();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+    _ticker = Timer.periodic(const Duration(milliseconds: 350), (_) {
       if (_stage == _VoiceStage.recording) {
         _elapsed.value += const Duration(seconds: 1);
         _refreshOverlay();
@@ -158,9 +159,7 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
 
   Future<void> _discardFile(String? path) async {
     if (path == null || path.isEmpty || kIsWeb) return;
-    try {
-      // مجلد المؤقت سيُدار من النظام؛ لا حاجة لإبقاء الملف بعد الحذف المنطقي.
-    } catch (_) {}
+    await deleteVoiceFile(path);
   }
 
   Future<void> _discard() async {
@@ -168,8 +167,13 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
     String? path = _recordedPath;
     if (_stage == _VoiceStage.recording || _stage == _VoiceStage.paused) {
       try {
-        path = await _recorder.stop();
-      } catch (_) {}
+        await _recorder.cancel();
+        path = null;
+      } catch (_) {
+        try {
+          path = await _recorder.stop();
+        } catch (_) {}
+      }
     }
     await _discardFile(path);
     _recordedPath = null;
@@ -341,9 +345,7 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
                     child: CircularProgressIndicator(strokeWidth: 2, color: widget.color),
                   )
                 : Icon(
-                    _stage == _VoiceStage.paused
-                        ? Icons.pause_circle_filled_rounded
-                        : Icons.mic_rounded,
+                    Icons.mic_rounded,
                     color: _stage == _VoiceStage.paused
                         ? const Color(0xFF7C3AED)
                         : const Color(0xFFE11D48),

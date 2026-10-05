@@ -521,13 +521,29 @@ class _RoomVoice {
         } catch (_) {}
       },
       onAudioVolumeIndication: (_, speakers, __, ___) {
-        speaking.value = {
-          for (final s in speakers)
-            if ((s.volume ?? 0) > 12 && s.uid != null) s.uid!,
-        };
+        final localUid = uid;
+        if (localUid == null) return;
+        final active = <int>{};
+        for (final s in speakers) {
+          final volume = s.volume ?? 0;
+          final vad = s.vad ?? 0;
+          if (volume <= 12 && vad != 1) continue;
+          // Agora reports the local speaker as uid=0 in this callback.
+          if (s.uid == 0) {
+            active.add(localUid);
+          } else if (s.uid != null) {
+            active.add(s.uid!);
+          }
+        }
+        if (speaking.value.length != active.length || !speaking.value.containsAll(active)) {
+          speaking.value = active;
+        }
       },
     ));
     await engine.enableAudio();
+    try {
+      await engine.setDefaultAudioRouteToSpeakerphone(true);
+    } catch (_) {}
     try {
       await engine.enableAudioVolumeIndication(interval: 400, smooth: 3, reportVad: true);
     } catch (_) {}
@@ -545,6 +561,9 @@ class _RoomVoice {
       ),
     );
     joined = true;
+    try {
+      await engine.setEnableSpeakerphone(true);
+    } catch (_) {}
   }
 
   /// يطلب رمزًا جديدًا يعكس الدور الحالي على الخادم، ثم يحدّث الدور محليًا.
@@ -559,6 +578,10 @@ class _RoomVoice {
           publisher ? ClientRoleType.clientRoleBroadcaster : ClientRoleType.clientRoleAudience,
       publishMicrophoneTrack: publisher,
     ));
+    try {
+      await engine.enableLocalAudio(publisher);
+      await engine.setEnableSpeakerphone(true);
+    } catch (_) {}
   }
 
   Future<void> setMuted(bool muted) async {
