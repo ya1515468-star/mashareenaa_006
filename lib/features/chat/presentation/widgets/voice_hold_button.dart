@@ -71,7 +71,7 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
 
   void _startTicker() {
     _ticker?.cancel();
-    _ticker = Timer.periodic(const Duration(milliseconds: 350), (_) {
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (_stage == _VoiceStage.recording) {
         _elapsed.value += const Duration(seconds: 1);
         _refreshOverlay();
@@ -82,7 +82,7 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
   Future<void> _start() async {
     if (_stage != _VoiceStage.idle || _uploading) return;
     try {
-      if (!await _recorder.hasPermission()) {
+      if (!await _recorder.hasPermission(request: true)) {
         _toast('اسمح بالوصول إلى الميكروفون من إعدادات الجهاز.');
         return;
       }
@@ -93,7 +93,19 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
       final dir = await getTemporaryDirectory();
       final name = 'voice_${DateTime.now().microsecondsSinceEpoch}.m4a';
       final path = '${dir.path}/$name';
-      await _recorder.start(const RecordConfig(), path: path);
+      const config = RecordConfig(
+        encoder: AudioEncoder.aacLc,
+        bitRate: 64000,
+        sampleRate: 44100,
+        numChannels: 1,
+        autoGain: true,
+        echoCancel: true,
+        noiseSuppress: true,
+      );
+      await _recorder.start(config, path: path);
+      if (!await _recorder.isRecording()) {
+        throw StateError('لم يبدأ المسجل على الجهاز.');
+      }
       if (!mounted) {
         await _recorder.stop();
         return;
