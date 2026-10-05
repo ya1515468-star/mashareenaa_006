@@ -53,7 +53,7 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
     String videoId,
   ) async {
     try {
-      await controller.cueVideoById(videoId: videoId);
+      await controller.loadVideoById(videoId: videoId);
       if (!mounted || !identical(_controller, controller)) return;
       if (_loading) setState(() => _loading = false);
     } catch (_) {
