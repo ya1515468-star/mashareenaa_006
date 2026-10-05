@@ -239,7 +239,7 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
           _blocked = true;
           _loading = false;
         });
-      } else if (value.isReady && _loading) {
+      } else if (value.playerState != PlayerState.unknown && _loading) {
         setState(() => _loading = false);
       }
     });
