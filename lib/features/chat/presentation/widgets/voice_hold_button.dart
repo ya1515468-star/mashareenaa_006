@@ -39,6 +39,7 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
   OverlayEntry? _overlay;
   _VoiceStage _stage = _VoiceStage.idle;
   bool _uploading = false;
+  bool _starting = false;
   String? _recordedPath;
 
   @override
@@ -52,12 +53,24 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
     });
   }
 
+  Future<void> _disposeRecorder() async {
+    try {
+      final active = await _recorder.isRecording() || await _recorder.isPaused();
+      if (active) {
+        await _recorder.cancel();
+      }
+    } catch (_) {}
+    try {
+      await _recorder.dispose();
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _ticker?.cancel();
     unawaited(_amplitudeSub?.cancel());
     _removeOverlay();
-    unawaited(_recorder.dispose());
+    unawaited(_disposeRecorder());
     _elapsed.dispose();
     _amplitude.dispose();
     super.dispose();
@@ -80,7 +93,8 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
   }
 
   Future<void> _start() async {
-    if (_stage != _VoiceStage.idle || _uploading) return;
+    if (_stage != _VoiceStage.idle || _uploading || _starting) return;
+    _starting = true;
     try {
       if (!await _recorder.hasPermission(request: true)) {
         _toast('اسمح بالوصول إلى الميكروفون من إعدادات الجهاز.');
@@ -118,6 +132,8 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
       _showOverlay();
     } catch (e) {
       _toast('تعذّر بدء التسجيل: $e');
+    } finally {
+      _starting = false;
     }
   }
 
@@ -146,7 +162,7 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
   }
 
   Future<void> _stopForPreview() async {
-    if (!(_stage == _VoiceStage.recording || _stage == _VoiceStage.paused)) return;
+    if (_starting || !(_stage == _VoiceStage.recording || _stage == _VoiceStage.paused)) return;
     _ticker?.cancel();
     String? path;
     try {
