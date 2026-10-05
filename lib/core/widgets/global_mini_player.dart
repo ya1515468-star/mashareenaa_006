@@ -21,6 +21,7 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
   String? _currentId;
   bool _compact = true;
   bool _blocked = false;
+  bool _loading = false;
   int? _errorCode;
 
   static const _blockedCodes = <int>{2, 100, 101, 150, 152, 153};
@@ -47,24 +48,53 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
     });
   }
 
+  Future<void> _loadIntoController(
+    YoutubePlayerController controller,
+    String videoId,
+  ) async {
+    try {
+      await controller.cueVideoById(videoId: videoId);
+      if (!mounted || !identical(_controller, controller)) return;
+      if (_loading) setState(() => _loading = false);
+    } catch (_) {
+      if (!mounted || !identical(_controller, controller)) return;
+      setState(() {
+        _loading = false;
+        _blocked = true;
+      });
+    }
+  }
+
+  Future<void> _playCurrent(YoutubePlayerController controller) async {
+    try {
+      await controller.playVideo();
+    } catch (_) {
+      if (!mounted || !identical(_controller, controller)) return;
+      setState(() => _blocked = true);
+    }
+  }
+
   void _syncController(MiniPlayerTrack? track) {
     if (track == null) {
       if (_controller != null) _disposeController();
       _currentId = null;
       _blocked = false;
+      _loading = false;
       _errorCode = null;
       return;
     }
     if (_currentId == track.videoId && _controller != null) return;
+
     _currentId = track.videoId;
     _compact = true;
     _blocked = false;
+    _loading = true;
     _errorCode = null;
-    final old = _controller;
-    if (old == null) {
-      final controller = YoutubePlayerController.fromVideoId(
-        videoId: track.videoId,
-        autoPlay: true,
+
+    final existing = _controller;
+    if (existing == null) {
+      final created = YoutubePlayerController(
+        key: track.videoId,
         params: const YoutubePlayerParams(
           showControls: true,
           showFullscreenButton: true,
@@ -72,14 +102,22 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
           strictRelatedVideos: false,
           interfaceLanguage: 'ar',
           privacyEnhancedMode: true,
-          origin: 'https://www.youtube-nocookie.com',
+          origin: 'https://com.mashareena.mashareena',
         ),
       );
-      _controller = controller;
-      _attachController(controller);
+      _controller = created;
+      _attachController(created);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !identical(_controller, created)) return;
+        unawaited(_loadIntoController(created, track.videoId));
+      });
       return;
     }
-    unawaited(old.loadVideoById(videoId: track.videoId));
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !identical(_controller, existing)) return;
+      unawaited(_loadIntoController(existing, track.videoId));
+    });
   }
 
   @override
@@ -175,7 +213,14 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
               IconButton(
                 visualDensity: VisualDensity.compact,
                 tooltip: playing ? 'إيقاف مؤقت' : 'تشغيل',
-                onPressed: () => playing ? controller.pauseVideo() : controller.playVideo(),
+                onPressed: _loading
+                    ? null
+                    : () => unawaited(
+                          (playing
+                                  ? controller.pauseVideo()
+                                  : _playCurrent(controller))
+                              .catchError((_) {}),
+                        ),
                 icon: Icon(
                   playing ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
                   color: const Color(0xFF67E8F9),
