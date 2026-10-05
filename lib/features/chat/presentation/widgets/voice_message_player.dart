@@ -28,7 +28,7 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
   @override
   void initState() {
     super.initState();
-    unawaited(_player.setAudioContext(const AudioContextConfig(
+    unawaited(_player.setAudioContext(AudioContextConfig(
       route: AudioContextConfigRoute.speaker,
       respectSilence: false,
       stayAwake: true,

@@ -175,9 +175,7 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
               IconButton(
                 visualDensity: VisualDensity.compact,
                 tooltip: playing ? 'إيقاف مؤقت' : 'تشغيل',
-                onPressed: !value.isReady
-                    ? null
-                    : () => playing ? controller.pauseVideo() : controller.playVideo(),
+                onPressed: () => playing ? controller.pauseVideo() : controller.playVideo(),
                 icon: Icon(
                   playing ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
                   color: const Color(0xFF67E8F9),
