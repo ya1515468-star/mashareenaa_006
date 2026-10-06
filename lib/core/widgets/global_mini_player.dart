@@ -6,7 +6,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../providers/mini_player_provider.dart';
-import 'youtube_thumbnail.dart';
 
 /// مشغل YouTube عائم واحد مشترك بين الغرفة والخاص.
 /// عند التصغير يبقى WebView حيًا بحجم 1px حتى لا ينقطع الصوت، بينما تظهر
