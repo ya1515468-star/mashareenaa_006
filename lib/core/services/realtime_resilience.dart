@@ -79,6 +79,12 @@ class RealtimeResilience with WidgetsBindingObserver {
     }
   }
 
+  /// Call after any channel reports CHANNEL_ERROR/TIMED_OUT so a stale JWT
+  /// or a transient websocket drop never becomes an uncaught async error.
+  void recoverAfterChannelFailure() {
+    unawaited(_recover(forceRefreshIfNearExpiry: true));
+  }
+
   Future<void> _recover({required bool forceRefreshIfNearExpiry}) async {
     if (_recovering) return;
     _recovering = true;
