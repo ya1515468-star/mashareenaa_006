@@ -53,6 +53,27 @@ class _SongSearchBody extends StatefulWidget {
   State<_SongSearchBody> createState() => _SongSearchBodyState();
 }
 
+class _YoutubeBadge extends StatelessWidget {
+  const _YoutubeBadge();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xCC111111),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: const Text(
+          'YouTube',
+          style: TextStyle(
+            color: Color(0xFF22C55E),
+            fontWeight: FontWeight.w900,
+            fontSize: 9,
+          ),
+        ),
+      );
+
 class _SongSearchBodyState extends State<_SongSearchBody> {
   final _query = TextEditingController();
   WebViewController? _fallbackController;
@@ -296,15 +317,88 @@ class _SongSearchBodyState extends State<_SongSearchBody> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           AspectRatio(
             aspectRatio: 16 / 9,
-            child: result.thumbnail.isEmpty
-                ? const ColoredBox(
-                    color: Color(0xFF2A2038),
-                    child: Icon(Icons.ondemand_video_rounded, color: Color(0xFFA78BFA), size: 42),
-                  )
-                : Image.network(result.thumbnail, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const ColoredBox(
-                      color: Color(0xFF2A2038),
-                      child: Icon(Icons.ondemand_video_rounded, color: Color(0xFFA78BFA), size: 42),
-                    )),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: result.thumbnail.isEmpty
+                      ? const ColoredBox(
+                          color: Color(0xFF2A2038),
+                          child: Icon(
+                            Icons.ondemand_video_rounded,
+                            color: Color(0xFFA78BFA),
+                            size: 42,
+                          ),
+                        )
+                      : Image.network(
+                          result.thumbnail,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const ColoredBox(
+                            color: Color(0xFF2A2038),
+                            child: Icon(
+                              Icons.ondemand_video_rounded,
+                              color: Color(0xFFA78BFA),
+                              size: 42,
+                            ),
+                          ),
+                        ),
+                ),
+                const Positioned(
+                  top: 8,
+                  left: 8,
+                  child: _YoutubeBadge(),
+                ),
+                Positioned.fill(
+                  child: Center(
+                    child: Material(
+                      color: Colors.white,
+                      shape: const CircleBorder(),
+                      elevation: 4,
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: _busy
+                            ? null
+                            : () => widget.onPreviewPlay?.call(
+                                  result.id,
+                                  result.title,
+                                ),
+                        child: const SizedBox(
+                          width: 58,
+                          height: 58,
+                          child: Icon(
+                            Icons.play_arrow_rounded,
+                            color: Color(0xFF2F3E7D),
+                            size: 38,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                if (result.duration.isNotEmpty)
+                  Positioned(
+                    bottom: 7,
+                    right: 7,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black87,
+                        borderRadius: BorderRadius.circular(7),
+                      ),
+                      child: Text(
+                        result.duration,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(10, 9, 10, 8),
@@ -319,31 +413,50 @@ class _SongSearchBodyState extends State<_SongSearchBody> {
                 Text(result.duration, style: const TextStyle(color: Colors.white38, fontSize: 10)),
               ],
               const SizedBox(height: 8),
-              Row(children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _busy ? null : () => widget.onPreviewPlay?.call(result.id, result.title),
-                    icon: const Icon(Icons.headphones_rounded, size: 16),
-                    label: const Text('تشغيل'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF67E8F9),
-                      side: const BorderSide(color: Color(0xFF2DD4BF)),
+              Row(
+                textDirection: TextDirection.ltr,
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _busy ? null : () => _sendResult(result),
+                      icon: const Icon(Icons.send_rounded, size: 16),
+                      label: const Text('إرسال'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF7C5CFF),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(0, 42),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: _busy ? null : () => _sendResult(result),
-                    icon: const Icon(Icons.send_rounded, size: 16),
-                    label: const Text('إرسال'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF8B5CF6),
-                      foregroundColor: Colors.white,
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => widget.onPreviewPlay?.call(
+                                result.id,
+                                result.title,
+                              ),
+                      icon: const Icon(Icons.headphones_rounded, size: 16),
+                      label: const Text('تشغيل'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF67E8F9),
+                        side: const BorderSide(
+                          color: Color(0xFF2DD4BF),
+                          width: 1.5,
+                        ),
+                        minimumSize: const Size(0, 42),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ]),
+                ],
+              ),
             ]),
           ),
         ]),
@@ -365,6 +478,43 @@ class _SongSearchBodyState extends State<_SongSearchBody> {
           child: Column(children: [
             Container(width: 46, height: 5, margin: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(4))),
+            Container(
+              margin: const EdgeInsets.fromLTRB(14, 2, 14, 8),
+              height: 50,
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.play_circle_fill_rounded,
+                    color: Color(0xFFFF0033),
+                    size: 27,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'YouTube',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 17,
+                    ),
+                  ),
+                  const Spacer(),
+                  const Text(
+                    'بحث YouTube',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Row(children: [
