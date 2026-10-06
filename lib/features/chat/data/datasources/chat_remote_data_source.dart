@@ -79,7 +79,6 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
   Stream<List<ChatMessageModel>> watchMessages(String threadId) {
     final controller = StreamController<List<ChatMessageModel>>.broadcast();
     final byId = <String, ChatMessageModel>{};
-    StreamSubscription? dbSub;
     Timer? expiryTimer;
 
     void emit() {
@@ -109,53 +108,37 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
       emit();
     });
 
-    dbSub = supabase
+    // One live data path for DM messages. Supabase stream() already combines
+    // the initial database snapshot with subsequent Realtime changes, so a
+    // second Broadcast listener on the same messages would duplicate events
+    // and increase Realtime channel pressure.
+    final messageStream = supabase
         .from('chat_messages')
         .stream(primaryKey: ['id'])
         .eq('thread_id', threadId)
         .order('created_at', ascending: false)
-        .limit(200)
-        .listen((rows) {
-          byId
-            ..clear()
-            ..addEntries(rows.map((row) {
-              final id = row['id'].toString();
-              return MapEntry(
-                id,
-                ChatMessageModel.fromMap(
-                  id,
-                  threadId,
-                  Map<String, dynamic>.from(row),
-                ),
-              );
-            }));
-          emit();
-        }, onError: controller.addError);
+        .limit(200);
 
-    final channel = supabase.channel(
-      'dm:$threadId:messages',
-      opts: const RealtimeChannelConfig(private: true),
-    );
-    channel.onBroadcast(event: 'message', callback: (payload) {
-      final record = payload['record'];
-      if (record is! Map) return;
-      final map = Map<String, dynamic>.from(record);
-      final id = map['id']?.toString();
-      if (id == null || id.isEmpty) return;
-      final op = payload['op']?.toString() ?? 'INSERT';
-      if (op == 'DELETE') {
-        byId.remove(id);
-      } else {
-        byId[id] = ChatMessageModel.fromMap(id, threadId, map);
-      }
+    final streamSub = messageStream.listen((rows) {
+      byId
+        ..clear()
+        ..addEntries(rows.map((row) {
+          final id = row['id'].toString();
+          return MapEntry(
+            id,
+            ChatMessageModel.fromMap(
+              id,
+              threadId,
+              Map<String, dynamic>.from(row),
+            ),
+          );
+        }));
       emit();
-    });
-    channel.subscribe();
+    }, onError: controller.addError);
 
     controller.onCancel = () async {
       expiryTimer?.cancel();
-      await dbSub?.cancel();
-      await channel.unsubscribe();
+      await streamSub.cancel();
       _typingChannels.remove(threadId);
       await controller.close();
     };
@@ -335,7 +318,11 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
     required String uid,
     required bool isTyping,
   }) async {
-    final channel = _typingChannels[threadId] ?? supabase.channel('chat:thread:$threadId');
+    final channel = _typingChannels[threadId] ??
+        supabase.channel(
+          'chat:thread:$threadId',
+          opts: const RealtimeChannelConfig(private: true),
+        );
     if (!_typingChannels.containsKey(threadId)) {
       _typingChannels[threadId] = channel;
       channel.subscribe();
@@ -376,10 +363,20 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
         controller.add(state.keys.toList(growable: false));
       },
     );
-    channel.subscribe();
+    channel.subscribe((status, error) {
+      if (status == RealtimeSubscribeStatus.channelError ||
+          status == RealtimeSubscribeStatus.timedOut ||
+          status == RealtimeSubscribeStatus.closed) {
+        if (!controller.isClosed) {
+          controller.addError(
+            StateError('typing realtime disconnected: $status'),
+          );
+        }
+      }
+    });
     controller.onCancel = () async {
       await channel.unsubscribe();
-      await controller.close();
+      if (!controller.isClosed) await controller.close();
     };
     return controller.stream;
   }
