@@ -23,7 +23,7 @@ void main() {
     expect(inline, isNot(contains('YoutubePlayerController(')));
     expect(inline, contains('miniPlayerProvider'));
     expect(inline, contains('MiniPlayerTrack('));
-    expect(inline, contains('Image.network'));
+    expect(inline, contains('YoutubeThumbnail'));
     expect(mini, contains('YoutubePlayerController('));
     expect(mini, isNot(contains('YoutubePlayerController.fromVideoId')));
     expect(mini, contains('loadVideoById'));
