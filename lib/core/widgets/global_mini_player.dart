@@ -50,10 +50,17 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
 
   Future<void> _loadIntoController(
     YoutubePlayerController controller,
-    String videoId,
-  ) async {
+    String videoId, {
+    required bool autoPlay,
+  }) async {
     try {
-      await controller.loadVideoById(videoId: videoId);
+      if (autoPlay) {
+        await controller.unMute();
+        await controller.loadVideoById(videoId: videoId);
+      } else {
+        await controller.cueVideoById(videoId: videoId);
+        await controller.unMute();
+      }
       if (!mounted || !identical(_controller, controller)) return;
       if (_loading) setState(() => _loading = false);
     } catch (_) {
@@ -83,7 +90,14 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
       _errorCode = null;
       return;
     }
-    if (_currentId == track.videoId && _controller != null) return;
+    if (_currentId == track.videoId && _controller != null) {
+      if (track.autoPlay) {
+        unawaited(
+          _controller!.unMute().then((_) => _controller!.playVideo()),
+        );
+      }
+      return;
+    }
 
     _currentId = track.videoId;
     _compact = true;
@@ -109,14 +123,26 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
       _attachController(created);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !identical(_controller, created)) return;
-        unawaited(_loadIntoController(created, track.videoId));
+        unawaited(
+          _loadIntoController(
+            created,
+            track.videoId,
+            autoPlay: track.autoPlay,
+          ),
+        );
       });
       return;
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !identical(_controller, existing)) return;
-      unawaited(_loadIntoController(existing, track.videoId));
+      unawaited(
+        _loadIntoController(
+          existing,
+          track.videoId,
+          autoPlay: track.autoPlay,
+        ),
+      );
     });
   }
 
