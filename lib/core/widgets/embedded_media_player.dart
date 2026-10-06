@@ -184,6 +184,7 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
   StreamSubscription<YoutubePlayerValue>? _youtubeSubscription;
   bool _blocked = false;
   bool _loading = true;
+  int? _errorCode;
   late final YoutubePlayerController _controller = YoutubePlayerController(
     key: widget.videoId,
     params: const YoutubePlayerParams(
@@ -208,6 +209,7 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
   Future<void> _loadVideo() async {
     try {
       await _controller.cueVideoById(videoId: widget.videoId);
+      await _controller.unMute();
       if (!mounted || _disposed) return;
       setState(() => _loading = false);
     } catch (_) {
@@ -224,6 +226,7 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
     setState(() {
       _blocked = false;
       _loading = true;
+      _errorCode = null;
     });
     await _loadVideo();
   }
@@ -234,9 +237,11 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
     _youtubeSubscription = _controller.listen((value) {
       if (!mounted || _disposed) return;
       final code = value.error.code;
-      if (code != 0) {
+      const hardErrors = <int>{2, 5, 100, 101, 150, 152, 153};
+      if (hardErrors.contains(code)) {
         setState(() {
           _blocked = true;
+          _errorCode = code;
           _loading = false;
         });
       } else if (value.playerState != PlayerState.unknown && _loading) {
@@ -292,8 +297,17 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
           const Text('هذا الفيديو لا يسمح يوتيوب بتشغيله داخل مشغّل مضمّن.', textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
           const SizedBox(height: 6),
-          const Text('اختر نتيجة أخرى أو افتحه في يوتيوب.', textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white60, fontSize: 12)),
+          if (_errorCode != null)
+            Text(
+              'رمز YouTube: $_errorCode',
+              style: const TextStyle(color: Colors.white54, fontSize: 11),
+            ),
+          const SizedBox(height: 6),
+          const Text(
+            'اختر نتيجة أخرى أو افتحه في يوتيوب.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white60, fontSize: 12),
+          ),
           const SizedBox(height: 10),
           FilledButton.icon(
             onPressed: () => launchUrl(Uri.parse('https://www.youtube.com/watch?v=${widget.videoId}'), mode: LaunchMode.externalApplication),
