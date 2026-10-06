@@ -73,6 +73,7 @@ class _YoutubeBadge extends StatelessWidget {
           ),
         ),
       );
+}
 
 class _SongSearchBodyState extends State<_SongSearchBody> {
   final _query = TextEditingController();
