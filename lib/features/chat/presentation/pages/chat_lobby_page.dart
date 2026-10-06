@@ -947,7 +947,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       context,
       onPreviewPlay: (videoId, title) {
         ref.read(miniPlayerProvider.notifier).state =
-            MiniPlayerTrack(videoId: videoId, title: title);
+            MiniPlayerTrack(videoId: videoId, title: title, autoPlay: true);
       },
       onSelected: (videoId, title) async {
         try {
