@@ -3,13 +3,27 @@ import 'package:mashareena/features/chat/data/services/chat_media_url_resolver.d
 
 void main() {
   group('chat media storage contract', () {
-    test('room voice namespace remains public-media compatible', () {
-      expect(ChatMediaUrlResolver.bucketForPath('chat/voice_room/123/voice.m4a'), isNull);
+    test('room voice namespace resolves to public media', () {
+      expect(
+        ChatMediaUrlResolver.bucketForPath(
+          'chat/voice_room/123/voice.m4a',
+        ),
+        'media',
+      );
     });
     test('private voice paths resolve to chat-voice', () {
       expect(
         ChatMediaUrlResolver.bucketForPath(
           'chat/voice_private/123/voice.m4a',
+        ),
+        'chat-voice',
+      );
+    });
+
+    test('private storage URLs are recognized for fresh signing', () {
+      expect(
+        ChatMediaUrlResolver.bucketForPath(
+          'https://example.supabase.co/storage/v1/object/public/chat-voice/chat/voice_private/123/voice.m4a',
         ),
         'chat-voice',
       );
