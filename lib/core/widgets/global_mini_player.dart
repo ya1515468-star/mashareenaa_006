@@ -8,8 +8,8 @@ import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import '../providers/mini_player_provider.dart';
 
 /// مشغل YouTube عائم واحد مشترك بين الغرفة والخاص.
-/// عند التصغير يبقى WebView حيًا بحجم 1px حتى لا ينقطع الصوت، بينما تظهر
-/// واجهة mini واضحة فوق التطبيق. وعند التكبير يعود الفيديو بالحجم الكامل.
+/// عند التصغير يبقى WebView حيًا ومرئيًا داخل mini player، حتى لا ينقطع الصوت أثناء
+/// التنقل. وعند التكبير يعود الفيديو بالحجم الكامل.
 class GlobalMiniPlayer extends ConsumerStatefulWidget {
   const GlobalMiniPlayer({super.key});
 
