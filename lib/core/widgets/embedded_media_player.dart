@@ -7,6 +7,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
 import '../providers/mini_player_provider.dart';
+import 'youtube_thumbnail.dart';
 import 'tiktok_web_player_stub.dart'
     if (dart.library.html) 'tiktok_web_player_web.dart';
 
@@ -179,7 +180,6 @@ class _InlineYoutubePlayer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final thumb = 'https://i.ytimg.com/vi/$videoId/hqdefault.jpg';
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: GestureDetector(
@@ -193,19 +193,13 @@ class _InlineYoutubePlayer extends ConsumerWidget {
         },
         child: Container(
           width: double.infinity,
-          constraints: const BoxConstraints(minHeight: 200),
           color: Colors.black,
           child: AspectRatio(
             aspectRatio: 16 / 9,
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.network(
-                  thumb,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
-                      const ColoredBox(color: Colors.black),
-                ),
+                YoutubeThumbnail(videoId: videoId),
                 const Center(
                   child: SizedBox(
                     width: 70,
@@ -225,7 +219,7 @@ class _InlineYoutubePlayer extends ConsumerWidget {
                 ),
                 Positioned(
                   top: 10,
-                  right: 10,
+                  left: 10,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 9,

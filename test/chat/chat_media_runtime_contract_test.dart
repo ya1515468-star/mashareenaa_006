@@ -27,6 +27,10 @@ void main() {
     expect(mini, contains('YoutubePlayerController('));
     expect(mini, isNot(contains('YoutubePlayerController.fromVideoId')));
     expect(mini, contains('loadVideoById'));
+    expect(mini, contains('width: 1'));
+    expect(mini, contains('height: 1'));
+    expect(mini, contains("tooltip: 'تكبير'"));
+    expect(mini, contains("tooltip: 'تصغير'"));
   });
 
   test('YouTube global player uses safe origin, controls and unmuted volume', () {
@@ -37,6 +41,20 @@ void main() {
     expect(
       mini,
       contains("origin: 'https://com.mashareena.mashareena'"),
+    );
+    expect(
+      mini,
+      contains(
+        "static const _blockedCodes = <int>{2, 5, 100, 101, 150, 153};",
+      ),
+    );
+    expect(
+      mini,
+      isNot(
+        contains(
+          "static const _blockedCodes = <int>{2, 5, 100, 101, 150, 152, 153};",
+        ),
+      ),
     );
   });
 
@@ -52,5 +70,23 @@ void main() {
     expect(s, contains('if (s.uid == 0)'));
     expect(s, contains('active.add(localUid)'));
     expect(s, contains('setDefaultAudioRouteToSpeakerphone(true)'));
+  });
+
+  test('YouTube search keeps thumbnails and readable action buttons', () {
+    final s = source('lib/core/widgets/song_search_sheet.dart');
+    expect(s, contains('YoutubeThumbnail'));
+    expect(s, contains("label: const Text('إرسال')"));
+    expect(s, contains("label: const Text('تشغيل')"));
+    expect(s, contains('mainAxisExtent: 360'));
+  });
+
+  test('voice playback never sends a relative Storage path to audioplayers', () {
+    final resolver =
+        source('lib/features/chat/data/services/chat_media_url_resolver.dart');
+    final player =
+        source('lib/features/chat/presentation/widgets/voice_message_player.dart');
+    expect(resolver, contains("VOICE_SIGNED_URL_INVALID"));
+    expect(player, contains("resolved.startsWith('http://')"));
+    expect(player, contains('ReleaseMode.stop'));
   });
 }

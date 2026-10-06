@@ -112,13 +112,15 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
       // Resolve on every play so private chat-voice objects always receive a
       // fresh signed URL instead of reusing an expired one.
       final resolved = await ChatMediaUrlResolver.resolve(raw);
-      if (resolved.trim().isEmpty) {
-        throw StateError('تعذّر تجهيز رابط الصوت.');
+      if (resolved.trim().isEmpty ||
+          !(resolved.startsWith('http://') || resolved.startsWith('https://'))) {
+        throw StateError('تعذّر تجهيز رابط صوت صالح للتشغيل.');
       }
 
       await _player.stop();
       // Restore full media volume before each new playback session.
       await _player.setVolume(1.0);
+      await _player.setReleaseMode(ReleaseMode.stop);
       await _player.play(
         UrlSource(resolved),
         mode: PlayerMode.mediaPlayer,

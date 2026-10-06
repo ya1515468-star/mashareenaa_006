@@ -26,4 +26,13 @@ void main() {
       'chat-media-plus',
     );
   });
+  test('recognizes a legacy voice_private path without the chat prefix', () {
+    expect(
+      ChatMediaUrlResolver.bucketForPath(
+        'voice_private/u/voice_1.m4a',
+      ),
+      'chat-voice',
+    );
+  });
 }
+

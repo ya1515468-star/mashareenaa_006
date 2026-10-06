@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:webview_flutter/webview_flutter.dart';
 
+import 'youtube_thumbnail.dart';
+
 class SongSearchSheet {
   static Future<void> show(
     BuildContext context, {
@@ -321,27 +323,10 @@ class _SongSearchBodyState extends State<_SongSearchBody> {
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: result.thumbnail.isEmpty
-                      ? const ColoredBox(
-                          color: Color(0xFF2A2038),
-                          child: Icon(
-                            Icons.ondemand_video_rounded,
-                            color: Color(0xFFA78BFA),
-                            size: 42,
-                          ),
-                        )
-                      : Image.network(
-                          result.thumbnail,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const ColoredBox(
-                            color: Color(0xFF2A2038),
-                            child: Icon(
-                              Icons.ondemand_video_rounded,
-                              color: Color(0xFFA78BFA),
-                              size: 42,
-                            ),
-                          ),
-                        ),
+                  child: YoutubeThumbnail(
+                    videoId: result.id,
+                    preferredUrl: result.thumbnail,
+                  ),
                 ),
                 const Positioned(
                   top: 8,
@@ -425,7 +410,11 @@ class _SongSearchBodyState extends State<_SongSearchBody> {
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF7C5CFF),
                         foregroundColor: Colors.white,
-                        minimumSize: const Size(0, 42),
+                        textStyle: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
+                        minimumSize: const Size(0, 48),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -445,9 +434,13 @@ class _SongSearchBodyState extends State<_SongSearchBody> {
                       label: const Text('تشغيل'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF67E8F9),
+                        textStyle: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
                         side: const BorderSide(
                           color: Color(0xFF2DD4BF),
-                          width: 1.5,
+                          width: 1.8,
                         ),
                         minimumSize: const Size(0, 42),
                         shape: RoundedRectangleBorder(
@@ -680,8 +673,11 @@ class _SongSearchBodyState extends State<_SongSearchBody> {
                   child: Row(children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.network('https://i.ytimg.com/vi/$selected/hqdefault.jpg', width: 94, height: 62, fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const ColoredBox(color: Colors.black26, child: SizedBox(width: 94, height: 62))),
+                      child: SizedBox(
+                        width: 94,
+                        height: 62,
+                        child: YoutubeThumbnail(videoId: selected),
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -690,15 +686,21 @@ class _SongSearchBodyState extends State<_SongSearchBody> {
                       Row(children: [
                         OutlinedButton.icon(
                           onPressed: () => widget.onPreviewPlay?.call(selected, _selectedTitle),
-                          icon: const Icon(Icons.headphones_rounded, size: 17),
-                          label: const Text('تشغيل'),
+                          icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                          label: const Text(
+                            'تشغيل',
+                            style: TextStyle(fontWeight: FontWeight.w900),
+                          ),
                           style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF67E8F9)),
                         ),
                         const SizedBox(width: 6),
                         FilledButton.icon(
                           onPressed: _send,
-                          icon: const Icon(Icons.send_rounded, size: 17),
-                          label: const Text('إرسال'),
+                          icon: const Icon(Icons.send_rounded, size: 18),
+                          label: const Text(
+                            'إرسال',
+                            style: TextStyle(fontWeight: FontWeight.w900),
+                          ),
                           style: FilledButton.styleFrom(backgroundColor: const Color(0xFF8B5CF6), foregroundColor: Colors.white),
                         ),
                       ]),
@@ -715,7 +717,7 @@ class _SongSearchBodyState extends State<_SongSearchBody> {
                         crossAxisCount: 2,
                         crossAxisSpacing: 10,
                         mainAxisSpacing: 10,
-                        childAspectRatio: .72,
+                        mainAxisExtent: 360,
                       ),
                       itemCount: _results.length,
                       itemBuilder: (_, i) => _resultCard(_results[i]),

@@ -61,6 +61,7 @@ class ChatMediaUrlResolver {
     // Storage object path.
     if (raw.startsWith('chat-voice/chat/voice_private/')) return 'chat-voice';
     if (raw.startsWith('chat-media-plus/chat/attachments/')) return 'chat-media-plus';
+    if (raw.startsWith('voice_private/')) return 'chat-voice';
     if (raw.startsWith('chat/voice_private/')) return 'chat-voice';
     if (raw.startsWith('chat/voice_room/')) return 'media';
     if (raw.startsWith('chat/attachments/')) return 'chat-media-plus';
@@ -97,13 +98,26 @@ class ChatMediaUrlResolver {
           .getPublicUrl(objectPath);
     }
 
-    // Some older rows persisted "bucket/object/path". Strip the bucket
-    // prefix before resolving so the SDK receives the actual object name.
-    final objectPath = raw.startsWith('$bucket/')
+    // Normalize legacy private-voice rows before asking Storage for a signed
+    // URL. Never pass a relative path to audioplayers on Android: that is the
+    // direct cause of the ENOENT/FileInputStream failure seen in older builds.
+    var objectPath = raw.startsWith('$bucket/')
         ? raw.substring(bucket.length + 1)
         : raw;
-    return Supabase.instance.client.storage
+    if (bucket == 'chat-voice' && objectPath.startsWith('voice_private/')) {
+      objectPath = 'chat/$objectPath';
+    }
+    if (bucket == 'chat-voice' && !objectPath.startsWith('chat/voice_private/')) {
+      objectPath = objectPath.startsWith('chat/')
+          ? objectPath
+          : 'chat/voice_private/$objectPath';
+    }
+    final signed = await Supabase.instance.client.storage
         .from(bucket)
         .createSignedUrl(objectPath, 3600);
+    if (!signed.startsWith('http://') && !signed.startsWith('https://')) {
+      throw StateError('VOICE_SIGNED_URL_INVALID');
+    }
+    return signed;
   }
 }
