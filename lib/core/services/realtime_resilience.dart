@@ -104,8 +104,9 @@ class RealtimeResilience with WidgetsBindingObserver {
         }
       }
 
-      final token = session.accessToken;
-      await _syncRealtimeAuth(token);
+      if (session != null) {
+        await _syncRealtimeAuth(session.accessToken);
+      }
     } finally {
       _recovering = false;
     }
