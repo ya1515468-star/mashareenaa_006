@@ -6,7 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class MiniPlayerTrack {
   final String videoId;
   final String title;
-  const MiniPlayerTrack({required this.videoId, required this.title});
+  final bool autoPlay;
+
+  const MiniPlayerTrack({
+    required this.videoId,
+    required this.title,
+    this.autoPlay = false,
+  });
 }
 
 final miniPlayerProvider = StateProvider<MiniPlayerTrack?>((ref) => null);
