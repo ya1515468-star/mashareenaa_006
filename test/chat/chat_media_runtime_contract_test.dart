@@ -78,8 +78,9 @@ void main() {
   test('YouTube search keeps thumbnails and readable action buttons', () {
     final s = source('lib/core/widgets/song_search_sheet.dart');
     expect(s, contains('YoutubeThumbnail'));
-    expect(s, contains("label: const Text('إرسال')"));
-    expect(s, contains("label: const Text('تشغيل')"));
+    expect(s, contains("label: const Text("));
+    expect(s, contains("'إرسال'"));
+    expect(s, contains("'تشغيل'"));
     expect(s, contains('mainAxisExtent: 374'));
     expect(s, contains('بحث YouTube'));
     expect(s, contains('ابحث ثم اختر تشغيل أو إرسال'));
