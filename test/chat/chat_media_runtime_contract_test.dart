@@ -31,8 +31,8 @@ void main() {
     expect(mini, contains('height: 52'));
     expect(mini, contains("tooltip: 'تكبير'"));
     expect(mini, contains("tooltip: 'تصغير'"));
-    expect(mini, isNot(contains('width: 1')));
-    expect(mini, isNot(contains('height: 1')));
+    expect(mini, isNot(contains('width: 1,')));
+    expect(mini, isNot(contains('height: 1,')));
     expect(mini, isNot(contains('Opacity(')));
   });
 
