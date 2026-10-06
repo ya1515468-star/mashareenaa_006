@@ -185,6 +185,7 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
   bool _blocked = false;
   bool _loading = true;
   int? _errorCode;
+  bool _started = false;
   late final YoutubePlayerController _controller = YoutubePlayerController(
     key: widget.videoId,
     params: const YoutubePlayerParams(
@@ -319,14 +320,85 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
     }
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
-      // يوتيوب يشترط ألا يقل المشغّل المضمَّن عن 200×200 بكسل. في فقاعة الشات
-      // كان ارتفاعه بنسبة 16:9 حوالي 146 فقط (عرض الفقاعة ~258)، فيُرفض.
-      // النسبة تُحسب بحيث لا يقل الارتفاع عن 200 مهما كان عرض الفقاعة.
       child: LayoutBuilder(
         builder: (context, c) {
           final w = c.maxWidth.isFinite ? c.maxWidth : 320.0;
           final h = (w * 9 / 16) < 200 ? 200.0 : w * 9 / 16;
-          return YoutubePlayer(controller: _controller, aspectRatio: w / h);
+          if (!_started) {
+            final thumb =
+                'https://i.ytimg.com/vi/${widget.videoId}/hqdefault.jpg';
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () async {
+                if (!mounted || _disposed) return;
+                setState(() => _started = true);
+                try {
+                  await _controller.unMute();
+                  await _controller.playVideo();
+                } catch (_) {
+                  if (!mounted || _disposed) return;
+                  setState(() {
+                    _started = false;
+                    _blocked = true;
+                    _errorCode ??= 152;
+                  });
+                }
+              },
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Positioned.fill(
+                    child: Image.network(
+                      thumb,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          const ColoredBox(color: Colors.black),
+                    ),
+                  ),
+                  Container(
+                    width: 70,
+                    height: 70,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Color(0xFFEF1745),
+                      size: 44,
+                    ),
+                  ),
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xCC111111),
+                        borderRadius: BorderRadius.circular(13),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: const Text(
+                        'YouTube',
+                        style: TextStyle(
+                          color: Color(0xFF22C55E),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 9,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+          return YoutubePlayer(
+            controller: _controller,
+            aspectRatio: w / h,
+          );
         },
       ),
     );
