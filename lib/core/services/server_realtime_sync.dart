@@ -93,7 +93,11 @@ final globalServerRealtimeSyncProvider = Provider<void>((ref) {
       callback: (_) => scheduleOwnershipRefresh(),
     );
 
-  channel = builder..subscribe();
+  channel = builder..subscribe((_, error) {
+        if (error != null) {
+          RealtimeResilience.instance.recoverAfterChannelFailure();
+        }
+      });
   ref.onDispose(() {
     profileTimer?.cancel();
     catalogTimer?.cancel();
