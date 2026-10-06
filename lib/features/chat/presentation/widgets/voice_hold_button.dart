@@ -301,6 +301,15 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
                         size: 38,
                       ),
                       const SizedBox(width: 10),
+                      const Text(
+                        'إيقاف مؤقت',
+                        style: TextStyle(
+                          color: Color(0xFF16161B),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: ValueListenableBuilder<double>(
                           valueListenable: _amplitude,
