@@ -321,7 +321,7 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
       context,
       onPreviewPlay: (videoId, title) {
         ref.read(miniPlayerProvider.notifier).state =
-            MiniPlayerTrack(videoId: videoId, title: title);
+            MiniPlayerTrack(videoId: videoId, title: title, autoPlay: true);
       },
       onSelected: (videoId, title) async {
         await ref.read(chatControllerProvider.notifier).sendMessage(
