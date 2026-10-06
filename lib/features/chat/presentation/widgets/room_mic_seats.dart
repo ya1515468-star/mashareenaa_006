@@ -62,7 +62,11 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
           filter: PostgresChangeFilter(
               type: PostgresChangeFilterType.eq, column: 'room_id', value: widget.roomId),
           callback: (_) => _load())
-      ..subscribe();
+      ..subscribe((_, error) {
+        if (error != null) {
+          RealtimeResilience.instance.recoverAfterChannelFailure();
+        }
+      });
   }
 
   @override
