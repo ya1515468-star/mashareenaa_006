@@ -27,10 +27,13 @@ void main() {
     expect(mini, contains('YoutubePlayerController('));
     expect(mini, isNot(contains('YoutubePlayerController.fromVideoId')));
     expect(mini, contains('loadVideoById'));
-    expect(mini, contains('width: 1'));
-    expect(mini, contains('height: 1'));
+    expect(mini, contains('width: 92'));
+    expect(mini, contains('height: 52'));
     expect(mini, contains("tooltip: 'تكبير'"));
     expect(mini, contains("tooltip: 'تصغير'"));
+    expect(mini, isNot(contains('width: 1')));
+    expect(mini, isNot(contains('height: 1')));
+    expect(mini, isNot(contains('Opacity(')));
   });
 
   test('YouTube global player uses safe origin, controls and unmuted volume', () {
@@ -77,7 +80,9 @@ void main() {
     expect(s, contains('YoutubeThumbnail'));
     expect(s, contains("label: const Text('إرسال')"));
     expect(s, contains("label: const Text('تشغيل')"));
-    expect(s, contains('mainAxisExtent: 360'));
+    expect(s, contains('mainAxisExtent: 374'));
+    expect(s, contains('بحث YouTube'));
+    expect(s, contains('ابحث ثم اختر تشغيل أو إرسال'));
   });
 
   test('voice playback never sends a relative Storage path to audioplayers', () {
@@ -90,3 +95,4 @@ void main() {
     expect(player, contains('ReleaseMode.stop'));
   });
 }
+

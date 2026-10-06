@@ -196,6 +196,17 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
     ref.read(miniPlayerProvider.notifier).state = null;
   }
 
+  Future<void> _playPause(YoutubePlayerController controller) async {
+    try {
+      final value = controller.value;
+      if (value.playerState == PlayerState.playing) {
+        await controller.pauseVideo();
+      } else {
+        await _playCurrent(controller);
+      }
+    } catch (_) {}
+  }
+
   Widget _playPauseButton(
     YoutubePlayerController controller, {
     double size = 40,
@@ -233,16 +244,21 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
     );
   }
 
-  Widget _compactView(MiniPlayerTrack track, YoutubePlayerController controller) {
+  Widget _compactView(
+    MiniPlayerTrack track,
+    YoutubePlayerController controller,
+  ) {
     return Container(
       height: 76,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFF1A1230), Color(0xFF302060)],
         ),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF8D6BFF).withValues(alpha: .65)),
+        border: Border.all(
+          color: const Color(0xFF8D6BFF).withValues(alpha: .65),
+        ),
         boxShadow: const [
           BoxShadow(
             color: Colors.black54,
@@ -251,18 +267,25 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
           ),
         ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Row(
         textDirection: TextDirection.ltr,
         children: [
+          // Keep the real YouTube platform view mounted and visible at a
+          // useful mini size. Hiding it at 1x1 can pause the WebView on
+          // Android, which breaks continuous playback during navigation.
           ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(11),
             child: SizedBox(
-              width: 96,
-              height: 64,
-              child: YoutubeThumbnail(videoId: track.videoId),
+              width: 92,
+              height: 52,
+              child: YoutubePlayer(
+                controller: controller,
+                aspectRatio: 16 / 9,
+              ),
             ),
           ),
-          const SizedBox(width: 9),
+          const SizedBox(width: 8),
           Expanded(
             child: Directionality(
               textDirection: TextDirection.rtl,
@@ -276,7 +299,7 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 12.5,
+                      fontSize: 12,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
@@ -290,15 +313,19 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
                         color: _muted
                             ? const Color(0xFFFCA5A5)
                             : const Color(0xFF4ADE80),
-                        size: 15,
+                        size: 14,
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        _muted ? 'مكتوم' : 'الصوت يعمل',
-                        style: const TextStyle(
-                          color: Colors.white60,
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
+                      Flexible(
+                        child: Text(
+                          _muted ? 'مكتوم' : 'يعمل أثناء التنقل',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ],
@@ -308,7 +335,8 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
             ),
           ),
           IconButton(
-            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 38, height: 38),
             tooltip: _muted ? 'إلغاء الكتم' : 'كتم',
             onPressed: _loading
                 ? null
@@ -318,28 +346,45 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
               color: _muted
                   ? const Color(0xFFFCA5A5)
                   : const Color(0xFF4ADE80),
-              size: 21,
+              size: 20,
             ),
           ),
-          _playPauseButton(controller),
           IconButton(
-            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 38, height: 38),
+            tooltip: 'إيقاف مؤقت / تشغيل',
+            onPressed: _loading ? null : () => unawaited(_playPause(controller)),
+            icon: YoutubeValueBuilder(
+              controller: controller,
+              builder: (_, value) => Icon(
+                value.playerState == PlayerState.playing
+                    ? Icons.pause_rounded
+                    : Icons.play_arrow_rounded,
+                color: Colors.white,
+                size: 23,
+              ),
+            ),
+          ),
+          IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 38, height: 38),
             tooltip: 'تكبير',
             onPressed: () => setState(() => _compact = false),
             icon: const Icon(
               Icons.open_in_full_rounded,
               color: Color(0xFFD9CCFF),
-              size: 21,
+              size: 20,
             ),
           ),
           IconButton(
-            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 38, height: 38),
             tooltip: 'إغلاق',
             onPressed: _close,
             icon: const Icon(
               Icons.close_rounded,
               color: Color(0xFFFCA5A5),
-              size: 22,
+              size: 21,
             ),
           ),
         ],
@@ -557,32 +602,13 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
       bottom: 72,
       child: Material(
         color: Colors.transparent,
-        child: Stack(
-          children: [
-            // Keep the same platform view/controller mounted while compact.
-            // The visible UI becomes a real mini bar instead of a shrunken
-            // full WebView, so navigation does not stop playback.
-            if (_compact)
-              Positioned(
-                left: 0,
-                top: 0,
-                width: 1,
-                height: 1,
-                child: IgnorePointer(
-                  child: Opacity(
-                    opacity: 0.01,
-                    child: YoutubePlayer(
-                      controller: controller,
-                      aspectRatio: 16 / 9,
-                    ),
-                  ),
-                ),
-              ),
-            if (_compact)
-              _compactView(track, controller)
-            else
-              _expandedView(track, controller),
-          ],
+        child: AnimatedSize(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: _compact
+              ? _compactView(track, controller)
+              : _expandedView(track, controller),
         ),
       ),
     );

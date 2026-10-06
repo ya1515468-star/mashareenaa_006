@@ -400,49 +400,52 @@ class _SongSearchBodyState extends State<_SongSearchBody> {
               ],
               const SizedBox(height: 8),
               Row(
-                textDirection: TextDirection.ltr,
+                textDirection: TextDirection.rtl,
                 children: [
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: _busy ? null : () => _sendResult(result),
-                      icon: const Icon(Icons.send_rounded, size: 16),
-                      label: const Text('إرسال'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF7C5CFF),
-                        foregroundColor: Colors.white,
-                        textStyle: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                        ),
-                        minimumSize: const Size(0, 48),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: OutlinedButton.icon(
                       onPressed: _busy
                           ? null
                           : () => widget.onPreviewPlay?.call(
                                 result.id,
                                 result.title,
                               ),
-                      icon: const Icon(Icons.headphones_rounded, size: 16),
-                      label: const Text('تشغيل'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF67E8F9),
-                        textStyle: const TextStyle(
-                          fontSize: 15,
+                      icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                      label: const Text(
+                        'تشغيل',
+                        style: TextStyle(
+                          fontSize: 16,
                           fontWeight: FontWeight.w900,
                         ),
-                        side: const BorderSide(
-                          color: Color(0xFF2DD4BF),
-                          width: 1.8,
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF0EA5E9),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(0, 52),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                        minimumSize: const Size(0, 42),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _busy ? null : () => _sendResult(result),
+                      icon: const Icon(Icons.send_rounded, size: 20),
+                      label: const Text(
+                        'إرسال',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF7C5CFF),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(0, 52),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -555,7 +558,10 @@ class _SongSearchBodyState extends State<_SongSearchBody> {
                   ),
                   const SizedBox(height: 10),
                   Container(
-                    height: 52,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0x4427194D),
                       borderRadius: BorderRadius.circular(17),
@@ -563,23 +569,38 @@ class _SongSearchBodyState extends State<_SongSearchBody> {
                         color: const Color(0xFF8D78C6).withValues(alpha: .65),
                       ),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Expanded(
-                          child: Text(
-                            'بحث YouTube',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ),
                         Icon(
-                          Icons.chevron_right_rounded,
-                          color: Color(0xFFD9CCFF),
-                          size: 31,
+                          Icons.search_rounded,
+                          color: Color(0xFFFFD600),
+                          size: 28,
+                        ),
+                        SizedBox(width: 9),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'بحث YouTube',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'ابحث ثم اختر تشغيل أو إرسال',
+                                style: TextStyle(
+                                  color: Colors.white60,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -603,7 +624,7 @@ class _SongSearchBodyState extends State<_SongSearchBody> {
                         fontSize: 15,
                       ),
                       decoration: InputDecoration(
-                        hintText: 'ابحث عن أغنية أو فيديو...',
+                        hintText: 'ابحث عن أغنية أو فيديو في YouTube...',
                         hintStyle: const TextStyle(
                           color: Colors.white38,
                           fontWeight: FontWeight.w700,
@@ -683,27 +704,64 @@ class _SongSearchBodyState extends State<_SongSearchBody> {
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(_selectedTitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 6),
-                      Row(children: [
-                        OutlinedButton.icon(
-                          onPressed: () => widget.onPreviewPlay?.call(selected, _selectedTitle),
-                          icon: const Icon(Icons.play_arrow_rounded, size: 18),
-                          label: const Text(
-                            'تشغيل',
-                            style: TextStyle(fontWeight: FontWeight.w900),
+                      Wrap(
+                        spacing: 7,
+                        runSpacing: 6,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: _busy
+                                ? null
+                                : () => widget.onPreviewPlay?.call(
+                                      selected,
+                                      _selectedTitle,
+                                    ),
+                            icon: const Icon(
+                              Icons.play_arrow_rounded,
+                              size: 19,
+                            ),
+                            label: const Text(
+                              'تشغيل',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF0EA5E9),
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(0, 48),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(13),
+                              ),
+                            ),
                           ),
-                          style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF67E8F9)),
-                        ),
-                        const SizedBox(width: 6),
-                        FilledButton.icon(
-                          onPressed: _send,
-                          icon: const Icon(Icons.send_rounded, size: 18),
-                          label: const Text(
-                            'إرسال',
-                            style: TextStyle(fontWeight: FontWeight.w900),
+                          FilledButton.icon(
+                            onPressed: _busy ? null : _send,
+                            icon: const Icon(Icons.send_rounded, size: 19),
+                            label: const Text(
+                              'إرسال',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF8B5CF6),
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(0, 48),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(13),
+                              ),
+                            ),
                           ),
-                          style: FilledButton.styleFrom(backgroundColor: const Color(0xFF8B5CF6), foregroundColor: Colors.white),
-                        ),
-                      ]),
+                        ],
+                      ),
                     ])),
                   ]),
                 ),
@@ -717,7 +775,7 @@ class _SongSearchBodyState extends State<_SongSearchBody> {
                         crossAxisCount: 2,
                         crossAxisSpacing: 10,
                         mainAxisSpacing: 10,
-                        mainAxisExtent: 360,
+                        mainAxisExtent: 374,
                       ),
                       itemCount: _results.length,
                       itemBuilder: (_, i) => _resultCard(_results[i]),
