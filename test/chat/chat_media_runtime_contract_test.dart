@@ -17,25 +17,23 @@ void main() {
     expect(s, contains('_recorder.cancel()'));
   });
 
-  test('safe YouTube controller initialization does not use fromVideoId', () {
+  test('YouTube message cards delegate playback to one global player', () {
     final inline = source('lib/core/widgets/embedded_media_player.dart');
     final mini = source('lib/core/widgets/global_mini_player.dart');
-    expect(inline, contains('YoutubePlayerController('));
-    expect(inline, isNot(contains('YoutubePlayerController.fromVideoId')));
+    expect(inline, isNot(contains('YoutubePlayerController(')));
+    expect(inline, contains('miniPlayerProvider'));
+    expect(inline, contains('MiniPlayerTrack('));
+    expect(inline, contains('Image.network'));
     expect(mini, contains('YoutubePlayerController('));
     expect(mini, isNot(contains('YoutubePlayerController.fromVideoId')));
-    expect(inline, contains('cueVideoById'));
     expect(mini, contains('loadVideoById'));
   });
 
-  test('YouTube playback uses the app origin and safe initialization', () {
-    final inline = source('lib/core/widgets/embedded_media_player.dart');
+  test('YouTube global player uses safe origin, controls and unmuted volume', () {
     final mini = source('lib/core/widgets/global_mini_player.dart');
-    expect(inline, contains('mute: false'));
-    expect(inline, contains('privacyEnhancedMode: true'));
-    expect(inline, contains("origin: _youtubeOrigin"));
     expect(mini, contains('showControls: true'));
     expect(mini, contains('mute: false'));
+    expect(mini, contains('setVolume(100)'));
     expect(
       mini,
       contains("origin: 'https://com.mashareena.mashareena'"),

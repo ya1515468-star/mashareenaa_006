@@ -4,7 +4,7 @@
 create or replace function public.normalize_chat_attachment_storage_path()
 returns trigger
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 declare
