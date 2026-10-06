@@ -214,7 +214,11 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       // Broadcast channel عام؛ لا يحتاج ACL لقناة private ولا يمنع الرسائل بسبب صلاحيات topic.
     )
       ..onBroadcast(event: 'room_typing', callback: _onRoomTypingBroadcast)
-      ..subscribe();
+      ..subscribe((_, error) {
+        if (error != null) {
+          RealtimeResilience.instance.recoverAfterChannelFailure();
+        }
+      });
     unawaited(_loadRoomControls());
     unawaited(_loadVisualSizeAccess());
     // لم تكن هناك أي ذاكرة لآخر غرفة دخلها المستخدم (البند ٨)؛ كل دخول
@@ -270,7 +274,11 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       // set_my_presence مع 3 مستخدمين، أغرقت محرّك Realtime وأسقطت الاتصال.
       // الغرض كان تحديث عدّاد ترويسة الغرفة، والترويسة حُذفت؛ الحضور يبقى
       // دقيقًا بنبضة الـ45 ثانية وقائمة المتصلين الخادمية.
-      ..subscribe();
+      ..subscribe((_, error) {
+        if (error != null) {
+          RealtimeResilience.instance.recoverAfterChannelFailure();
+        }
+      });
 
     // Server broadcasts role updates on this exact topic.
     _rankChannel = _db.channel('room:$_roomId:rank')
@@ -301,7 +309,11 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
           setState(() => _rankRevision++);
         },
       )
-      ..subscribe();
+      ..subscribe((_, error) {
+        if (error != null) {
+          RealtimeResilience.instance.recoverAfterChannelFailure();
+        }
+      });
 
     if (_user != null) {
       _profileChannel = _db.channel('profile-sync-${_user!.id}')
@@ -332,7 +344,11 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
             }
           },
         )
-        ..subscribe();
+        ..subscribe((_, error) {
+        if (error != null) {
+          RealtimeResilience.instance.recoverAfterChannelFailure();
+        }
+      });
 
       // Auto-floats the mini chat the instant a private message ARRIVES,
       // for the recipient — not just for whoever opened it to send. RLS on
@@ -371,7 +387,11 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
             }
           },
         )
-        ..subscribe();
+        ..subscribe((_, error) {
+        if (error != null) {
+          RealtimeResilience.instance.recoverAfterChannelFailure();
+        }
+      });
     }
 
     // إعلان دخول آمن يُنشأ على الخادم فقط.
