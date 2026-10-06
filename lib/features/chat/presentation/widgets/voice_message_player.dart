@@ -117,7 +117,10 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
       }
 
       await _player.stop();
-      await _player.play(UrlSource(resolved));
+      await _player.play(
+        UrlSource(resolved),
+        mode: PlayerMode.mediaPlayer,
+      );
 
       if (mounted) {
         setState(() {
