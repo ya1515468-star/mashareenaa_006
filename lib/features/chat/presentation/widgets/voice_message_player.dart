@@ -117,6 +117,8 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
       }
 
       await _player.stop();
+      // Restore full media volume before each new playback session.
+      await _player.setVolume(1.0);
       await _player.play(
         UrlSource(resolved),
         mode: PlayerMode.mediaPlayer,

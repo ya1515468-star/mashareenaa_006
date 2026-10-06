@@ -172,234 +172,83 @@ class _YoutubeEmbed extends StatelessWidget {
   Widget build(BuildContext context) => _InlineYoutubePlayer(videoId: videoId);
 }
 
-class _InlineYoutubePlayer extends StatefulWidget {
+class _InlineYoutubePlayer extends ConsumerWidget {
   final String videoId;
   const _InlineYoutubePlayer({required this.videoId});
-  @override
-  State<_InlineYoutubePlayer> createState() => _InlineYoutubePlayerState();
-}
-
-class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
-  static const _youtubeOrigin = 'https://com.mashareena.mashareena';
-  StreamSubscription<YoutubePlayerValue>? _youtubeSubscription;
-  bool _blocked = false;
-  bool _loading = true;
-  int? _errorCode;
-  bool _started = false;
-  late final YoutubePlayerController _controller = YoutubePlayerController(
-    key: widget.videoId,
-    params: const YoutubePlayerParams(
-      showControls: true,
-      showFullscreenButton: true,
-      mute: false,
-      strictRelatedVideos: false,
-      interfaceLanguage: 'ar',
-      privacyEnhancedMode: true,
-      origin: _youtubeOrigin,
-    ),
-  );
-
-  // يوتيوب يستخدم WebView داخليًا، والـWebView يبقى حيًّا لحظيًا بعد
-  // dispose() ريثما يُنظَّف الـplatform view. أي frame callback مجدوَل
-  // منه (كتحديث لون الخلفية) قد يُستدعى بعد أن صار الـState
-  // "defunct" فيحاول الوصول إلى context ويرمي "This widget has been
-  // unmounted". العلم يمنع أي عمل إضافي بعد التفكيك بلا الحاجة لتغيير
-  // الحزمة نفسها.
-  bool _disposed = false;
-
-  Future<void> _loadVideo() async {
-    try {
-      await _controller.cueVideoById(videoId: widget.videoId);
-      await _controller.unMute();
-      if (!mounted || _disposed) return;
-      setState(() => _loading = false);
-    } catch (_) {
-      if (!mounted || _disposed) return;
-      setState(() {
-        _loading = false;
-        _blocked = true;
-      });
-    }
-  }
-
-  Future<void> _retry() async {
-    if (_disposed || !mounted) return;
-    setState(() {
-      _blocked = false;
-      _loading = true;
-      _errorCode = null;
-    });
-    await _loadVideo();
-  }
 
   @override
-  void initState() {
-    super.initState();
-    _youtubeSubscription = _controller.listen((value) {
-      if (!mounted || _disposed) return;
-      final code = value.error.code;
-      const hardErrors = <int>{2, 5, 100, 101, 150, 152, 153};
-      if (hardErrors.contains(code)) {
-        setState(() {
-          _blocked = true;
-          _errorCode = code;
-          _loading = false;
-        });
-      } else if (value.playerState != PlayerState.unknown && _loading) {
-        setState(() => _loading = false);
-      }
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !_disposed) unawaited(_loadVideo());
-    });
-  }
-
-  @override
-  void didUpdateWidget(covariant _InlineYoutubePlayer oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (_disposed) return;
-    if (oldWidget.videoId != widget.videoId) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || _disposed) return;
-        unawaited(_retry());
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _disposed = true;
-    unawaited(_youtubeSubscription?.cancel());
-    _controller.close();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_disposed) return const SizedBox.shrink();
-    if (_loading) {
-      return const SizedBox(
-        height: 220,
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-    if (_blocked) {
-      return Container(
-        constraints: const BoxConstraints(minHeight: 200),
-        decoration: BoxDecoration(
-          color: const Color(0xFF18111F),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: .45)),
-        ),
-        padding: const EdgeInsets.all(16),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const Icon(Icons.ondemand_video_rounded, color: Color(0xFFA78BFA), size: 34),
-          const SizedBox(height: 10),
-          const Text('هذا الفيديو لا يسمح يوتيوب بتشغيله داخل مشغّل مضمّن.', textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
-          if (_errorCode != null)
-            Text(
-              'رمز YouTube: $_errorCode',
-              style: const TextStyle(color: Colors.white54, fontSize: 11),
-            ),
-          const SizedBox(height: 6),
-          const Text(
-            'اختر نتيجة أخرى أو افتحه في يوتيوب.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white60, fontSize: 12),
-          ),
-          const SizedBox(height: 10),
-          FilledButton.icon(
-            onPressed: () => launchUrl(Uri.parse('https://www.youtube.com/watch?v=${widget.videoId}'), mode: LaunchMode.externalApplication),
-            icon: const Icon(Icons.open_in_new_rounded, size: 18),
-            label: const Text('فتح في يوتيوب'),
-          ),
-        ]),
-      );
-    }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final thumb = 'https://i.ytimg.com/vi/$videoId/hqdefault.jpg';
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
-      child: LayoutBuilder(
-        builder: (context, c) {
-          final w = c.maxWidth.isFinite ? c.maxWidth : 320.0;
-          final h = (w * 9 / 16) < 200 ? 200.0 : w * 9 / 16;
-          if (!_started) {
-            final thumb =
-                'https://i.ytimg.com/vi/${widget.videoId}/hqdefault.jpg';
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () async {
-                if (!mounted || _disposed) return;
-                setState(() => _started = true);
-                try {
-                  await _controller.unMute();
-                  await _controller.playVideo();
-                } catch (_) {
-                  if (!mounted || _disposed) return;
-                  setState(() {
-                    _started = false;
-                    _blocked = true;
-                    _errorCode ??= 152;
-                  });
-                }
-              },
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Positioned.fill(
-                    child: Image.network(
-                      thumb,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
-                          const ColoredBox(color: Colors.black),
-                    ),
-                  ),
-                  Container(
-                    width: 70,
-                    height: 70,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.play_arrow_rounded,
-                      color: Color(0xFFEF1745),
-                      size: 44,
-                    ),
-                  ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xCC111111),
-                        borderRadius: BorderRadius.circular(13),
-                        border: Border.all(color: Colors.white24),
-                      ),
-                      child: const Text(
-                        'YouTube',
-                        style: TextStyle(
-                          color: Color(0xFF22C55E),
-                          fontWeight: FontWeight.w900,
-                          fontSize: 9,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-          return YoutubePlayer(
-            controller: _controller,
-            aspectRatio: w / h,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          ref.read(miniPlayerProvider.notifier).state = MiniPlayerTrack(
+            videoId: videoId,
+            title: 'فيديو يوتيوب',
+            autoPlay: true,
           );
         },
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 200),
+          color: Colors.black,
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.network(
+                  thumb,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      const ColoredBox(color: Colors.black),
+                ),
+                const Center(
+                  child: SizedBox(
+                    width: 70,
+                    height: 70,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.play_arrow_rounded,
+                        color: Color(0xFFEF1745),
+                        size: 44,
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xCC111111),
+                      borderRadius: BorderRadius.circular(13),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: const Text(
+                      'YouTube',
+                      style: TextStyle(
+                        color: Color(0xFF22C55E),
+                        fontWeight: FontWeight.w900,
+                        fontSize: 9,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

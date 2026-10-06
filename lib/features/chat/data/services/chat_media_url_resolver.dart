@@ -56,6 +56,11 @@ class ChatMediaUrlResolver {
       return null;
     }
 
+    // Accept canonical object paths and legacy DB values that included the
+    // bucket name as a prefix. The bucket must never become part of the
+    // Storage object path.
+    if (raw.startsWith('chat-voice/chat/voice_private/')) return 'chat-voice';
+    if (raw.startsWith('chat-media-plus/chat/attachments/')) return 'chat-media-plus';
     if (raw.startsWith('chat/voice_private/')) return 'chat-voice';
     if (raw.startsWith('chat/voice_room/')) return 'media';
     if (raw.startsWith('chat/attachments/')) return 'chat-media-plus';
@@ -84,13 +89,21 @@ class ChatMediaUrlResolver {
     }
 
     if (bucket == 'media') {
+      final objectPath = raw.startsWith('$bucket/')
+          ? raw.substring(bucket.length + 1)
+          : raw;
       return Supabase.instance.client.storage
           .from(bucket)
-          .getPublicUrl(raw);
+          .getPublicUrl(objectPath);
     }
 
+    // Some older rows persisted "bucket/object/path". Strip the bucket
+    // prefix before resolving so the SDK receives the actual object name.
+    final objectPath = raw.startsWith('$bucket/')
+        ? raw.substring(bucket.length + 1)
+        : raw;
     return Supabase.instance.client.storage
         .from(bucket)
-        .createSignedUrl(raw, 3600);
+        .createSignedUrl(objectPath, 3600);
   }
 }

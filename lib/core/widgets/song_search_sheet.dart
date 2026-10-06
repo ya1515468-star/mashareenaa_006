@@ -480,37 +480,115 @@ class _SongSearchBodyState extends State<_SongSearchBody> {
             Container(width: 46, height: 5, margin: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(4))),
             Container(
-              margin: const EdgeInsets.fromLTRB(14, 2, 14, 8),
-              height: 50,
+              margin: const EdgeInsets.fromLTRB(12, 2, 12, 10),
+              padding: const EdgeInsets.fromLTRB(12, 8, 8, 10),
               decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white12),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF17133A), Color(0xFF352078)],
+                ),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: const Color(0xFF8D6BFF).withValues(alpha: .55),
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x552B0A5B),
+                    blurRadius: 18,
+                    offset: Offset(0, 7),
+                  ),
+                ],
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
+              child: Column(
                 children: [
-                  const Icon(
-                    Icons.play_circle_fill_rounded,
-                    color: Color(0xFFFF0033),
-                    size: 27,
+                  Row(
+                    children: [
+                      const Text(
+                        'PLAY',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF6D28D9), Color(0xFF0EA5E9)],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: const Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Icon(
+                              Icons.graphic_eq_rounded,
+                              color: Colors.white70,
+                              size: 31,
+                            ),
+                            Icon(
+                              Icons.play_circle_fill_rounded,
+                              color: Colors.white,
+                              size: 27,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      Material(
+                        color: const Color(0x334A3A83),
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: () => Navigator.of(context).pop(),
+                          child: const SizedBox(
+                            width: 52,
+                            height: 52,
+                            child: Icon(
+                              Icons.close_rounded,
+                              color: Colors.white,
+                              size: 30,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'YouTube',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 17,
+                  const SizedBox(height: 10),
+                  Container(
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: const Color(0x4427194D),
+                      borderRadius: BorderRadius.circular(17),
+                      border: Border.all(
+                        color: const Color(0xFF8D78C6).withValues(alpha: .65),
+                      ),
                     ),
-                  ),
-                  const Spacer(),
-                  const Text(
-                    'بحث YouTube',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 16,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: const Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'بحث YouTube',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: Color(0xFFD9CCFF),
+                          size: 31,
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -518,36 +596,76 @@ class _SongSearchBodyState extends State<_SongSearchBody> {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: Row(children: [
-                Expanded(
-                  child: TextField(
-                    controller: _query,
-                    autofocus: true,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-                    decoration: InputDecoration(
-                      hintText: 'ابحث عن أغنية أو فيديو…',
-                      hintStyle: const TextStyle(color: Colors.white38),
-                      prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFFB8A6FF)),
-                      filled: true,
-                      fillColor: const Color(0xFF21183A),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
+              child: Row(
+                textDirection: TextDirection.rtl,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _query,
+                      autofocus: true,
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'ابحث عن أغنية أو فيديو...',
+                        hintStyle: const TextStyle(
+                          color: Colors.white38,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        suffixIcon: const Icon(
+                          Icons.search_rounded,
+                          color: Color(0xFFBDA7FF),
+                          size: 28,
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFF21183A),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF4F8BFF),
+                            width: 2.2,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF5B8CFF),
+                            width: 2.6,
+                          ),
+                        ),
+                      ),
+                      onSubmitted: (_) => _search(),
                     ),
-                    onSubmitted: (_) => _search(),
                   ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFD600),
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  const SizedBox(width: 9),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFD600),
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 15,
+                      ),
+                      minimumSize: const Size(0, 54),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(17),
+                      ),
+                    ),
+                    onPressed: _busy ? null : _search,
+                    icon: const Icon(Icons.search_rounded, size: 23),
+                    label: const Text(
+                      'بحث',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                      ),
+                    ),
                   ),
-                  onPressed: _busy ? null : _search,
-                  icon: const Icon(Icons.search_rounded),
-                  label: const Text('بحث', style: TextStyle(fontWeight: FontWeight.w900)),
-                ),
-              ]),
+                ],
+              ),
             ),
             if (selected != null)
               Padding(
