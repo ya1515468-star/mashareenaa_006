@@ -1,3 +1,4 @@
+import 'package:mashareena/core/utils/safe_launch.dart';
 import 'dart:async';
 import '../../../core/services/snack_sfx.dart';
 import 'dart:typed_data';
@@ -496,8 +497,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(color: Colors.white70, fontSize: 11)),
                         ),
-                        onPressed: () => launchUrl(Uri.parse(src.url),
-                            mode: LaunchMode.externalApplication),
+                        onPressed: () => safeLaunch(src.url),
                       ),
                   ]),
                 ),

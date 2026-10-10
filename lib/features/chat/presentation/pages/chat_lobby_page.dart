@@ -1,3 +1,4 @@
+import 'package:mashareena/core/utils/safe_launch.dart';
 import '../../../../core/widgets/mini_player_chip.dart';
 import '../../../../core/services/snack_sfx.dart';
 import '../widgets/room_mic_seats.dart';
@@ -3405,10 +3406,7 @@ class _ChatMessageRow extends ConsumerWidget {
       final icon = type == 'video' ? Icons.play_circle_fill : Icons.insert_drive_file;
       Widget buildOpenRow(String u) => InkWell(
             onTap: () async {
-              final uri = Uri.tryParse(u);
-              if (uri != null) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              }
+              await safeLaunch(u);
             },
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Icon(icon, color: const Color(0xFF7D32A6), size: 30),

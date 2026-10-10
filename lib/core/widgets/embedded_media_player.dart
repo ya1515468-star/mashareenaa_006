@@ -1,3 +1,4 @@
+import 'package:mashareena/core/utils/safe_launch.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -5,11 +6,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import '../theme/app_theme.dart';
 import '../providers/mini_player_provider.dart';
+import '../services/youtube_guard.dart';
 import 'tiktok_web_player_stub.dart'
     if (dart.library.html) 'tiktok_web_player_web.dart';
 
@@ -347,6 +350,19 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
   bool _disposed = false;
 
   @override
+  void initState() {
+    super.initState();
+    // فحص خادمي: إن كان الفيديو ممنوع التضمين نبدّله ببديل قابل للتضمين.
+    final asked = widget.videoId;
+    YoutubeGuard.resolve(asked, '').then((r) {
+      if (_disposed || !mounted) return;
+      if (r.replaced && widget.videoId == asked) {
+        _controller.loadVideoById(videoId: r.videoId);
+      }
+    });
+  }
+
+  @override
   void didUpdateWidget(covariant _InlineYoutubePlayer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (_disposed) return;
@@ -386,8 +402,12 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
 /// إطلاقًا (صفحة ويب داخل WebView لا تصل لشريحة الهاتف)، فتمرير الرابط عبر
 /// خادم Supabase (خارج سوريا) عبر وكيل الحافة tiktok-proxy يتجاوز العائق
 /// الوحيد الفعلي المتبقي: IP الجهاز نفسه.
-String _tiktokProxied(String url) =>
-    'https://aknksnctyqjcsxcwnvdz.supabase.co/functions/v1/tiktok-proxy?url=${Uri.encodeComponent(url)}';
+String _tiktokProxied(String url) {
+  // الوكيل يشترط جلسة مستخدم صالحة (توكن في الرابط لأن WebView لا يرسل
+  // رأس Authorization بطلب التنقل الأول).
+  final token = Supabase.instance.client.auth.currentSession?.accessToken ?? '';
+  return 'https://aknksnctyqjcsxcwnvdz.supabase.co/functions/v1/tiktok-proxy?t=${Uri.encodeComponent(token)}&url=${Uri.encodeComponent(url)}';
+}
 
 class _TikTokSearchEmbed extends StatefulWidget {
   final String url;
@@ -462,7 +482,7 @@ class _ExternalMusicCard extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: () =>
-          launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+          safeLaunch(url),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(

@@ -2,6 +2,7 @@
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TikTokWebPlayer extends StatefulWidget {
   final String url;
@@ -30,8 +31,9 @@ class _TikTokWebPlayerState extends State<TikTokWebPlayer> {
     // سوريا محظورة عن تيك توك بعنوان IP تحديدًا (لا علاقة لها بقراءة شريحة
     // الهاتف، التي لا تنطبق على صفحة ويب أصلًا)، فتمرير الرابط عبر وكيل
     // Supabase (خارج سوريا) يتجاوز هذا العائق لتحميل المستند الأساسي.
+    final token = Supabase.instance.client.auth.currentSession?.accessToken ?? '';
     final proxied =
-        'https://aknksnctyqjcsxcwnvdz.supabase.co/functions/v1/tiktok-proxy?url=${Uri.encodeComponent('https://www.tiktok.com/player/v1/$id?music_info=1&description=1&controls=1&autoplay=0')}';
+        'https://aknksnctyqjcsxcwnvdz.supabase.co/functions/v1/tiktok-proxy?t=${Uri.encodeComponent(token)}&url=${Uri.encodeComponent('https://www.tiktok.com/player/v1/$id?music_info=1&description=1&controls=1&autoplay=0')}';
     final frame = html.IFrameElement()
       ..src = proxied
       ..style.border = '0'

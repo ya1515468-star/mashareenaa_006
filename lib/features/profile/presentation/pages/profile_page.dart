@@ -1,3 +1,4 @@
+import 'package:mashareena/core/utils/safe_launch.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -581,8 +582,7 @@ class _ProfileMusicPlayerState extends State<_ProfileMusicPlayer> {
 
   Future<void> _toggle() async {
     if (!_isUploadedProfileMusic) {
-      await launchUrl(Uri.parse(widget.url),
-          mode: LaunchMode.externalApplication);
+      await safeLaunch(widget.url);
       return;
     }
     if (_playing) {

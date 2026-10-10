@@ -1,3 +1,4 @@
+import 'package:mashareena/core/utils/safe_launch.dart';
 import '../../../../core/services/media_upload_service.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:image_picker/image_picker.dart';
@@ -856,9 +857,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
   }
 
   Future<void> _open(String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri == null || !await canLaunchUrl(uri)) return;
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    await safeLaunch(url);
   }
 
   Future<void> _purchaseStoreItem(BuildContext context, WidgetRef ref, Map<String, dynamic> item) async {

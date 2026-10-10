@@ -1,3 +1,4 @@
+import 'package:mashareena/core/utils/safe_launch.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/widgets/fullscreen_image_viewer.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -145,10 +146,7 @@ class _OpenCard extends StatelessWidget {
   Widget build(BuildContext context) => InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () async {
-          final uri = Uri.tryParse(url);
-          if (uri != null) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          }
+          await safeLaunch(url);
         },
         child: Container(
             padding: const EdgeInsets.all(12),
@@ -198,7 +196,7 @@ class _VideoPreviewState extends State<_VideoPreview> {
     } else {
       final src = Uri.encodeFull(widget.url);
       _webController = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setJavaScriptMode(JavaScriptMode.disabled)
         ..setBackgroundColor(Colors.black)
         ..loadHtmlString(
             '<html><body style="margin:0;background:#000"><video src="$src" controls playsinline style="width:100%;height:100%;object-fit:contain"></video></body></html>');

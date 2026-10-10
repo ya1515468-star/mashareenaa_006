@@ -1,3 +1,4 @@
+import 'package:mashareena/core/utils/safe_launch.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -52,11 +53,7 @@ class PlatformSafetyWarningsPage extends StatelessWidget {
                         if (evidence.isNotEmpty)
                           TextButton.icon(
                             onPressed: () async {
-                              final u = Uri.tryParse(evidence);
-                              if (u != null) {
-                                await launchUrl(u,
-                                    mode: LaunchMode.externalApplication);
-                              }
+                              await safeLaunch(evidence);
                             },
                             icon: const Icon(Icons.attachment_outlined),
                             label: const Text('عرض الدليل المرفق'),

@@ -1,3 +1,4 @@
+import 'package:mashareena/core/utils/safe_launch.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -75,8 +76,7 @@ class MyPatternRequestsPage extends ConsumerWidget {
                                       padding: const EdgeInsets.only(top: 8),
                                       child: OutlinedButton.icon(
                                         onPressed: () async {
-                                          final url = Uri.tryParse(r.resultVideoUrl!);
-                                          if (url == null || !await launchUrl(url, mode: LaunchMode.platformDefault)) {
+                                          if (!await safeLaunch(r.resultVideoUrl, mode: LaunchMode.platformDefault)) {
                                             if (context.mounted) {
                                               ScaffoldMessenger.of(context).showSnackBarSfx(
                                                 const SnackBar(content: Text('تعذر فتح رابط الفيديو.')),

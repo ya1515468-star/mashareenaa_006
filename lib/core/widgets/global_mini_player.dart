@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../providers/mini_player_provider.dart';
+import '../services/youtube_guard.dart';
 
 /// شريط عائم ثابت فوق التطبيق كله (يُركَّب في MaterialApp.builder في
 /// main.dart، لا داخل أي شاشة)، فيبقى حيًّا عبر كل تنقّل — بين الغرف،
@@ -31,16 +34,34 @@ class GlobalMiniPlayer extends ConsumerStatefulWidget {
 class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
   YoutubePlayerController? _controller;
   String? _currentId;
+  // فحص خادمي (youtube-check) قبل التشغيل: إن كان الفيديو ممنوع التضمين
+  // يُستبدل بنسخة قابلة للتضمين بنفس العنوان بدل خطأ 152.
+  final Map<String, YoutubeResolution> _resolved = {};
+  String? _pendingId;
 
   void _syncController(MiniPlayerTrack? track) {
     if (track == null) {
       _controller?.close();
       _controller = null;
       _currentId = null;
+      _pendingId = null;
       return;
     }
-    if (_currentId == track.videoId) return;
-    _currentId = track.videoId;
+    final res = _resolved[track.videoId];
+    if (res == null) {
+      if (_pendingId != track.videoId) {
+        _pendingId = track.videoId;
+        final asked = track.videoId;
+        unawaited(YoutubeGuard.resolve(asked, track.title).then((r) {
+          _resolved[asked] = r;
+          if (mounted) setState(() {});
+        }));
+      }
+      return;
+    }
+    final playId = res.videoId;
+    if (_currentId == playId) return;
+    _currentId = playId;
     // مقطع جديد يبدأ دائمًا كنافذة عائمة كاملة، بصرف النظر عن حالة التصغير
     // التي رُبما تُركت عليها نافذة المقطع السابق. لا setState هنا: هذا
     // يُستدعى من build قبل استعمال _minimized في هذا التمريرة نفسها.
@@ -49,7 +70,7 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
       // origin مخصّص ولا إعادة تحميل، بعد ثلاث محاولات فاشلة هناك أثبتت
       // أن التدخل اليدوي في هذا المسار يكسر التشغيل أكثر مما يصلحه.
       _controller = YoutubePlayerController.fromVideoId(
-        videoId: track.videoId,
+        videoId: playId,
         autoPlay: true,
         params: const YoutubePlayerParams(
           showControls: false,
@@ -58,7 +79,7 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
         ),
       );
     } else {
-      _controller!.loadVideoById(videoId: track.videoId);
+      _controller!.loadVideoById(videoId: playId);
     }
   }
 
