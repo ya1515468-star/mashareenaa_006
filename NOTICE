@@ -1,0 +1,7 @@
+MASHAREENA — THIRD-PARTY NOTICE
+
+Copyright © 2026 MASHAREENA project rights-holder in original project-specific materials. All rights reserved except as stated in the accompanying licenses.
+
+Third-party components are included in or used by this application. Their ownership and licensing remain with their respective holders. The bundled Noto Kufi Arabic, Noto Naskh Arabic and Amiri fonts are licensed under the SIL Open Font License 1.1 (OFL-1.1); see assets/fonts/decorative/OFL.txt.
+
+Third-party package license texts are collected for each CI build in the downloadable release artifact as THIRD_PARTY_NOTICES.txt. Review entries whose license text could not be found before public distribution.

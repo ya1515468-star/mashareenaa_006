@@ -9,10 +9,14 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: mashareena-arm64-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-arm64:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,9 +35,110 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Align CI-only dependency compatibility
+      - name: Check source release configuration
         run: |
-          sed -i -E 's/record:[[:space:]]+\^?5\.1\.2/record: 6.2.1/' pubspec.yaml
+          test -f pubspec.yaml
+          test -f android/app/proguard-rules.pro
+          test -f assets/fonts/decorative/OFL.txt
+          ! grep -qE '^\\s*record:\\s*\\^?5\\.1\\.2\\s*        run: flutter pub get
+
+      - name: Flutter analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Flutter tests
+        run: flutter test
+
+      - name: Verify release signing secrets
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_B64" || (echo "ANDROID_KEYSTORE_BASE64 is missing" && exit 1)
+          test -n "$KEYSTORE_PASSWORD" || (echo "ANDROID_KEYSTORE_PASSWORD is missing" && exit 1)
+          test -n "$KEY_ALIAS" || (echo "ANDROID_KEY_ALIAS is missing" && exit 1)
+          test -n "$KEY_PASSWORD" || (echo "ANDROID_KEY_PASSWORD is missing" && exit 1)
+
+      - name: Configure release keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > android/app/mashareena-upload.jks
+          cat > android/key.properties <<EOF2
+          storeFile=mashareena-upload.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF2
+          chmod 600 android/app/mashareena-upload.jks android/key.properties
+
+      - name: Build signed ARM64 APK
+        run: |
+          flutter build apk --release \
+            --target-platform android-arm64 \
+            --split-per-abi
+
+      - name: Verify APK architecture and signature
+        run: |
+          APK=build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          test -f "$APK"
+          unzip -l "$APK" | grep -q 'lib/arm64-v8a/'
+          ! unzip -l "$APK" | grep -qE 'lib/(armeabi-v7a|x86|x86_64)/' || exit 1
+          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner" verify --verbose "$APK"
+          mkdir -p out
+          cp "$APK" "out/MASHAREENA-arm64-${GITHUB_SHA::7}.apk"
+          ls -lh out/
+
+      - name: Generate third-party notices and release metadata
+        run: |
+          python3 scripts/generate_third_party_notices.py --output out/THIRD_PARTY_NOTICES.txt
+          cp assets/fonts/decorative/OFL.txt out/SIL-OPEN-FONT-LICENSE-1.1.txt
+          cat > out/BUILD_INFO.txt <<EOF2
+          Project: MASHAREENA
+          Repository: ${GITHUB_REPOSITORY}
+          Commit: ${GITHUB_SHA}
+          Flutter: 3.47.2 stable
+          Java: 17
+          Target ABI: android-arm64 (arm64-v8a)
+          Build mode: release
+          Application ID: com.mashareena.mashareena
+          Version: $(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -1)
+          EOF2
+          (cd out && sha256sum "MASHAREENA-arm64-${GITHUB_SHA::7}.apk" > SHA256SUMS.txt)
+          (cd out && zip -q "MASHAREENA-ARM64-${GITHUB_SHA::7}.zip" \\
+            "MASHAREENA-arm64-${GITHUB_SHA::7}.apk" \\
+            BUILD_INFO.txt SHA256SUMS.txt THIRD_PARTY_NOTICES.txt SIL-OPEN-FONT-LICENSE-1.1.txt)
+          ls -lh out/
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MASHAREENA-arm64-release
+          path: out/*
+          retention-days: 30
+
+      - name: GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            out/*.apk
+            out/*.zip
+            out/SHA256SUMS.txt
+            out/BUILD_INFO.txt
+            out/THIRD_PARTY_NOTICES.txt
+          generate_release_notes: true
+
+      - name: Remove temporary signing files
+        if: always()
+        run: rm -f android/app/mashareena-upload.jks android/key.properties
+ pubspec.yaml
+          test ! -e android/key.properties
+          test -z "$(find android/app -maxdepth 1 -type f \\( -name '*.jks' -o -name '*.keystore' \\) -print -quit)"
 
       - name: Flutter pub get
         run: flutter pub get
