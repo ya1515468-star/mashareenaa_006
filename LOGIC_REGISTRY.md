@@ -136,3 +136,11 @@
 - **أزرار النظام:** `main.dart` يحجز مساحة سفلية بقدر `viewPadding.bottom` (مطروحًا منها لوحة المفاتيح) لأن targetSdk 35 يفرض الرسم خلف أزرار النظام.
 - **تركس:** رمز أنواع الورق ♠♥♦♣ بدل 🧵 في مركز الألعاب والدعوات والملف المصغّر.
 - **اللون البنفسجي في الشات:** سمة `royal_dark` الافتراضية صارت «ذهبي ملكي» (ألوان ثابتة؛ لا حركة جديدة للفقاعات).
+
+## دفعة 2 (2026-10-11)
+- **بانر الموسم:** كان جدول `market_season_banner` فارغًا والعميل يقرأ عمود `date` بدل `season_date`. أُصلحت القراءة وزُرع بانر فعّال («موسم الشتاء») يعدّله المالك؛ الـGIF الموسمي يقبل رابط شبكة.
+- **النشر العام في سوق المنتجين:** حُذف شريط الفئات وقائمة «فئة المنتج». السبب الجذري لخطأ القطاع: العميل كان يرسل مفاتيح غير موجودة في `garment_sectors` (`other`/`fabric`/`pattern`) فيفشل `INVALID_SECTOR`. الآن `publish_producer_reel_paid` يقبل قطاعًا فارغًا ويحفظه `general` (صف غير فعّال في `garment_sectors` لقيد المفتاح الأجنبي)، ويتحقق من القطاع فقط إن أُرسل. اختُبر بجلسة المالك: نجح النشر وsector=general.
+- **الخطوط العربية على الخادم:** حاوية `fonts` عامة + جدول `server_fonts` (20 خطًا: Cairo, Tajawal, Almarai, Amiri, Lateef, Scheherazade, El Messiri, Changa, Reem Kufi, Noto Kufi, Aref Ruqaa, Lalezar, Rakkas, Katibeh, Harmattan, Mada, Baloo Bhaijaan, Markazi, Vibes, Jomhuria). عمود `profiles.message_font_key` و`set_my_message_font(key)` (يرفض مفتاحًا غير موجود `FONT_NOT_FOUND`) و`get_user_chat_identity` يعيد `message_font_key`. العميل: `core/services/server_fonts.dart` (تنزيل عند الاستخدام + FontLoader) ومنتقي «خط الرسائل» في تبويب ألوان الرسائل. دالة التهيئة المؤقتة `seed-arabic-fonts` عُطّلت (410).
+- **ألوان مزيجة:** كل `msg_blend_*` صار `animation_mode='gradient'` و`metadata.gradient=true` (كانت `none` فتُرسم بلون واحد). الأسود: `msg_black`, `msg_black_soft` + مزيجات الأسود.
+- **تلوين الرتبة:** قائمة المالك (تعديل شامل/إهداء/حذف) على كل مؤثر وخلفية داخل `_RoleColorTab`، وهي نفس RPCs بقية المتجر.
+- **عدة GIF:** `_pendingGifs` قائمة؛ شريط مصغّرات بلا نص «جاهز للإرسال»، حذف فردي، وتُرسل كلها بالسهم (رسالة لكل GIF ثم النص).

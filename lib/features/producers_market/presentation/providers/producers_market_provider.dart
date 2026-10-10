@@ -16,7 +16,7 @@ final marketSeasonBannerProvider =
         final r = rows.first;
         return MarketSeasonBannerEntity(
           title: r['title']?.toString(),
-          date: r['date']?.toString(),
+          date: (r['season_date'] ?? r['date'])?.toString(),
           seasonGifUrl: r['season_gif_url']?.toString(),
           backgroundUrl: r['background_url']?.toString(),
           isActive: r['is_active'] == true,
@@ -193,7 +193,7 @@ class ProducerMarketController extends StateNotifier<AsyncValue<void>> {
         'p_thumbnail_url': thumbnailUrl,
         'p_business_id': null,
         'p_product_id': null,
-        'p_sector_key': category,
+        'p_sector_key': null, // النشر عام: لا قطاع مطلوب
         'p_price_minor_units': 0,
         'p_city': null,
         'p_tags': tags,

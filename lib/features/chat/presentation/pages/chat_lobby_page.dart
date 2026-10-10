@@ -139,7 +139,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   /// هدية/GIF مختارة من المنتقي لكنها لم تُرسَل بعد — تبقى معلَّقة
   /// حتى يضغط المستخدم صراحة زر الإرسال (تنفيذ حرفي لبند "لا تُرسَل
   /// السمايلات/الـGIF إلا عند اختيارها والضغط على زر الإرسال").
-  String? _pendingGif;
+  final List<String> _pendingGifs = [];
 
   /// الرسالة التي يردّ عليها المستخدم حاليًا (اقتباس مضمَّن في نص
   /// الرسالة المُرسَلة، دون حاجة لعمود جديد في قاعدة البيانات).
@@ -574,14 +574,14 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
 
   Future<void> _sendText() async {
     final text = _controller.text.trim();
-    final gif = _pendingGif;
-    if ((text.isEmpty && gif == null) || _user == null || _sending) return;
+    final gifs = List<String>.from(_pendingGifs);
+    if ((text.isEmpty && gifs.isEmpty) || _user == null || _sending) return;
     setState(() {
       _sending = true;
       _error = null;
     });
     try {
-      if (gif != null) {
+      for (final gif in gifs) {
         await _insertPublicMessage(
           body: gif,
           message: 'GIF',
@@ -611,7 +611,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       _mentionUserIds.clear();
       _mentionUserNames.clear();
       setState(() {
-        _pendingGif = null;
+        _pendingGifs.clear();
         _replyingTo = null;
         _replyMode = 'reply';
       });
@@ -1152,7 +1152,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       },
       onGifSelected: (gif) {
         if (_user == null || !mounted) return;
-        setState(() => _pendingGif = gif);
+        setState(() => _pendingGifs.add(gif));
       },
     );
   }
@@ -1236,7 +1236,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
         _replyMode = 'reply';
       });
 
-  void _cancelPendingGif() => setState(() => _pendingGif = null);
+  void _removePendingGif(int i) => setState(() => _pendingGifs.removeAt(i));
 
   /// إدراج "@الاسم " في نقطة المؤشر الحالية — منشن سريع دون الحاجة
   /// لكتابة الاسم يدويًا.
@@ -2103,7 +2103,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                                             // صندوق الإرسال بصمت (المعاينة فوق
                                             // الحقل كافية)، ويُرسَل بالسهم — بلا
                                             // أي رسالة تأكيد تقاطع المستخدم.
-                                            setState(() => _pendingGif = url);
+                                            setState(() => _pendingGifs.add(url));
                                           },
                                           onVideoTap: (url) {
                                           if (!mounted) return;
@@ -2172,10 +2172,10 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                     '${(_replyingTo!['body'] ?? '📎 مرفق').toString()}',
                 onCancel: _cancelReply,
               ),
-            if (_pendingGif != null)
+            if (_pendingGifs.isNotEmpty)
               _PendingGifBar(
-                gif: _pendingGif!,
-                onCancel: _cancelPendingGif,
+                gifs: _pendingGifs,
+                onRemove: _removePendingGif,
               ),
             if (_activeMediaUrl != null && _showMedia)
               Column(
@@ -4828,47 +4828,46 @@ class _PendingBar extends StatelessWidget {
 }
 
 class _PendingGifBar extends StatelessWidget {
-  final String gif;
-  final VoidCallback onCancel;
+  final List<String> gifs;
+  final void Function(int index) onRemove;
 
-  const _PendingGifBar({required this.gif, required this.onCancel});
+  const _PendingGifBar({required this.gifs, required this.onRemove});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       color: const Color(0xFF241733),
-      child: Row(
-        children: [
-          const Icon(Icons.gif_box_outlined,
-              color: Color(0xFFC187FF), size: 18),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 25,
-            height: 25,
-            child: Image.asset(
-              gif,
-              width: 25,
-              height: 25,
-              fit: BoxFit.contain,
-              gaplessPlayback: true,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: gifs.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) => Stack(
+          clipBehavior: Clip.none,
+          children: [
+            SizedBox(
+              width: 42,
+              height: 42,
+              child: gifs[i].startsWith('http')
+                  ? Image.network(gifs[i], fit: BoxFit.contain, gaplessPlayback: true)
+                  : Image.asset(gifs[i], fit: BoxFit.contain, gaplessPlayback: true),
             ),
-          ),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Text(
-              'GIF جاهز للإرسال',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.white70, fontSize: 12),
+            PositionedDirectional(
+              top: -4,
+              start: -4,
+              child: InkWell(
+                onTap: () => onRemove(i),
+                child: const CircleAvatar(
+                  radius: 8,
+                  backgroundColor: Colors.black87,
+                  child: Icon(Icons.close, color: Colors.white, size: 11),
+                ),
+              ),
             ),
-          ),
-          InkWell(
-            onTap: onCancel,
-            child: const Icon(Icons.close, color: Colors.white54, size: 18),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

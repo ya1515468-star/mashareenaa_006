@@ -12,6 +12,8 @@ import '../../../profile/presentation/providers/profile_provider.dart';
 import '../../../../core/typography/local_glyph_text.dart';
 import 'server_user_identity_badges.dart';
 import '../../../chat/presentation/widgets/chat_mention_badge.dart';
+import 'dart:async';
+import '../../../../core/services/server_fonts.dart';
 
 class ServerChatInlineMessage extends ConsumerWidget {
   final String uid;
@@ -94,7 +96,9 @@ class ServerChatInlineMessage extends ConsumerWidget {
     final async = roomId == null
         ? ref.watch(serverUserIdentityProvider(uid))
         : ref.watch(serverUserIdentityInRoomProvider((uid: uid, roomId: roomId)));
-    return async.when(
+    return ValueListenableBuilder<int>(
+      valueListenable: ServerFonts.revision,
+      builder: (_, __, ___) => async.when(
       loading: () => _fallback(),
       error: (_, __) => _fallback(),
       data: (identity) {
@@ -114,7 +118,13 @@ class ServerChatInlineMessage extends ConsumerWidget {
         final nameColor = int.tryParse(identity['username_color']?.toString() ?? '');
         final nameSize = ((identity['username_font_size'] as num?)?.toDouble() ?? nameFontSize).clamp(8.0, 34.0).toDouble();
         final nameFont = localArabicFontFamily(identity['username_font_family']?.toString());
-        final messageFont = localArabicFontFamily(identity['message_font_family']?.toString());
+        final serverFontKey = identity['message_font_key']?.toString();
+        if (serverFontKey != null && serverFontKey.isNotEmpty) {
+          unawaited(ServerFonts.ensure(serverFontKey));
+        }
+        final messageFont = (serverFontKey != null && ServerFonts.isLoaded(serverFontKey))
+            ? ServerFonts.family(serverFontKey)
+            : localArabicFontFamily(identity['message_font_family']?.toString());
         final identityMessageColor = int.tryParse(identity['message_color']?.toString() ?? '');
         // الخادم يوفّر نظام ألوان أحدث وأكمل لم يكن يُقرأ إطلاقًا:
         // message_color_1/message_color_2 بصيغة hex (ولون ثانٍ يعني لونًا
@@ -208,6 +218,7 @@ class ServerChatInlineMessage extends ConsumerWidget {
           child: body,
         );
       },
+    ),
     );
   }
 

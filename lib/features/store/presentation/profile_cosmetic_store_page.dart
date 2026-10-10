@@ -1,7 +1,9 @@
+import 'dart:async';
 // ignore_for_file: prefer_const_constructors
 import 'currency_store/currency_store_tab.dart';
 import '../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
+import '../../../core/services/server_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart' as fp;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -529,7 +531,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                   // لكنه لم يُربط بأي واجهة، فتعذّر على أي مستخدم
                   // الوصول إليه. كشفه فحص الملفات اليتيمة.
                   const CurrencyStoreTab(),
-                  const _RoleColorTab(),
+                  _RoleColorTab(ownerMenu: _profileCosmeticOwnerMenu),
                 ],
               ),
             ),
@@ -784,6 +786,8 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
             // الخادم set_my_message_style جاهز منذ إضافته لتنسيق الرسائل
             // (غامق/مائل) لكنه كان بلا أي واجهة تصل إليه إطلاقًا.
             const _MessageTextStyleSection(),
+            const SizedBox(height: 18),
+            const _ServerFontPicker(),
             const SizedBox(height: 18),
             _messageColorSectionTitle('ألوان المبتدئين — مجانية', Icons.palette_outlined, ''),
             _messageColorGrid(free, owner),
@@ -2513,7 +2517,9 @@ class _MessageTextStyleSectionState
 /// ما يملكه العضو من المتجر (أو يشتريه من هنا)؛ التطبيق عبر set_my_role_style
 /// التي تتحقق من الملكية خادميًا، والمالك بلا شراء.
 class _RoleColorTab extends StatefulWidget {
-  const _RoleColorTab();
+  /// قائمة المالك (تعديل شامل/إهداء/حذف) المشتركة مع بقية تبويبات المتجر.
+  final Widget Function(ProfileCosmeticItem item) ownerMenu;
+  const _RoleColorTab({required this.ownerMenu});
   @override
   State<_RoleColorTab> createState() => _RoleColorTabState();
 }
@@ -2541,13 +2547,13 @@ class _RoleColorTabState extends State<_RoleColorTab> {
     try {
       final fx = await _db
           .from('profile_cosmetic_catalog')
-          .select('item_key,name_ar,metadata,price_points,price_gems')
+          .select('item_key,name_ar,metadata,price_points,price_gems,sort_order')
           .eq('category', 'name_effect')
           .eq('is_active', true)
           .order('sort_order');
       final bg = await _db
           .from('profile_cosmetic_catalog')
-          .select('item_key,name_ar,color1,color2,price_points,price_gems')
+          .select('item_key,name_ar,color1,color2,price_points,price_gems,sort_order')
           .eq('category', 'background')
           .eq('is_active', true)
           .order('sort_order');
@@ -2642,6 +2648,23 @@ class _RoleColorTabState extends State<_RoleColorTab> {
     );
   }
 
+  Widget _withOwnerMenu(Widget cell, Map<String, dynamic> row, String category) {
+    if (!_owner) return cell;
+    final item = ProfileCosmeticItem(
+      key: row['item_key'].toString(), category: category, gender: 'unisex',
+      nameAr: row['name_ar']?.toString() ?? '', animationMode: 'gif', palette: 'custom',
+      modeVariant: 'remote', color1: row['color1']?.toString() ?? '#FFFFFF',
+      color2: row['color2']?.toString(),
+      pricePoints: (row['price_points'] as num?)?.toInt() ?? 0,
+      priceGems: (row['price_gems'] as num?)?.toInt() ?? 0,
+      metadata: row['metadata'] is Map ? Map<String, dynamic>.from(row['metadata'] as Map) : const {},
+      isActive: true, sortOrder: (row['sort_order'] as num?)?.toInt() ?? 0);
+    return Stack(children: [
+      Positioned.fill(child: cell),
+      PositionedDirectional(top: 0, start: 0, child: widget.ownerMenu(item)),
+    ]);
+  }
+
   Widget _cell({required Widget preview, required bool active, required bool owned,
       required int price, required VoidCallback onApply, required VoidCallback onBuy}) {
     return Container(
@@ -2714,14 +2737,14 @@ class _RoleColorTabState extends State<_RoleColorTab> {
           ),
           _grid([
             for (final e in _effects)
-              _cell(
+              _withOwnerMenu(_cell(
                 preview: _preview(fx: e['effect_key'], bg: currentBg),
                 active: _fx == e['effect_key'],
                 owned: _ownsEffect(e['effect_key']),
                 price: (e['price_points'] as num?)?.toInt() ?? 0,
                 onApply: () => _apply(fx: e['effect_key'], bg: _bg),
                 onBuy: () => _buy(e['item_key'].toString()),
-              ),
+              ), e, 'name_effect'),
           ]),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
@@ -2729,15 +2752,110 @@ class _RoleColorTabState extends State<_RoleColorTab> {
           ),
           _grid([
             for (final b in _backgrounds)
-              _cell(
+              _withOwnerMenu(_cell(
                 preview: _preview(fx: _fx, bg: b),
                 active: _bg == b['item_key'],
                 owned: _ownsBg(b),
                 price: (b['price_points'] as num?)?.toInt() ?? 0,
                 onApply: () => _apply(fx: _fx, bg: b['item_key'].toString()),
                 onBuy: () => _buy(b['item_key'].toString()),
-              ),
+              ), b, 'background'),
           ]),
         ]);
+  }
+}
+
+
+/// اختيار خط الرسائل من خطوط عربية محفوظة في الخادم (جدول server_fonts).
+class _ServerFontPicker extends StatefulWidget {
+  const _ServerFontPicker();
+  @override
+  State<_ServerFontPicker> createState() => _ServerFontPickerState();
+}
+
+class _ServerFontPickerState extends State<_ServerFontPicker> {
+  List<Map<String, dynamic>> _fonts = [];
+  String? _current;
+  bool _loading = true;
+  String? _busyKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final db = Supabase.instance.client;
+      final uid = db.auth.currentUser?.id;
+      final fonts = await ServerFonts.list();
+      final me = uid == null
+          ? null
+          : await db.from('profiles').select('message_font_key').eq('id', uid).maybeSingle();
+      for (final f in fonts) {
+        unawaited(ServerFonts.ensure(f['font_key'].toString()));
+      }
+      if (!mounted) return;
+      setState(() {
+        _fonts = fonts;
+        _current = me?['message_font_key']?.toString();
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _pick(String? key) async {
+    setState(() => _busyKey = key ?? '');
+    try {
+      await Supabase.instance.client.rpc('set_my_message_font', params: {'p_font_key': key});
+      if (mounted) setState(() => _current = key);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تعذّر تغيير الخط')));
+      }
+    } finally {
+      if (mounted) setState(() => _busyKey = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const SizedBox(height: 40, child: Center(child: CircularProgressIndicator()));
+    if (_fonts.isEmpty) return const SizedBox.shrink();
+    return ValueListenableBuilder<int>(
+      valueListenable: ServerFonts.revision,
+      builder: (_, __, ___) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Row(children: [
+          Icon(Icons.font_download_outlined, size: 22),
+          SizedBox(width: 8),
+          Text('خط الرسائل', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+        ]),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          ChoiceChip(
+            label: const Text('الافتراضي'),
+            selected: _current == null,
+            onSelected: _busyKey != null ? null : (_) => _pick(null),
+          ),
+          for (final f in _fonts)
+            ChoiceChip(
+              label: Text(
+                f['name_ar'].toString(),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontFamily: ServerFonts.isLoaded(f['font_key'].toString())
+                      ? ServerFonts.family(f['font_key'].toString())
+                      : null,
+                ),
+              ),
+              selected: _current == f['font_key'],
+              onSelected: _busyKey != null ? null : (_) => _pick(f['font_key'].toString()),
+            ),
+        ]),
+      ]),
+    );
   }
 }

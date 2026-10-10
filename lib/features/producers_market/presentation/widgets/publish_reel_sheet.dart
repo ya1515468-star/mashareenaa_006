@@ -341,30 +341,6 @@ class _PublishReelSheetState extends ConsumerState<PublishReelSheet> {
             ),
             const SizedBox(height: 10),
 
-            // ─── فئة المنتج ───────────────────────────────────
-            DropdownButtonFormField<String>(
-              initialValue: _selectedCategory,
-              dropdownColor: const Color(0xFF1A1A2E),
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: 'فئة المنتج',
-                labelStyle: TextStyle(color: Colors.white54),
-                border: OutlineInputBorder(),
-                enabledBorder: OutlineInputBorder(
-                    borderSide: BorderSide(color: Colors.white24)),
-              ),
-              items: _categories
-                  .map((c) => DropdownMenuItem(
-                        value: c['key'],
-                        child: Text(c['label']!),
-                      ))
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) setState(() => _selectedCategory = v);
-              },
-            ),
-            const SizedBox(height: 10),
-
             // ─── العنوان ──────────────────────────────────────
             TextField(
               controller: _titleCtrl,

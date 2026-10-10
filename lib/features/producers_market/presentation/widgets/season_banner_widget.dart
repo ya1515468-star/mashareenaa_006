@@ -55,11 +55,17 @@ class SeasonBannerWidget extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                     child: Opacity(
                       opacity: 0.65,
-                      child: Image.asset(
-                        banner.seasonGifUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                      ),
+                      child: banner.seasonGifUrl!.startsWith('http')
+                          ? Image.network(
+                              banner.seasonGifUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                            )
+                          : Image.asset(
+                              banner.seasonGifUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                            ),
                     ),
                   ),
                 ),

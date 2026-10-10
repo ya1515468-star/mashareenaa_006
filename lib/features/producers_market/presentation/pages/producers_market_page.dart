@@ -195,7 +195,6 @@ class _ProducersMarketPageState extends ConsumerState<ProducersMarketPage>
                     loading: () => const SizedBox.shrink(),
                     error: (_, __) => const SizedBox.shrink(),
                   ),
-                  _buildCategoryBar(p),
                 ],
               ),
             ),
