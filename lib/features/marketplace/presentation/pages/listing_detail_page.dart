@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -110,7 +111,7 @@ class ListingDetailPage extends ConsumerWidget {
 
                                 final state =
                                     ref.read(marketplaceControllerProvider);
-                                ScaffoldMessenger.of(context).showSnackBar(
+                                ScaffoldMessenger.of(context).showSnackBarSfx(
                                   SnackBar(
                                     content: Text(
                                       success

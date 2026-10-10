@@ -31,10 +31,10 @@ class UploadProgressOverlay extends StatelessWidget {
                   child: Container(
                     width: 64,
                     height: 64,
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFF1B1524),
-                      boxShadow: const [
+                      color: Color(0xFF1B1524),
+                      boxShadow: [
                         BoxShadow(color: Colors.black45, blurRadius: 10, offset: Offset(0, 3)),
                       ],
                     ),

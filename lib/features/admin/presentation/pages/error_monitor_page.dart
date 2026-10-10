@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -110,7 +111,7 @@ ${e['details'] ?? '—'}
   Future<void> _copyReport(Map<String, dynamic> e) async {
     await Clipboard.setData(ClipboardData(text: _reportText(e)));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+    ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(
       content: Text('تم نسخ تقرير الخطأ ✓'),
       duration: Duration(seconds: 2),
     ));
@@ -128,7 +129,7 @@ ${e['details'] ?? '—'}
     }
     await Clipboard.setData(ClipboardData(text: buffer.toString()));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(
       content: Text('تم نسخ ${errors.length} خطأ ✓'),
       duration: const Duration(seconds: 2),
     ));
@@ -142,7 +143,7 @@ ${e['details'] ?? '—'}
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('تعذر التحديث: $e')));
+            .showSnackBarSfx(SnackBar(content: Text('تعذر التحديث: $e')));
       }
     }
   }
@@ -154,7 +155,7 @@ ${e['details'] ?? '—'}
       ref.invalidate(_flagsRawProvider);
       ref.invalidate(featureFlagsProvider);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(
           content: Text(enabled ? 'تم تفعيل الميزة ✓' : 'تم تعطيل الميزة ✓'),
           backgroundColor: Colors.green.shade700,
         ));
@@ -162,7 +163,7 @@ ${e['details'] ?? '—'}
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('تعذر التغيير: $e')));
+            .showSnackBarSfx(SnackBar(content: Text('تعذر التغيير: $e')));
       }
     }
   }

@@ -1,4 +1,5 @@
 import '../../../rbac/presentation/widgets/server_username_display.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -592,7 +593,7 @@ class _RespondState
           );
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           const SnackBar(
             content: Text('✅ تم إرسال عرضك للمراجعة'),
             backgroundColor: Color(0xFF1A5276),
@@ -1024,7 +1025,7 @@ class _PostExtReqSheetState
           );
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           const SnackBar(
             content: Text('✅ تم نشر الطلب الخارجي بنجاح'),
             backgroundColor: Color(0xFF1A5276),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
@@ -123,7 +124,7 @@ class _AdminUsersTabState extends ConsumerState<AdminUsersTab> {
                                                 );
                                                 if (!context.mounted) return;
                                                 ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
+                                                    .showSnackBarSfx(
                                                   SnackBar(
                                                     content: Text(
                                                       result.isRight()
@@ -211,7 +212,7 @@ class _AdminUsersTabState extends ConsumerState<AdminUsersTab> {
                                                 );
                                                 if (!context.mounted) return;
                                                 ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
+                                                    .showSnackBarSfx(
                                                   SnackBar(
                                                     content: Text(
                                                       result.isRight()
@@ -247,7 +248,7 @@ class _AdminUsersTabState extends ConsumerState<AdminUsersTab> {
     final result = await useCase(
         targetUid: targetUid, status: status, requestedByUid: myUid);
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBarSfx(
       SnackBar(
           content: Text(
               result.isRight() ? 'تم تحديث الحالة' : 'فشل: صلاحية غير كافية')),

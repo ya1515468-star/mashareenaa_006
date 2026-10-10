@@ -1,4 +1,5 @@
 import '../../../core/data/supabase_document_compat.dart';
+import '../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
@@ -48,7 +49,7 @@ class _SubmitFeedbackPageState extends ConsumerState<SubmitFeedbackPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _sending = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text('تعذر إرسال الاقتراح: $e')),
       );
     }

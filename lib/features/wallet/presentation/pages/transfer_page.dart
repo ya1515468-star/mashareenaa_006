@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/widgets/auth_button.dart';
@@ -56,7 +57,7 @@ class _TransferPageState extends ConsumerState<TransferPage> {
       ref.invalidate(walletHistoryProvider);
       Navigator.of(context).pop();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         const SnackBar(content: Text('تعذر تنفيذ التحويل الآن. تحقق من الرصيد والاتصال ثم أعد المحاولة.')),
       );
     }

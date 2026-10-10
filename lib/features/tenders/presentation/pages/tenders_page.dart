@@ -1,4 +1,5 @@
 import '../../../rbac/presentation/widgets/server_username_display.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -538,7 +539,7 @@ class _SubmitBidSheetState extends ConsumerState<_SubmitBidSheet> {
           );
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           const SnackBar(
             content: Text('✅ تم تقديم عرضك بنجاح'),
             backgroundColor: Color(0xFF2D7A4F),
@@ -823,7 +824,7 @@ class _PostTenderSheetState extends ConsumerState<_PostTenderSheet> {
           );
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           const SnackBar(
             content: Text('✅ تم نشر المناقصة بنجاح'),
             backgroundColor: Color(0xFF2D7A4F),

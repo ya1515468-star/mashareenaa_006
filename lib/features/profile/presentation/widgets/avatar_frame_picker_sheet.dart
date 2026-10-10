@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -63,7 +64,7 @@ class AvatarFramePickerSheet extends ConsumerWidget {
                       const SizedBox(height:5),
                       Text(selected?'مُجهز':(unlocked?'تجهيز':'يتطلب شراء'),style:const TextStyle(fontSize:10,color:Colors.white60)),
                       const SizedBox(height:5),
-                      FilledButton(onPressed:unlocked?() async{try{await Supabase.instance.client.rpc('set_avatar_frame',params:{'p_frame_key':f.key});ref.invalidate(currentProfileProvider);ref.invalidate(profileByIdProvider(uid));ref.invalidate(serverUserIdentityProvider);ref.invalidate(serverUserIdentityInRoomProvider);DynamicAvatarFrame.invalidateVisualSizeCache(uid);if(context.mounted){Navigator.pop(context);ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم تجهيز الإطار ✓')));}}catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('فشل تجهيز الإطار: $e')));}}:null,child:Text(selected?'مُجهز':'تجهيز')),
+                      FilledButton(onPressed:unlocked?() async{try{await Supabase.instance.client.rpc('set_avatar_frame',params:{'p_frame_key':f.key});ref.invalidate(currentProfileProvider);ref.invalidate(profileByIdProvider(uid));ref.invalidate(serverUserIdentityProvider);ref.invalidate(serverUserIdentityInRoomProvider);DynamicAvatarFrame.invalidateVisualSizeCache(uid);if(context.mounted){Navigator.pop(context);ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content:Text('تم تجهيز الإطار ✓')));}}catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content:Text('فشل تجهيز الإطار: $e')));}}:null,child:Text(selected?'مُجهز':'تجهيز')),
                     ])));
                   },
                 )),

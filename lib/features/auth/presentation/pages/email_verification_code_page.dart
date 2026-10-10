@@ -1,4 +1,5 @@
 import '../../../../core/config/auth_redirect.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -69,7 +70,7 @@ class _EmailVerificationCodePageState
       }
     } catch (_) {/* الإحالة لا تمنع إكمال التأكيد */}
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBarSfx(
       const SnackBar(content: Text('تم تأكيد بريدك الإلكتروني بنجاح! ✓')),
     );
     Navigator.of(context).popUntil((route) => route.isFirst);
@@ -154,7 +155,7 @@ class _EmailVerificationCodePageState
       }
       if (mounted) setState(() => _canResend = true);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           const SnackBar(content: Text('تمت إعادة إرسال رسالة التأكيد.')),
         );
       }

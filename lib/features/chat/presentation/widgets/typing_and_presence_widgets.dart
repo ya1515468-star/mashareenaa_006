@@ -33,11 +33,18 @@ final privacyAwarePresenceProvider =
   late final StreamController<Map<String, dynamic>> controller;
   Timer? timer;
   controller = StreamController<Map<String, dynamic>>(
+    // كان الفحص isClosed يسبق await fetch() لا يتبعها — فإن أُغلق الـcontroller
+    // (المزوّد autoDispose انتهت حاجته، مثلاً عند إغلاق الشاشة بسرعة قبل اكتمال
+    // الطلب) أثناء انتظار fetch()، يصل controller.add بعد الإغلاق مباشرة فيرمي
+    // "Bad state: Cannot add event after closing" — وهذا مسجَّل فعليًا في
+    // المراقبة. الفحص الآن بعد await في كلا الموضعين، مباشرة قبل add.
     onListen: () async {
-      controller.add(await fetch());
+      final first = await fetch();
+      if (!controller.isClosed) controller.add(first);
       timer = Timer.periodic(const Duration(seconds: 6), (_) async {
         if (controller.isClosed) return;
-        controller.add(await fetch());
+        final data = await fetch();
+        if (!controller.isClosed) controller.add(data);
       });
     },
     onCancel: () {
@@ -59,7 +66,8 @@ class PrivacyAwarePresenceSubtitle extends StatelessWidget {
     final d = data;
     if (d == null) return '';
     if (d['is_online'] == true) return 'متصل الآن';
-    final lastSeenRaw = d['last_seen_at']?.toString();
+    // get_profile_for_viewer يعيد last_seen للجميع وlast_seen_at للمخوَّلين فقط.
+    final lastSeenRaw = (d['last_seen'] ?? d['last_seen_at'])?.toString();
     if (lastSeenRaw == null || lastSeenRaw.isEmpty) return '';
     final lastSeen = DateTime.tryParse(lastSeenRaw);
     if (lastSeen == null) return '';

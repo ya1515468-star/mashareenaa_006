@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -143,7 +144,7 @@ class _EditableItemRowState extends ConsumerState<_EditableItemRow> {
         priceGems < 0) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         const SnackBar(
           content: Text(
             'يجب إدخال سعر صالح بالنقاط وسعر صالح بالجواهر.',
@@ -168,7 +169,7 @@ class _EditableItemRowState extends ConsumerState<_EditableItemRow> {
 
     setState(() => _saving = false);
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBarSfx(
       SnackBar(
         content: Text(
           result.isRight() ? 'تم الحفظ ✓' : 'فشل: صلاحية غير كافية',

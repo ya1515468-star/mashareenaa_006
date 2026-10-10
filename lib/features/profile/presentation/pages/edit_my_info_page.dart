@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../domain/entities/profile_entity.dart';
@@ -73,7 +74,7 @@ class _EditMyInfoPageState extends ConsumerState<EditMyInfoPage> {
       Navigator.of(context).pop();
     } else {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('فشل حفظ التعديلات')));
+          .showSnackBarSfx(const SnackBar(content: Text('فشل حفظ التعديلات')));
     }
   }
 

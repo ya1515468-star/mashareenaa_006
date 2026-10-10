@@ -154,19 +154,36 @@ class StoreRemoteDataSourceImpl implements StoreRemoteDataSource {
     final prices = row['store_item_prices'];
 
     if (prices is List && prices.isNotEmpty) {
+      // نفس قاعدة الخادم في purchase_store_item: السعر الفعّال هو أحدث صف
+      // is_active لكل عملة. كان التطبيق يأخذ آخر صف في القائمة أيًّا كان
+      // (حتى المنتهي)، فيعرض سعرًا يختلف عمّا سيُخصم فعلًا.
+      final latestFrom = <String, DateTime>{};
       for (final raw in prices) {
         if (raw is! Map) {
+          continue;
+        }
+        if (raw['is_active'] == false) {
           continue;
         }
 
         final currency = raw['currency']?.toString();
         final amount = (raw['amount'] as num?)?.toInt();
+        if (currency == null || amount == null) {
+          continue;
+        }
+        final from = DateTime.tryParse('${raw['effective_from'] ?? ''}') ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final prev = latestFrom[currency];
+        if (prev != null && from.isBefore(prev)) {
+          continue;
+        }
+        latestFrom[currency] = from;
 
-        if (currency == 'points' && amount != null) {
+        if (currency == 'points') {
           result['pricePoints'] = amount;
         }
 
-        if (currency == 'gems' && amount != null) {
+        if (currency == 'gems') {
           result['priceGems'] = amount;
         }
       }

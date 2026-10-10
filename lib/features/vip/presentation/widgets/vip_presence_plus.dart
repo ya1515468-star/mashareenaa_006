@@ -28,7 +28,10 @@ class VipPresencePlus extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final data = ref.watch(vipPresencePlusProvider(uid)).valueOrNull ?? const <String, dynamic>{};
-    final online = data['is_online'] == true;
+    final seen = DateTime.tryParse('${data['last_seen'] ?? ''}');
+    final fresh = seen != null &&
+        DateTime.now().toUtc().difference(seen.toUtc()).inSeconds <= 120;
+    final online = data['is_online'] == true && fresh;
     final total = _duration(data['total_online_seconds']);
     return Row(
       mainAxisSize: MainAxisSize.min,

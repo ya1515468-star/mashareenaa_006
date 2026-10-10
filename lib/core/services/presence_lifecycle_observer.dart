@@ -14,6 +14,7 @@ import '../../features/gifts/domain/repositories/gift_repository.dart';
 import '../constants/app_constants.dart';
 import '../di/injection_container.dart';
 import 'dragon_bootstrap_service.dart';
+import 'server_sounds.dart';
 
 /// يضبط presence/{uid}.isOnline = true عند دخول المستخدم المصادَق
 /// للتطبيق أو عودته من الخلفية، ويضبطه false عند الانتقال للخلفية
@@ -64,6 +65,8 @@ class _PresenceLifecycleObserverState
           if (user.uid != _boundUid) _handleAuthenticatedUser(user);
         } else {
           _boundUid = null;
+          _presenceTimer?.cancel();
+          _presenceTimer = null;
           _updatePresence(false);
         }
       },
@@ -94,6 +97,9 @@ class _PresenceLifecycleObserverState
     _missedCallTimer?.cancel();
     _missedCallTimer = null;
 
+    _presenceTimer?.cancel();
+    _presenceTimer = null;
+
     _broadcastSubscription?.cancel();
     _broadcastSubscription = null;
 
@@ -108,20 +114,51 @@ class _PresenceLifecycleObserverState
 
     WidgetsBinding.instance.removeObserver(this);
 
-    _updatePresence(false);
+    // كان هذا ينادي _updatePresence(false) التي تقرأ ref.read(...) —
+    // لكن Riverpod يرفض أي استخدام لـref أثناء dispose() بالذات (الـElement
+    // يُعتبر "مُستَهلَكًا" فعليًا عند هذه النقطة من unmount)، فيرمي
+    // "Bad state: Cannot use ref after the widget was disposed" — وهذا
+    // مسجَّل فعليًا في المراقبة. uid الحالي محفوظ أصلًا في _boundUid منذ
+    // _handleAuthenticatedUser، فنستعمله مباشرة بلا أي لمسة لـref هنا.
+    final uid = _boundUid;
+    if (uid != null) {
+      unawaited(_applyPresence(uid, false));
+    }
 
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    _updatePresence(state == AppLifecycleState.resumed);
+    _resumed = state == AppLifecycleState.resumed;
+    _updatePresence(_resumed);
+  }
+
+  Timer? _presenceTimer;
+  bool _resumed = true;
+
+  /// نبضة حضور: الخادم يعدّ المستخدم "متصلًا" فقط إن وصلت نبضته خلال دقيقتين،
+  /// وإلا (إغلاق مفاجئ/انقطاع شبكة) يعيده تلقائيًا إلى "غير متصل". النبضة تحدّث
+  /// last_seen فقط ولا تغيّر الغرفة الحالية.
+  void _startPresenceHeartbeat() {
+    _presenceTimer?.cancel();
+    _presenceTimer = Timer.periodic(const Duration(seconds: 45), (_) async {
+      if (!_resumed || _boundUid == null) return;
+      try {
+        await Supabase.instance.client.rpc('heartbeat_my_presence');
+      } catch (_) {
+        // best-effort؛ النبضة التالية تكفي.
+      }
+    });
   }
 
   void _updatePresence(bool isOnline) async {
     final uid = ref.read(authControllerProvider).value?.uid;
     if (uid == null) return;
+    await _applyPresence(uid, isOnline);
+  }
 
+  Future<void> _applyPresence(String uid, bool isOnline) async {
     // ميزة 10 من القائمة الإضافية: من فعّل "إخفاء حالة الاتصال"
     // (متاحة لمن يملك canHideOnlineStatus في عضويته) يبقى isOnline
     // مضبوطًا على false دائمًا بصرف النظر عن حالته الفعلية — بهذا
@@ -258,8 +295,27 @@ class _PresenceLifecycleObserverState
             _knownNotificationIds = ids;
             return;
           }
-          if (ids.difference(_knownNotificationIds).isNotEmpty) {
-            unawaited(_chatSound.play(ChatSoundEvent.notification));
+          final fresh = ids.difference(_knownNotificationIds);
+          if (fresh.isNotEmpty) {
+            // إشعارات نتائج الألعاب: نغمة ربح/خسارة/تعادل بدل نغمة الإشعار العامة.
+            String? gameKey;
+            for (final r in rows) {
+              if (!fresh.contains(r['id'].toString())) continue;
+              final t = (r['title'] ?? '').toString();
+              if (t.startsWith('🏆')) {
+                gameKey = 'game_win';
+              } else if (t.startsWith('😔')) {
+                gameKey = 'game_lose';
+              } else if (t.startsWith('🤝')) {
+                gameKey = 'game_draw';
+              }
+              if (gameKey != null) break;
+            }
+            if (gameKey != null) {
+              playServerSound(gameKey);
+            } else {
+              unawaited(_chatSound.play(ChatSoundEvent.notification));
+            }
           }
           _knownNotificationIds = ids;
         });
@@ -291,6 +347,7 @@ class _PresenceLifecycleObserverState
   void _handleAuthenticatedUser(UserEntity user) {
     _boundUid = user.uid;
     _updatePresence(true);
+    _startPresenceHeartbeat();
     DragonBootstrapService.ensureDragonRole(user);
     _listenForGifts(user.uid);
     _listenForTransfers(user.uid);

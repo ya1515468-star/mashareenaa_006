@@ -1,4 +1,5 @@
 import '../../../rbac/presentation/widgets/server_username_display.dart';
+import '../../../../core/services/snack_sfx.dart';
 import '../../../chat/presentation/widgets/mini_profile_popup.dart';
 import 'dart:async';
 import 'dart:math' as math;
@@ -874,7 +875,7 @@ class _SeasonBannerEditorSheetState
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           SnackBar(content: Text('خطأ: $e')),
         );
       }

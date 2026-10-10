@@ -6,13 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class MiniPlayerTrack {
   final String videoId;
   final String title;
-  final bool autoPlay;
-
-  const MiniPlayerTrack({
-    required this.videoId,
-    required this.title,
-    this.autoPlay = false,
-  });
+  const MiniPlayerTrack({required this.videoId, required this.title});
 }
 
 final miniPlayerProvider = StateProvider<MiniPlayerTrack?>((ref) => null);
+
+/// true = النافذة العائمة مصغَّرة: لا نافذة ولا شريط، فقط أيقونة تشغيل
+/// صغيرة بجانب زر السمايل في شريط الكتابة (MiniPlayerChip)، والصوت يستمر.
+final miniPlayerMinimizedProvider = StateProvider<bool>((ref) => false);

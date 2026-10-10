@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../../core/services/snack_sfx.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -62,17 +63,23 @@ class ProfilePremiumOwnedService {
   final String key;
   final bool enabled;
   final Map<String, dynamic> settings;
+  final String currency;
 
   const ProfilePremiumOwnedService({
     required this.key,
     required this.enabled,
     required this.settings,
+    this.currency = '',
   });
+
+  /// الخدمة ممنوحة ضمن العضوية (تتوقف بانتهائها).
+  bool get fromMembership => currency == 'membership';
 
   factory ProfilePremiumOwnedService.fromMap(Map<String, dynamic> m) =>
       ProfilePremiumOwnedService(
         key: '${m['feature_key']}',
         enabled: m['enabled'] == true,
+        currency: '${m['currency'] ?? ''}',
         settings: m['settings'] is Map
             ? Map<String, dynamic>.from(m['settings'] as Map)
             : <String, dynamic>{},
@@ -215,7 +222,7 @@ class _ProfilePremiumServicesTabState
     ];
     if (purchaseOptions.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         const SnackBar(content: Text('هذه الخدمة غير متاحة للشراء حالياً لأن سعرها غير مضبوط.')),
       );
       return;
@@ -269,14 +276,14 @@ class _ProfilePremiumServicesTabState
       ref.invalidate(profilePremiumServicesOwnedProvider);
       ref.invalidate(profilePremiumRuntimeProvider(item.key));
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text('تم تفعيل ${item.nameAr} على الخادم ✓')),
       );
       await _openService(item);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(_friendly(e))));
+          .showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
   }
 
@@ -295,13 +302,13 @@ class _ProfilePremiumServicesTabState
         ref.invalidate(currentProfileProvider);
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text(enabled ? 'تم التفعيل' : 'تم الإيقاف')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(_friendly(e))));
+          .showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
   }
 
@@ -312,11 +319,11 @@ class _ProfilePremiumServicesTabState
       ref.invalidate(currentProfileProvider);
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('تم تفعيل التوثيق ✓')));
+          .showSnackBarSfx(const SnackBar(content: Text('تم تفعيل التوثيق ✓')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(_friendly(e))));
+          .showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
   }
 
@@ -392,13 +399,13 @@ class _ProfilePremiumServicesTabState
       );
       ref.invalidate(profilePremiumServicesCatalogProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         const SnackBar(content: Text('تم تحديث السعر وحالة البيع على الخادم ✓')),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(_friendly(e))));
+          .showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
   }
 
@@ -435,9 +442,9 @@ class _ProfilePremiumServicesTabState
       ref.invalidate(currentProfileProvider);
       ref.invalidate(serverUserIdentityProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ حجم الاسم على الخادم ✓')));
+      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم حفظ حجم الاسم على الخادم ✓')));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
   }
 
@@ -530,7 +537,7 @@ class _ProfilePremiumServicesTabState
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text(_friendly(e))),
       );
       return;
@@ -647,7 +654,7 @@ class _ProfilePremiumServicesTabState
       ref.invalidate(profilePremiumServicesOwnedProvider);
       ref.invalidate(profilePremiumRuntimeProvider(item.key));
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text('تم حفظ ${item.nameAr} وربطه بحسابك على الخادم ✓')),
       );
     } finally {
@@ -691,9 +698,9 @@ class _ProfilePremiumServicesTabState
           'p_idempotency_key': const Uuid().v4(),
         });
         if (raw is! Map || raw['ok'] != true) throw StateError('لم يؤكد الخادم نجاح الدعم.');
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال دعم المنشئ وتسجيل العملية خادميًا ✓')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم إرسال دعم المنشئ وتسجيل العملية خادميًا ✓')));
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
       }
     } finally {
       recipient.dispose();
@@ -817,7 +824,7 @@ class _ProfilePremiumServicesTabState
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(_friendly(e))));
+          .showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
   }
 
@@ -830,7 +837,7 @@ class _ProfilePremiumServicesTabState
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+      ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
       return;
     }
     if (!mounted) return;
@@ -891,12 +898,12 @@ class _ProfilePremiumServicesTabState
       );
       ref.invalidate(currentProfileProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text(hide ? 'تم إخفاء البروفايل' : 'تم إظهار البروفايل')),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text(_friendly(e))),
       );
     }
@@ -998,7 +1005,7 @@ class _ProfilePremiumServicesTabState
               } catch (e) {
                 if (!dialogContext.mounted) return;
                 ScaffoldMessenger.of(dialogContext)
-                    .showSnackBar(SnackBar(content: Text(_friendly(e))));
+                    .showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
               }
             },
             child: const Text('احسب واحفظ'),
@@ -1054,7 +1061,7 @@ class _ProfilePremiumServicesTabState
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
               } catch (e) {
                 if (dialogContext.mounted) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(_friendly(e))));
+                  ScaffoldMessenger.of(dialogContext).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
                 }
               }
             },
@@ -1103,10 +1110,10 @@ class _ProfilePremiumServicesTabState
                   });
                   await Supabase.instance.client.rpc('publish_profile_targeted_ad', params: {'p_ad_id': createdId});
                   if (dialogContext.mounted) Navigator.pop(dialogContext);
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إنشاء الحملة ودفع ميزانيتها ونشرها ✓')));
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم إنشاء الحملة ودفع ميزانيتها ونشرها ✓')));
                 } catch (e) {
                   if (dialogContext.mounted) {
-                    ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(_friendly(e))));
+                    ScaffoldMessenger.of(dialogContext).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
                   }
                 }
               },
@@ -1187,7 +1194,7 @@ class _ProfilePremiumServicesTabState
       );
       if (result != true || !mounted) return;
       if (title.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           const SnackBar(content: Text('اكتب عنوان المنتج أولًا.')),
         );
         return;
@@ -1218,7 +1225,7 @@ class _ProfilePremiumServicesTabState
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context).showSnackBarSfx(
             SnackBar(content: Text(_friendly(e))),
           );
         }
@@ -1226,7 +1233,7 @@ class _ProfilePremiumServicesTabState
       }
       ref.invalidate(profilePremiumRuntimeProvider('profile_products'));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           const SnackBar(content: Text('تم رفع المنتج وحفظه على الخادم ✓')),
         );
       }
@@ -1266,7 +1273,7 @@ class _ProfilePremiumServicesTabState
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
               } catch (e) {
                 if (dialogContext.mounted) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(_friendly(e))));
+                  ScaffoldMessenger.of(dialogContext).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
                 }
               }
             },
@@ -1371,7 +1378,7 @@ class _ProfilePremiumServicesTabState
                   if (dialogContext.mounted) Navigator.pop(dialogContext);
                 } catch (e) {
                   if (dialogContext.mounted) {
-                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    ScaffoldMessenger.of(dialogContext).showSnackBarSfx(
                       SnackBar(content: Text(_friendly(e))),
                     );
                   }
@@ -1503,6 +1510,18 @@ class _ProfilePremiumServicesTabState
               '${item.pricePoints} نقطة • ${item.priceGems} جوهرة',
               style: const TextStyle(fontSize: 12),
             ),
+            if (ownedItem != null && ownedItem.fromMembership && !owner)
+              const Padding(
+                padding: EdgeInsets.only(top: 4),
+                child: Text(
+                  'ضمن عضويتك — تتوقف عند انتهاء العضوية',
+                  style: TextStyle(
+                    color: Colors.lightBlueAccent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
             if (owner && !item.isActive)
               const Padding(
                 padding: EdgeInsets.only(top: 4),
@@ -1523,7 +1542,9 @@ class _ProfilePremiumServicesTabState
               children: [
                 FilledButton(
                   onPressed: (!item.isActive && !owner) ? null : () => _purchase(item),
-                  child: Text(active ? 'فتح الخدمة' : 'شراء'),
+                  child: Text(active
+                      ? 'فتح الخدمة'
+                      : (ownedItem != null ? 'مُتوقفة — فتح لإعادة التفعيل' : 'شراء')),
                 ),
                 if (owner)
                   OutlinedButton.icon(

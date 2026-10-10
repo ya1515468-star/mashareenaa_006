@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/widgets/cross_platform_image.dart';
@@ -65,7 +66,7 @@ class _CreateListingPageState extends ConsumerState<CreateListingPage> {
         if (!mounted) return;
         setState(() => _isUploading = false);
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('تعذّر رفع الصورة: $e')));
+            .showSnackBarSfx(SnackBar(content: Text('تعذّر رفع الصورة: $e')));
         return;
       }
       if (!mounted) return;
@@ -102,7 +103,7 @@ class _CreateListingPageState extends ConsumerState<CreateListingPage> {
         } catch (_) {}
         if (!mounted) return;
       }
-      messenger.showSnackBar(
+      messenger.showSnackBarSfx(
         const SnackBar(content: Text('تعذر نشر العرض الآن. تحقق من البيانات والاتصال ثم أعد المحاولة.')),
       );
     }

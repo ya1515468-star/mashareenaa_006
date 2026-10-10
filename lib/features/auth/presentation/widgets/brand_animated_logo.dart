@@ -91,7 +91,7 @@ class _ShimmeringMark extends StatelessWidget {
         // الشريط اللامع يتحرك قطريًا من خارج الشعار (يسار-أعلى) إلى خارجه
         // (يمين-أسفل) مرة كل دورة، فيبدو كأنه ينزلق فوق المعدن الذهبي.
         final t = shimmer.value; // 0..1 طوال الدورة (منها فترة سكون)
-        final band = 0.28;
+        const band = 0.28;
         final start = (t * (1 + band * 2)) - band;
         return ShaderMask(
           blendMode: BlendMode.srcATop,
@@ -183,7 +183,7 @@ class _NeedleThreadPainter extends CustomPainter {
     const gold = Color(0xFFFFD54F);
     const goldDark = Color(0xFFD6A01E);
 
-    final angle = 40 * math.pi / 180;
+    const angle = 40 * math.pi / 180;
     final half = s * 0.30;
     final ex = cx + half * math.cos(angle);
     final ey = cy - half * math.sin(angle);

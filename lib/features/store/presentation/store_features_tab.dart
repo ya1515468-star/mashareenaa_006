@@ -1,4 +1,5 @@
 import '../domain/usecases/store_usecases.dart';
+import '../../../core/services/snack_sfx.dart';
 // ignore_for_file: prefer_const_declarations
 
 import 'dart:math' as math;
@@ -359,6 +360,15 @@ class _StoreItemCard extends ConsumerStatefulWidget {
 class _StoreItemCardState extends ConsumerState<_StoreItemCard> {
   bool _isPressed = false;
 
+  /// نص السعر كما سيخصمه الخادم فعلًا: نقاط إن كان للعنصر سعر نقاط، وإلا جواهر.
+  /// كانت الواجهة تعرض النقاط فقط، فتظهر العناصر المسعّرة بالجواهر "0⭐".
+  static String _priceLabel(StoreItemEntity item) {
+    if (item.pricePoints > 0) return '${item.pricePoints} ⭐';
+    final gems = item.priceGems ?? 0;
+    if (gems > 0) return '$gems 💎';
+    return 'غير متاح';
+  }
+
   void _showPreview() {
     showDialog(
       context: context,
@@ -393,7 +403,7 @@ class _StoreItemCardState extends ConsumerState<_StoreItemCard> {
               if (!widget.owned)
                 ElevatedButton.icon(
                   icon: const Icon(Icons.shopping_cart, size: 16),
-                  label: Text('${widget.item.pricePoints} ⭐'),
+                  label: Text(_priceLabel(widget.item)),
                   onPressed: () {
                     Navigator.of(dialogContext).pop();
                     _purchase();
@@ -421,7 +431,7 @@ class _StoreItemCardState extends ConsumerState<_StoreItemCard> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('تأكيد الشراء'),
-        content: Text('سيتم شراء «${widget.item.nameAr}» من المتجر وحفظ الملكية على الخادم. هل تريد المتابعة؟'),
+        content: Text('سيتم شراء «${widget.item.nameAr}» مقابل ${_priceLabel(widget.item)} وحفظ الملكية على الخادم. هل تريد المتابعة؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('شراء')),
@@ -434,9 +444,9 @@ class _StoreItemCardState extends ConsumerState<_StoreItemCard> {
     if (!mounted) return;
     result.fold(
       (failure) => ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(failure.message))),
+          .showSnackBarSfx(SnackBar(content: Text(failure.message))),
       (_) => ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('تم الشراء ✓'))),
+          .showSnackBarSfx(const SnackBar(content: Text('تم الشراء ✓'))),
     );
   }
 
@@ -460,7 +470,7 @@ class _StoreItemCardState extends ConsumerState<_StoreItemCard> {
       itemId: widget.item.id,
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBarSfx(
       const SnackBar(content: Text('تم التجهيز على ملفك الشخصي ✓')),
     );
   }
@@ -521,7 +531,7 @@ class _StoreItemCardState extends ConsumerState<_StoreItemCard> {
                       _ActionButton(
                         owned: widget.owned,
                         enabled: widget.uid != null,
-                        price: widget.item.pricePoints,
+                        priceLabel: _priceLabel(widget.item),
                         rarityColor: widget.item.colors.first,
                         onPurchase: widget.owned ? _equip : _purchase,
                       ),
@@ -615,14 +625,14 @@ class _MiniPreview extends StatelessWidget {
 class _ActionButton extends StatelessWidget {
   final bool owned;
   final bool enabled;
-  final int price;
+  final String priceLabel;
   final Color rarityColor;
   final VoidCallback onPurchase;
 
   const _ActionButton({
     required this.owned,
     required this.enabled,
-    required this.price,
+    required this.priceLabel,
     required this.rarityColor,
     required this.onPurchase,
   });
@@ -654,7 +664,7 @@ class _ActionButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 4),
         ),
         child: Text(
-          '$price⭐',
+          priceLabel,
           style: const TextStyle(fontSize: 10, color: Colors.white),
         ),
       ),

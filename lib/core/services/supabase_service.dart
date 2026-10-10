@@ -133,8 +133,15 @@ class SupabaseService {
   static const Set<String> _privateBuckets = {
     'profile-patterns',
     'profile-products',
+    // bucket الوسائط الخاص بمستخدمي VIP+ — غير public فعليًا على الخادم،
+    // وسياسة RLS للقراءة تتحقق من عضوية القارئ في محادثة الرسالة. كانت
+    // chat-media-plus غائبة عن كلا المجموعتين هنا فترمي StateError
+    // ("UNKNOWN_BUCKET_VISIBILITY") بعد نجاح كل رفع فعليًا — وهذا بالضبط
+    // سبب فشل رفع الرسائل الصوتية/المرفقات لأعضاء VIP+ (مرصود في
+    // المراقبة كـ"ليس لديك صلاحية رفع هذا الملف"، رغم أن السبب الحقيقي
+    // كان بعد نجاح الرفع لا أثناءه — انظر أيضًا تصحيح مسار المجلد في
+    // voice_upload_helper.dart وchat_lobby_page.dart).
     'chat-media-plus',
-    'chat-voice',
   };
 
   static const Set<String> _publicBuckets = {
@@ -177,6 +184,39 @@ class SupabaseService {
 
   static String? currentUploadProgressId() => UploadProgressBus.current.value?.id;
 
+  static final Map<String, _SignedUrlEntry> _signedUrlCache = {};
+
+  /// يُرجِع رابطًا صالحًا للعرض من [pathOrUrl]: إن كان أصلًا رابطًا كاملًا
+  /// (bucket عام، كـ"media") يُعاد كما هو بلا أي طلب شبكة إضافي. إن كان
+  /// مسار تخزين خامًا (bucket خاص، كـ"chat-media-plus") يُوقَّع عبر جلسة
+  /// المستخدم الحالية — محميًا بسياسة RLS نفسها لقراءة ذلك الـbucket (هنا:
+  /// التحقق من عضوية القارئ في محادثة الرسالة)، فلا يتجاوز هذا أي صلاحية
+  /// لم تكن ممنوحة أصلًا. النتائج تُخزَّن مؤقتًا (أقل من مدة صلاحية
+  /// التوقيع الفعلية بهامش أمان) لتفادي توقيع الرابط نفسه مرارًا عند كل
+  /// إعادة بناء للودجت.
+  static Future<String> resolvePrivateMediaUrl({
+    required String bucket,
+    required String pathOrUrl,
+    int expiresInSeconds = 3600,
+  }) async {
+    final trimmed = pathOrUrl.trim();
+    if (trimmed.isEmpty) return trimmed;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    final key = '$bucket:$trimmed';
+    final cached = _signedUrlCache[key];
+    if (cached != null && cached.expiresAt.isAfter(DateTime.now())) {
+      return cached.url;
+    }
+    final signed =
+        await client.storage.from(bucket).createSignedUrl(trimmed, expiresInSeconds);
+    // هامش أمان 10% قبل الانتهاء الفعلي حتى لا يصل رابط شارف على الانتهاء
+    // لودجت يعرضه للتو.
+    final safeTtl = Duration(seconds: (expiresInSeconds * 0.9).round());
+    _signedUrlCache[key] = _SignedUrlEntry(signed, DateTime.now().add(safeTtl));
+    return signed;
+  }
 
   /// Helper to construct same public URL from existing SDK getPublicUrl responses
   /// or to compute path extraction if callers only have the full URL.
@@ -191,4 +231,10 @@ class SupabaseService {
     final base = SupabaseConfig.url.replaceAll(RegExp(r'/$'), '');
     return '$base/storage/v1/object/public/$bucket/$cleanPath';
   }
+}
+
+class _SignedUrlEntry {
+  final String url;
+  final DateTime expiresAt;
+  const _SignedUrlEntry(this.url, this.expiresAt);
 }

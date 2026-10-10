@@ -26,7 +26,7 @@ class OrderModel extends OrderEntity {
         currency: CurrencyX.fromWire(map['currency'] as String?),
       ),
       status: OrderStatusX.fromWire(map['status'] as String?),
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: parseFlexibleTimestamp(map['createdAt']),
     );
   }
 

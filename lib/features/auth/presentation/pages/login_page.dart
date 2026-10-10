@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/local_session_service.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -74,7 +75,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       final message = error.error?.toString() ?? 'فشل تسجيل الدخول';
       final requiresConfirmation = message.contains('تأكيد البريد');
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(
           content: Text(message),
           action: requiresConfirmation
@@ -87,7 +88,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           _emailController.text.trim(),
                         );
                     if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    ScaffoldMessenger.of(context).showSnackBarSfx(
                       SnackBar(
                         content: Text(
                           resendMessage ??
@@ -237,7 +238,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     showAppleButton: true,
                     onError: (message) {
                       ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(content: Text(message)));
+                          .showSnackBarSfx(SnackBar(content: Text(message)));
                     },
                   ),
                   const SizedBox(height: 20),

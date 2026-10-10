@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import '../../../../core/services/snack_sfx.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -64,7 +65,7 @@ class _SponsoredAdsPageState extends ConsumerState<SponsoredAdsPage> {
     await _load();
     if (!mounted) return;
     if (_categories.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
           const SnackBar(content: Text('لا توجد فئات إعلانات متاحة بعد.')));
       return;
     }
@@ -145,10 +146,10 @@ class _SponsoredAdsPageState extends ConsumerState<SponsoredAdsPage> {
         'p_category_key': selectedCategory,
         if (imageUrl != null) 'p_image_url': imageUrl,
       });
-      m.showSnackBar(const SnackBar(content: Text('تم نشر الإعلان ✓')));
+      m.showSnackBarSfx(const SnackBar(content: Text('تم نشر الإعلان ✓')));
     } catch (e) {
       final t = e.toString();
-      m.showSnackBar(SnackBar(content: Text(
+      m.showSnackBarSfx(SnackBar(content: Text(
         t.contains('INSUFFICIENT_GEMS') ? 'رصيدك من الجواهر لا يكفي.'
         : t.contains('INSUFFICIENT_POINTS') ? 'رصيدك من النقاط لا يكفي.'
         : 'تعذّر نشر الإعلان: $e',
@@ -344,7 +345,7 @@ class _CategoryManagerSheetState extends State<_CategoryManagerSheet> {
         await _load();
         widget.onChanged();
       } catch (e) {
-        m?.showSnackBar(SnackBar(content: Text('تعذّر الحفظ: $e')));
+        m?.showSnackBarSfx(SnackBar(content: Text('تعذّر الحفظ: $e')));
       }
     }
   }
@@ -357,7 +358,7 @@ class _CategoryManagerSheetState extends State<_CategoryManagerSheet> {
       await _load();
       widget.onChanged();
     } catch (e) {
-      m?.showSnackBar(SnackBar(content: Text('تعذّر الحذف: $e')));
+      m?.showSnackBarSfx(SnackBar(content: Text('تعذّر الحذف: $e')));
     }
   }
 

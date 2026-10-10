@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
 import '../../../../core/monitoring/error_monitor.dart';
@@ -16,6 +17,8 @@ import '../../../profile/presentation/providers/profile_provider.dart';
 import '../../../friends/presentation/widgets/friend_button.dart';
 import '../../../profile/presentation/widgets/profile_avatar.dart';
 import '../../../rbac/presentation/widgets/server_username_display.dart';
+import 'game_hub.dart';
+import '../../../../core/services/server_sounds.dart';
 
 /// نافذة الملف المصغَّر — تفتح عند الضغط على صورة أي عضو آخر داخل
 /// الشات العام: الاسم، صورة الملف، الغلاف، الرتبة، زر عرض الملف
@@ -36,14 +39,32 @@ class MiniProfilePopup extends ConsumerWidget {
         final size = MediaQuery.sizeOf(dialogContext);
         return Dialog(
           insetPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+              const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
           clipBehavior: Clip.antiAlias,
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: 620,
-              maxHeight: size.height * 0.88,
+              maxWidth: 340,
+              maxHeight: size.height * 0.72,
             ),
-            child: MiniProfilePopup(uid: uid, roomId: roomId),
+            child: Stack(children: [
+              MiniProfilePopup(uid: uid, roomId: roomId),
+              PositionedDirectional(
+                top: 4,
+                end: 4,
+                child: Material(
+                  color: Colors.black54,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => Navigator.of(dialogContext).pop(),
+                    child: const Padding(
+                      padding: EdgeInsets.all(5),
+                      child: Icon(Icons.close, color: Colors.white, size: 18),
+                    ),
+                  ),
+                ),
+              ),
+            ]),
           ),
         );
       },
@@ -67,7 +88,7 @@ class MiniProfilePopup extends ConsumerWidget {
     if (!context.mounted) return;
     final reason = ref.read(giftControllerProvider.notifier).lastError?.trim();
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBarSfx(
       SnackBar(
         content: Text(
           tx != null
@@ -86,11 +107,27 @@ class MiniProfilePopup extends ConsumerWidget {
       await Supabase.instance.client.rpc(rpc, params: params);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(success)));
+          .showSnackBarSfx(SnackBar(content: Text(success)));
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('لم يكتمل الأمر: $e')));
+      final raw = e.toString();
+      const known = {
+        'MUTE_NOT_ACTIVE': 'الكتم مرفوع مسبقًا (ربما رفعه شخص آخر).',
+        'BAN_NOT_ACTIVE': 'الحظر مرفوع مسبقًا.',
+        'KICK_NOT_ACTIVE': 'الطرد منتهٍ أو مرفوع مسبقًا.',
+        'BURY_NOT_ACTIVE': 'العضو ليس في المقبرة.',
+        'TARGET_ROLE_TOO_HIGH': 'لا يمكنك تنفيذ أمر على رتبة مساوية أو أعلى منك.',
+        'FORBIDDEN': 'ليست لديك صلاحية لهذا الأمر.',
+        'CANNOT_ASSIGN_EQUAL_OR_HIGHER_ROLE': 'لا يمكنك منح رتبة مساوية أو أعلى من رتبتك.',
+      };
+      var msg = 'لم يكتمل الأمر: $raw';
+      for (final k in known.entries) {
+        if (raw.contains(k.key)) {
+          msg = k.value;
+          break;
+        }
+      }
+      ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(msg)));
     }
   }
 
@@ -124,25 +161,85 @@ class MiniProfilePopup extends ConsumerWidget {
       });
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('تم تحديث صورة العضو ✓')));
+          .showSnackBarSfx(const SnackBar(content: Text('تم تحديث صورة العضو ✓')));
     } catch (e) {
       unawaited(ErrorMonitor.report(e, screen: 'mini_profile_popup', source: 'admin_set_member_avatar'));
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('تعذّر تحديث الصورة: $e')));
+          .showSnackBarSfx(SnackBar(content: Text('تعذّر تحديث الصورة: $e')));
     }
   }
 
-  Future<void> _pickRole(BuildContext context) async {
+  static const _durations = <MapEntry<String, int?>>[
+    MapEntry('5 دقائق', 5),
+    MapEntry('15 دقيقة', 15),
+    MapEntry('30 دقيقة', 30),
+    MapEntry('ساعة', 60),
+    MapEntry('6 ساعات', 360),
+    MapEntry('24 ساعة', 1440),
+    MapEntry('7 أيام', 10080),
+  ];
+
+  /// يعرض خيارات المدة. يعيد null عند الإلغاء، و(label, minutes) حيث minutes
+  /// فارغة تعني دائم (للكتم والحظر فقط).
+  Future<({String label, int? minutes})?> _pickDuration(
+      BuildContext context, String title,
+      {bool allowPermanent = false}) {
+    return showModalBottomSheet<({String label, int? minutes})>(
+      context: context,
+      backgroundColor: AppColors.surfaceElevated,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(shrinkWrap: true, children: [
+          ListTile(title: Text(title), subtitle: const Text('اختر المدة')),
+          ..._durations.map((d) => ListTile(
+                leading: const Icon(Icons.timer_outlined),
+                title: Text(d.key),
+                onTap: () => Navigator.pop(
+                    sheetContext, (label: d.key, minutes: d.value)),
+              )),
+          if (allowPermanent)
+            ListTile(
+              leading: const Icon(Icons.all_inclusive),
+              title: const Text('دائم'),
+              onTap: () => Navigator.pop(
+                  sheetContext, (label: 'بشكل دائم', minutes: null)),
+            ),
+        ]),
+      ),
+    );
+  }
+
+  Future<void> _timedAction(BuildContext context, String rpc, String title,
+      String reason, String doneVerb,
+      {bool allowPermanent = false}) async {
     final rid = roomId;
     if (rid == null) return;
+    final d = await _pickDuration(context, title, allowPermanent: allowPermanent);
+    if (d == null || !context.mounted) return;
+    await _adminCall(
+        context,
+        rpc,
+        {
+          'p_room_id': rid,
+          'p_user_id': uid,
+          'p_duration_minutes': d.minutes,
+          'p_reason': reason
+        },
+        d.minutes == null ? '$doneVerb بشكل دائم ✓' : '$doneVerb لمدة ${d.label} ✓');
+  }
+
+  Future<void> _pickRole(BuildContext context) async {
     try {
-      final raw = await Supabase.instance.client
-          .rpc('get_room_assignable_roles', params: {'p_room_id': rid});
+      final raw = await Supabase.instance.client.rpc('get_assignable_global_roles');
       final roles = (raw is List ? raw : const [])
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
-      if (!context.mounted || roles.isEmpty) return;
+      if (!context.mounted) return;
+      if (roles.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBarSfx(
+            const SnackBar(content: Text('لا توجد رتب يمكنك منحها لهذا العضو')));
+        return;
+      }
       final selected = await showModalBottomSheet<Map<String, dynamic>>(
         context: context,
         backgroundColor: AppColors.surfaceElevated,
@@ -152,10 +249,10 @@ class MiniProfilePopup extends ConsumerWidget {
             children: [
               const ListTile(
                   title: Text('تعيين/ترقية العضو'),
-                  subtitle: Text('اختر رتبة الغرفة')),
+                  subtitle: Text('اختر الرتبة (الرتبة الحالية تُستبدل)')),
               ...roles.map((r) => ListTile(
-                    title: Text((r['name'] ?? r['code'] ?? 'دور').toString()),
-                    subtitle: Text('أولوية ${r['priority'] ?? 0}'),
+                    leading: const Icon(Icons.military_tech_outlined),
+                    title: Text((r['name'] ?? r['code'] ?? 'رتبة').toString()),
                     onTap: () => Navigator.pop(sheetContext, r),
                   )),
             ],
@@ -163,28 +260,32 @@ class MiniProfilePopup extends ConsumerWidget {
         ),
       );
       if (selected == null || !context.mounted) return;
+      final me = Supabase.instance.client.auth.currentUser?.id;
       await _adminCall(
           context,
-          'grant_room_role',
+          'assign_role',
           {
-            'p_room_id': rid,
-            'p_user_id': uid,
-            'p_role_id': selected['id'],
+            'p_target_user_id': uid,
+            'p_role_code': selected['code'],
+            'p_assigned_by': me,
           },
-          'تم تعيين رتبة العضو ✓');
+          'تم تعيين الرتبة: ${selected['name']} ✓');
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('تعذر تحميل الرتب: $e')));
+          .showSnackBarSfx(SnackBar(content: Text('تعذر تحميل الرتب: $e')));
     }
   }
 
   Widget _adminSection(BuildContext context, Map<String, dynamic> controls) {
     final rid = roomId;
     if (rid == null || controls.isEmpty) return const SizedBox.shrink();
+    // قاعدة صارمة: لا يظهر أي أمر إداري تجاه عضو رتبته مساوية أو أعلى.
+    if (controls['outranks_target'] != true) return const SizedBox.shrink();
     final allowed = controls['can_manage'] == true ||
         controls['can_moderate'] == true ||
-        controls['can_roles'] == true;
+        controls['can_roles'] == true ||
+        controls['can_assign_global_role_this_target'] == true;
     if (!allowed) return const SizedBox.shrink();
     final banned = controls['is_banned'] == true;
     final muted = controls['is_muted'] == true;
@@ -200,16 +301,9 @@ class MiniProfilePopup extends ConsumerWidget {
         Wrap(spacing: 8, runSpacing: 8, children: [
           if (controls['can_ban'] == true && !banned)
             OutlinedButton.icon(
-                onPressed: () => _adminCall(
-                    context,
-                    'ban_room_member',
-                    {
-                      'p_room_id': rid,
-                      'p_user_id': uid,
-                      'p_duration_minutes': null,
-                      'p_reason': 'إدارة الغرفة'
-                    },
-                    'تم حظر العضو ✓'),
+                onPressed: () => _timedAction(context, 'ban_room_member',
+                    'حظر العضو من الغرفة', 'إدارة الغرفة', 'تم حظر العضو',
+                    allowPermanent: true),
                 icon: const Icon(Icons.block),
                 label: const Text('حظر')),
           if (controls['can_unban'] == true && banned)
@@ -227,15 +321,8 @@ class MiniProfilePopup extends ConsumerWidget {
                 label: const Text('إلغاء الحظر')),
           if (controls['can_kick'] == true && !banned && !kicked)
             OutlinedButton.icon(
-                onPressed: () => _adminCall(
-                    context,
-                    'kick_room_member',
-                    {
-                      'p_room_id': rid,
-                      'p_user_id': uid,
-                      'p_reason': 'طرد من الغرفة'
-                    },
-                    'تم طرد العضو ✓'),
+                onPressed: () => _timedAction(context, 'kick_room_member',
+                    'طرد العضو من الغرفة', 'طرد من الغرفة', 'تم طرد العضو'),
                 icon: const Icon(Icons.logout),
                 label: const Text('طرد')),
           if (controls['can_unkick'] == true && kicked)
@@ -253,16 +340,9 @@ class MiniProfilePopup extends ConsumerWidget {
                 label: const Text('إلغاء الطرد')),
           if (controls['can_mute'] == true && !banned && !muted)
             OutlinedButton.icon(
-                onPressed: () => _adminCall(
-                    context,
-                    'mute_room_member',
-                    {
-                      'p_room_id': rid,
-                      'p_user_id': uid,
-                      'p_duration_minutes': 60,
-                      'p_reason': 'كتم مؤقت'
-                    },
-                    'تم كتم العضو لمدة ساعة ✓'),
+                onPressed: () => _timedAction(context, 'mute_room_member',
+                    'كتم العضو', 'كتم مؤقت', 'تم كتم العضو',
+                    allowPermanent: true),
                 icon: const Icon(Icons.volume_off),
                 label: const Text('كتم')),
           if (controls['can_unmute'] == true && muted)
@@ -306,7 +386,7 @@ class MiniProfilePopup extends ConsumerWidget {
                     'تم رفع المقبرة ✓'),
                 icon: const Icon(Icons.restore_from_trash),
                 label: const Text('رفع المقبرة')),
-          if (controls['can_assign_roles_this_target'] == true)
+          if (controls['can_assign_global_role_this_target'] == true)
             OutlinedButton.icon(
                 onPressed: () => _pickRole(context),
                 icon: const Icon(Icons.upgrade),
@@ -348,22 +428,45 @@ class MiniProfilePopup extends ConsumerWidget {
     );
   }
 
-  Future<void> _sendGameRequest(BuildContext context, String gameType) async {
+  Future<void> _sendDiceChallenge(BuildContext context) async {
+    final stake = await showDialog<int>(
+      context: context,
+      builder: (c) => SimpleDialog(
+        title: const Text('تحدي النرد — اختر الرهان'),
+        children: [
+          for (final v in const [0, 10, 50, 100, 500, 1000])
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(c, v),
+              child: Text(v == 0 ? 'ودّي (بلا نقاط)' : '$v نقطة',
+                  textDirection: TextDirection.rtl),
+            ),
+        ],
+      ),
+    );
+    if (stake == null || !context.mounted) return;
     try {
-      await Supabase.instance.client.rpc('send_game_request', params: {
+      await Supabase.instance.client.rpc('send_dice_challenge', params: {
         'p_to_uid': uid,
-        'p_game_type': gameType,
+        'p_stake': stake,
+        'p_room_id': roomId,
       });
       if (!context.mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم إرسال طلب اللعبة ✓')),
-      );
+      ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(
+          content: Text(stake > 0
+              ? 'تم إرسال تحدي النرد على $stake نقطة ✓'
+              : 'تم إرسال تحدي النرد ✓')));
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تعذّر إرسال طلب اللعبة: $e')),
-      );
+      final raw = e.toString();
+      final msg = raw.contains('INSUFFICIENT_POINTS')
+          ? 'رصيدك من النقاط لا يكفي لهذا الرهان.'
+          : raw.contains('REQUEST_ALREADY_PENDING')
+              ? 'لديك تحدٍّ معلّق لهذا العضو بالفعل.'
+              : raw.contains('BLOCKED')
+                  ? 'لا يمكن إرسال التحدي بسبب الحظر.'
+                  : 'تعذّر إرسال التحدي.';
+      ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(msg)));
     }
   }
 
@@ -416,6 +519,7 @@ class MiniProfilePopup extends ConsumerWidget {
         throw StateError('لم يؤكد الخادم نجاح التحويل.');
       }
       if (!context.mounted) return;
+      playServerSound('success');
       await showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
@@ -443,6 +547,7 @@ class MiniProfilePopup extends ConsumerWidget {
       } else if (message.contains('INVALID_RECIPIENT')) {
         message = 'لا يمكن التحويل إلى هذا الحساب.';
       }
+      playServerSound('error');
       await showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
@@ -470,24 +575,26 @@ class MiniProfilePopup extends ConsumerWidget {
           ListTile(
               leading: const Icon(Icons.casino_outlined),
               title: const Text('لعبة النرد'),
+              subtitle: const Text('تحدٍّ بنقاط أو ودّي'),
               onTap: () {
                 Navigator.pop(sheetContext);
-                _sendGameRequest(context, 'dice');
+                _sendDiceChallenge(context);
               }),
-          ListTile(
-              leading: const Icon(Icons.close_rounded),
-              title: const Text('XO'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _sendGameRequest(context, 'xo');
-              }),
-          ListTile(
-              leading: const Icon(Icons.emoji_events_outlined),
-              title: const Text('تحدي'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _sendGameRequest(context, 'challenge');
-              }),
+          for (final t in const ['connect4', 'rps', 'coin', 'trix_solo', 'trix_partner'])
+            ListTile(
+                leading: Text(
+                    t == 'connect4'
+                        ? '🔴'
+                        : (t == 'rps' ? '✊' : (t == 'coin' ? '🪙' : '🧵')),
+                    style: const TextStyle(fontSize: 24)),
+                title: Text(t.startsWith('trix_') ? gameTitle(t) : '${gameTitle(t)} (3D)'),
+                subtitle: const Text('رهان نقاط: ربح / خسارة / مضاعفة'),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  final sent = await sendGameChallengeFlow(context,
+                      toUid: uid, gameType: t, roomId: roomId);
+                  if (sent && context.mounted) Navigator.of(context).pop();
+                }),
         ]),
       ),
     );
@@ -591,7 +698,7 @@ class MiniProfilePopup extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   SizedBox(
-                    height: 90,
+                    height: 64,
                     width: double.infinity,
                     child: profile.coverUrl != null &&
                             profile.coverUrl!.isNotEmpty

@@ -201,8 +201,12 @@ class ProducerMarketController extends StateNotifier<AsyncValue<void>> {
         'p_request_id': const Uuid().v4(),
       });
       state = const AsyncValue.data(null);
-    } catch (e) {
-      state = AsyncValue.error(e, StackTrace.current);
+    } catch (e, st) {
+      // لا نبتلع الخطأ هنا: ورقة النشر تعتمد على رمي الاستثناء لتعرض
+      // رسالة الفشل وتمنع القفل على "نجاح" وهمي (كانت تُغلق وتُظهر
+      // "تم النشر" حتى عند فشل الخادم لأن هذا الـcatch كان يبتلعه).
+      state = AsyncValue.error(e, st);
+      rethrow;
     }
   }
 

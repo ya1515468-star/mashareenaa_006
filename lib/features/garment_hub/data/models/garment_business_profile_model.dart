@@ -31,8 +31,7 @@ class GarmentBusinessProfileModel extends GarmentBusinessProfileEntity {
       contactPhone: business['contactPhone'] as String?,
       city: business['city'] as String?,
       country: business['country'] as String?,
-      updatedAt:
-          (business['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      updatedAt: parseFlexibleTimestamp(business['updatedAt']),
     );
   }
 

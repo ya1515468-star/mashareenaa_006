@@ -1,4 +1,5 @@
 import 'package:file_picker/file_picker.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -50,24 +51,36 @@ typedef AttachmentPicked = Future<void> Function(
     MessageType type, String url, String name);
 
 /// مرفقات الشات كلها عبر Supabase Storage: صور، فيديو، ملفات، GIF محلية وصوت.
+///
+/// [onMusicSearch] اختياري: عند تمريره تظهر بطاقة "موسيقى" إضافية تفتح لوحة
+/// بحث الأغاني — تنفيذ "نقل زر الموسيقى إلى داخل زر +" بدل أيقونة مستقلة في
+/// شريط الكتابة.
 class AttachmentMenu extends StatelessWidget {
   final AttachmentPicked onPicked;
-  const AttachmentMenu({super.key, required this.onPicked});
+  final VoidCallback? onMusicSearch;
+  const AttachmentMenu({super.key, required this.onPicked, this.onMusicSearch});
 
   static Future<void> show(BuildContext context,
-      {required AttachmentPicked onPicked}) {
+      {required AttachmentPicked onPicked, VoidCallback? onMusicSearch}) {
     return showModalBottomSheet(
         context: context,
         backgroundColor: Colors.transparent,
-        builder: (_) => AttachmentMenu(onPicked: onPicked));
+        builder: (_) =>
+            AttachmentMenu(onPicked: onPicked, onMusicSearch: onMusicSearch));
   }
 
+  /// [extensions] فارغة أو null = أي ملف من الهاتف بلا قيد امتداد (الحد
+  /// الفعلي للحجم مفروض خادميًا على مستوى سطل التخزين نفسه، لا قيمة
+  /// يختارها التطبيق فقط — انظر الفحص الخادمي الحقيقي أدناه عبر
+  /// get_profile_service_runtime ثم رفض Supabase Storage لأي تجاوز).
   Future<void> _pick(BuildContext context,
-      {required MessageType type, required List<String> extensions}) async {
+      {required MessageType type, List<String>? extensions}) async {
     final authUid = await userId();
     if (authUid == null) return;
     final result = await FilePicker.pickFiles(
-        withData: true, type: FileType.custom, allowedExtensions: extensions);
+        withData: true,
+        type: extensions == null ? FileType.any : FileType.custom,
+        allowedExtensions: extensions);
     if (result == null || result.files.isEmpty) return;
     final f = result.files.single;
     final bytes = f.bytes;
@@ -80,7 +93,7 @@ class AttachmentMenu extends StatelessWidget {
     final limit = vipPlus ? 25 * 1024 * 1024 : 10 * 1024 * 1024;
     final user = MediaUploadService(bucket: vipPlus ? 'chat-media-plus' : 'media');
     if (bytes.length > limit) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(vipPlus ? 'حد الوسائط Plus هو 25MB.' : 'الحد الأساسي 10MB. فعّل وسائط Plus للوصول إلى 25MB.')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(vipPlus ? 'حد الوسائط Plus هو 25MB.' : 'الحد الأساسي 10MB. فعّل وسائط Plus للوصول إلى 25MB.')));
       return;
     }
     try {
@@ -93,7 +106,7 @@ class AttachmentMenu extends StatelessWidget {
       await onPicked(type, url, f.name);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           SnackBar(content: Text('فشل رفع المرفق: $e')),
         );
       }
@@ -115,7 +128,7 @@ class AttachmentMenu extends StatelessWidget {
     final limit = vipPlus ? 25 * 1024 * 1024 : 10 * 1024 * 1024;
     final user = MediaUploadService(bucket: vipPlus ? 'chat-media-plus' : 'media');
     if (bytes.length > limit) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(vipPlus ? 'حد الوسائط Plus هو 25MB.' : 'الحد الأساسي 10MB. فعّل وسائط Plus للوصول إلى 25MB.')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(vipPlus ? 'حد الوسائط Plus هو 25MB.' : 'الحد الأساسي 10MB. فعّل وسائط Plus للوصول إلى 25MB.')));
       return;
     }
     try {
@@ -128,7 +141,7 @@ class AttachmentMenu extends StatelessWidget {
       await onPicked(MessageType.image, url, file.name);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           SnackBar(content: Text('فشل رفع الصورة: $e')),
         );
       }
@@ -138,13 +151,21 @@ class AttachmentMenu extends StatelessWidget {
   Future<void> _showGifs(BuildContext context) async {
     const gifs = mashareenaChatGifCatalog;
 
+    final surfaceColor = context.palette.surfaceElevated;
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
+      // كان onTap أدناه يستعمل context الخارجي (معامل الدالة) بدل سياق
+      // الورقة نفسها لِـNavigator.pop — فإن لم يعد لذاك السياق سلف
+      // Navigator حيّ (الشاشة الأصل أُغلقت أو أُعيد بناؤها بين فتح الورقة
+      // والنقر على GIF)، يرمي Navigator.of فحص-لا‑قيمة فارغًا بلا شاشة
+      // حمراء مرئية — وهذا طابق تمامًا خطأ "Null check operator used on
+      // a null value" المسجَّل من AttachmentMenu._showGifs في المراقبة.
+      // استعمال sheetContext (سياق الورقة ذاتها) هو الإصلاح الصحيح.
+      builder: (sheetContext) => Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-            color: context.palette.surfaceElevated,
+            color: surfaceColor,
             borderRadius:
                 const BorderRadius.vertical(top: Radius.circular(24))),
         child: SingleChildScrollView(
@@ -158,7 +179,7 @@ class AttachmentMenu extends StatelessWidget {
                   InkWell(
                     borderRadius: BorderRadius.circular(8),
                     onTap: () async {
-                      Navigator.pop(context);
+                      if (sheetContext.mounted) Navigator.pop(sheetContext);
                       await onPicked(MessageType.gif, gif, gif);
                     },
                     child: SizedBox(
@@ -170,6 +191,14 @@ class AttachmentMenu extends StatelessWidget {
                         height: 22,
                         fit: BoxFit.contain,
                         gaplessPlayback: true,
+                        // صورة واحدة فاسدة في الفهرس كانت تُسقط الشبكة
+                        // كلها بخطأ "asset does not exist or has empty
+                        // data" مسجَّل فعليًا في المراقبة — هذا يستبدلها
+                        // بأيقونة بديلة بدل كسر الصف بأكمله.
+                        errorBuilder: (_, __, ___) => const Icon(
+                            Icons.broken_image_outlined,
+                            size: 20,
+                            color: Colors.white38),
                       ),
                     ),
                   ),
@@ -222,11 +251,21 @@ class AttachmentMenu extends StatelessWidget {
             }),
         _AttachmentAction(
             icon: Icons.insert_drive_file_outlined,
-            label: 'ملف ZIP/PDF',
+            label: 'ملف',
             color: Colors.amberAccent,
-            onTap: () => _pick(context,
-                type: MessageType.file,
-                extensions: ['zip', 'pdf', 'doc', 'docx', 'txt'])),
+            // بلا قيد امتداد بعد الآن — "أي ملف من الهاتف"؛ الحد الفعلي
+            // للحجم يبقى مفروضًا خادميًا (bucket file_size_limit)، لا
+            // بقائمة امتدادات محلية فقط.
+            onTap: () => _pick(context, type: MessageType.file)),
+        if (onMusicSearch != null)
+          _AttachmentAction(
+              icon: Icons.music_note_rounded,
+              label: 'موسيقى',
+              color: Colors.pinkAccent,
+              onTap: () {
+                Navigator.pop(context);
+                onMusicSearch!();
+              }),
       ]),
     );
   }

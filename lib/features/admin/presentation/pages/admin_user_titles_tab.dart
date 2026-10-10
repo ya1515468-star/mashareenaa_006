@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -303,8 +304,8 @@ class _AdminUserTitlesTabState extends ConsumerState<AdminUserTitlesTab> {
     return 'تعذر تنفيذ العملية الآن.';
   }
 
-  void _message(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  void _error(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), backgroundColor: Theme.of(context).colorScheme.error));
+  void _message(String text) => ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(text)));
+  void _error(String text) => ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(text), backgroundColor: Theme.of(context).colorScheme.error));
 
   @override
   Widget build(BuildContext context) {

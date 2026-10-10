@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -147,7 +148,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     if (_usernameController.text.trim().isNotEmpty &&
         _usernameStatus != _UsernameStatus.available) {
       _shakeKey.currentState?.shake();
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         const SnackBar(
             content: Text('الرجاء اختيار اسم مستخدم متاح، أو تركه فارغًا')),
       );
@@ -171,7 +172,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         final message = raw.contains('confirm') || raw.contains('email') || raw.contains('تأكيد البريد')
             ? 'يرجى تأكيد البريد الإلكتروني ثم المحاولة مرة أخرى.'
             : 'تعذر إنشاء الحساب الآن. تحقق من البيانات والاتصال ثم أعد المحاولة.';
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           SnackBar(content: Text(message)),
         );
       }

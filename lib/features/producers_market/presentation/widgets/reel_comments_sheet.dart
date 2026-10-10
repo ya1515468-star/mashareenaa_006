@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/producers_market_provider.dart';
 
@@ -157,7 +158,7 @@ class _ReelCommentsSheetState extends ConsumerState<ReelCommentsSheet> {
       _ctrl.clear();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           SnackBar(content: Text('خطأ: $e')),
         );
       }

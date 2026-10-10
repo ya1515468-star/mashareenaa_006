@@ -197,7 +197,8 @@ class _IdentityView extends StatelessWidget {
     // Every non-owner starts visibly at L1 and progresses server-side.
     final showRole = !hideRole &&
         (isDragon || (!ownerOnlyRole && roleCode != 'user' && roleCode != 'visitor'));
-    final showRank = !isDragon;
+    // شارة الرتبة/المستوى (★ ذهبي • L74) مخفيّة بطلب المالك.
+    const showRank = false;
 
     final achievementRaw = identity['achievement_badges'];
     final achievements = achievementRaw is List

@@ -17,7 +17,7 @@ class CommentModel extends CommentEntity {
       postId: postId,
       authorUid: map['authorUid'] as String? ?? '',
       text: map['text'] as String? ?? '',
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: parseFlexibleTimestamp(map['createdAt']),
     );
   }
 

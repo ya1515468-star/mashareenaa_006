@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -145,7 +146,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         if (q is Map && q['unlimited'] != true && (q['remaining'] as num? ?? 1) <= 0) {
           if (!mounted) return;
           final resets = DateTime.tryParse(q['resets_at']?.toString() ?? '');
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(
             content: Text('استنفدت حصتك من تغيير الصورة هذا الشهر '
                 '(${q['used']} من ${q['limit']}).'
                 '${resets == null ? '' : ' تتجدد في ${resets.year}/${resets.month}/${resets.day}.'}'),
@@ -219,7 +220,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         }
         if (!mounted) return;
         final state = ref.read(profileControllerProvider);
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           SnackBar(
             content: Text(
               state.error?.toString() ?? 'فشل تحديث الملف الشخصي',
@@ -260,7 +261,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           _isUploadingAvatar = false;
           _isUploadingCover = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           SnackBar(content: Text(_profileUploadError(e, 'الملف الشخصي'))),
         );
       }

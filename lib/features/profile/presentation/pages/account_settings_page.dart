@@ -1,4 +1,5 @@
 import 'package:audioplayers/audioplayers.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,7 +67,7 @@ class AccountSettingsContent extends ConsumerWidget {
           .updateProfile(updated);
       if (!ok && context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('فشل حفظ التعديل')));
+            .showSnackBarSfx(const SnackBar(content: Text('فشل حفظ التعديل')));
       }
       return ok;
     }
@@ -180,7 +181,7 @@ class AccountSettingsContent extends ConsumerWidget {
           );
           if (ok && context.mounted) {
             ref.invalidate(currentProfileProvider);
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تطبيق خط الاسم فورًا على الملف والشات')));
+            ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم تطبيق خط الاسم فورًا على الملف والشات')));
           }
         },
       ),
@@ -194,7 +195,7 @@ class AccountSettingsContent extends ConsumerWidget {
           );
           if (ok && context.mounted) {
             ref.invalidate(currentProfileProvider);
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تطبيق خط الرسائل فورًا')));
+            ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم تطبيق خط الرسائل فورًا')));
           }
         },
       ),
@@ -674,7 +675,7 @@ class _ProfileMusicTileState extends State<ProfileMusicTile> {
   void _show(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+        .showSnackBarSfx(SnackBar(content: Text(message)));
   }
 
   @override
@@ -992,7 +993,7 @@ class _AnimatedAvatarTileState extends State<_AnimatedAvatarTile> {
     final file = picked.files.single;
     final bytes = file.bytes;
     if (bytes == null || bytes.isEmpty) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ملف GIF فارغ أو غير قابل للقراءة')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('ملف GIF فارغ أو غير قابل للقراءة')));
       return;
     }
     try {
@@ -1000,11 +1001,11 @@ class _AnimatedAvatarTileState extends State<_AnimatedAvatarTile> {
       final frames = codec.frameCount;
       codec.dispose();
       if (frames < 2) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اختر GIF متحركًا يحتوي على إطارين أو أكثر.')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('اختر GIF متحركًا يحتوي على إطارين أو أكثر.')));
         return;
       }
     } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('فشل قراءة ملف GIF.')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('فشل قراءة ملف GIF.')));
       return;
     }
     if (!mounted) return;
@@ -1049,7 +1050,7 @@ class _AnimatedAvatarTileState extends State<_AnimatedAvatarTile> {
       } catch (_) {}
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
             SnackBar(content: Text('فشل رفع GIF المتحرك: $e')));
       }
     } finally {
@@ -1073,7 +1074,7 @@ class _AnimatedAvatarTileState extends State<_AnimatedAvatarTile> {
       } catch (_) {}
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           SnackBar(content: Text('فشل إزالة GIF المتحرك: $e')),
         );
       }

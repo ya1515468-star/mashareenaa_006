@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/data/supabase_document_compat.dart';
@@ -16,6 +17,32 @@ import '../../domain/entities/subscription_tier_entity.dart';
 
 import '../providers/subscription_provider.dart';
 import 'store_membership_card.dart';
+
+/// أسعار العضويات بالنقاط والجواهر: tierId -> [points, gems].
+final _tierPricesProvider =
+    FutureProvider<Map<String, List<int>>>((ref) async {
+  final snap = await SupabaseDocumentStore.instance
+      .collection('subscription_tiers')
+      .get();
+  final out = <String, List<int>>{};
+  for (final doc in snap.docs) {
+    final d = doc.data();
+    out[doc.id] = [
+      (d['pricePoints'] as num?)?.toInt() ?? 0,
+      (d['priceGems'] as num?)?.toInt() ?? 0,
+    ];
+  }
+  return out;
+});
+
+String _tierPriceText(List<int>? p) {
+  if (p == null) return '';
+  final parts = <String>[
+    if (p[0] > 0) '${p[0]} ⭐',
+    if (p[1] > 0) '${p[1]} 💎',
+  ];
+  return parts.join('  أو  ');
+}
 
 final _membershipCatalogProvider =
     FutureProvider<List<SubscriptionTierEntity>>((ref) async {
@@ -181,13 +208,23 @@ class MembershipStoreTab extends ConsumerWidget {
               tier: tier,
               currentTierId: current?.tierId,
               ownerMode: canManage,
-              onPurchase: () => _purchase(context, tier),
+              priceText: _tierPriceText(ref.watch(_tierPricesProvider).valueOrNull?[tier.id]),
+              onPurchase: () => _purchase(context, ref, tier),
               onGift: canManage ? () => _gift(context, tier) : null,
               onEditPrice: canManage ? () => _openFullEditor(context, ref, tier) : null,
               onDelete: canManage ? () => _deleteTier(context, ref, tier) : null,
               onChangeBadge:
                   canManage ? () => _changeBadge(context, ref, tier) : null,
             )),
+        if (canManage)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: OutlinedButton.icon(
+              onPressed: () => _revoke(context),
+              icon: const Icon(Icons.block, color: Colors.redAccent),
+              label: const Text('إيقاف عضوية مستخدم'),
+            ),
+          ),
         const SizedBox(height: 20),
         _FeatureLegend(),
       ],
@@ -195,18 +232,118 @@ class MembershipStoreTab extends ConsumerWidget {
   }
 
   Future<void> _purchase(
-      BuildContext context, SubscriptionTierEntity tier) async {
+      BuildContext context, WidgetRef ref, SubscriptionTierEntity tier) async {
+    final prices = (await ref.read(_tierPricesProvider.future))[tier.id];
+    final points = prices?[0] ?? 0;
+    final gems = prices?[1] ?? 0;
+    if (!context.mounted) return;
+    if (points <= 0 && gems <= 0) {
+      ScaffoldMessenger.of(context).showSnackBarSfx(
+          const SnackBar(content: Text('سعر هذه العضوية غير محدّد بعد.')));
+      return;
+    }
+    final currency = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            ListTile(
+              title: Text('شراء ${tier.name} لمدة ${tier.durationDays} يوم'),
+              subtitle: const Text('اختر وسيلة الدفع — يُخصم المبلغ من رصيدك فورًا'),
+            ),
+            if (points > 0)
+              ListTile(
+                leading: const Text('⭐', style: TextStyle(fontSize: 22)),
+                title: Text('الدفع بالنقاط ($points)'),
+                onTap: () => Navigator.pop(ctx, 'points'),
+              ),
+            if (gems > 0)
+              ListTile(
+                leading: const Text('💎', style: TextStyle(fontSize: 22)),
+                title: Text('الدفع بالجواهر ($gems)'),
+                onTap: () => Navigator.pop(ctx, 'gems'),
+              ),
+          ]),
+        ),
+      ),
+    );
+    if (currency == null || !context.mounted) return;
     try {
       final callable =
           SupabaseFunctionsCompat.instance.httpsCallable('purchaseMembership');
-      await callable.call({'tierId': tier.id, 'requestId': const Uuid().v4()});
+      await callable.call({
+        'tierId': tier.id,
+        'requestId': const Uuid().v4(),
+        'currency': currency,
+      });
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('تم تفعيل ${tier.name} بنجاح')));
+      ref.invalidate(currentSubscriptionProvider);
+      ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(
+          content: Text(
+              'تم تفعيل ${tier.name} لمدة ${tier.durationDays} يوم، وخُصم ${currency == 'points' ? '$points نقطة' : '$gems جوهرة'}')));
     } on SupabaseFunctionException catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message ?? 'تعذّر شراء الميزة')));
+      ScaffoldMessenger.of(context).showSnackBarSfx(
+          SnackBar(content: Text(_membershipError(e.message))));
+    } on PostgrestException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBarSfx(SnackBar(content: Text(_membershipError(e.message))));
+    }
+  }
+
+  String _membershipError(String? m) => switch (m ?? '') {
+        'INSUFFICIENT_POINTS' => 'رصيد النقاط غير كافٍ.',
+        'INSUFFICIENT_GEMS' => 'رصيد الجواهر غير كافٍ.',
+        'PRICE_NOT_SET' => 'سعر العضوية بهذه العملة غير محدّد.',
+        'SERVICE_DISABLED' => 'هذه العضوية غير متاحة حاليًا.',
+        '' => 'تعذّر شراء العضوية',
+        final x => x,
+      };
+
+  Future<void> _revoke(BuildContext context) async {
+    final controller = TextEditingController();
+    final target = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('إيقاف عضوية مستخدم'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(
+              controller: controller,
+              decoration: const InputDecoration(labelText: 'UID المستخدم')),
+          const SizedBox(height: 8),
+          const Text(
+              'تتوقف مزايا العضوية والخدمات المضمّنة فيها فورًا، وتبقى الخدمات التي اشتراها المستخدم بنفسه.',
+              style: TextStyle(fontSize: 12)),
+        ]),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('إلغاء')),
+          FilledButton(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, controller.text.trim()),
+              child: const Text('إيقاف العضوية')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (target == null || target.isEmpty) return;
+    try {
+      await Supabase.instance.client.rpc('admin_revoke_membership', params: {
+        'p_target_uid': target,
+        'p_request_id': const Uuid().v4(),
+      });
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(
+          content: Text('تم إيقاف عضوية المستخدم $target وأُرسل له إشعار')));
+    } on PostgrestException catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(
+          content: Text(e.message.contains('NO_ACTIVE_MEMBERSHIP')
+              ? 'لا توجد عضوية فعّالة لهذا المستخدم.'
+              : 'تعذّر الإيقاف: ${e.message}')));
     }
   }
 
@@ -237,12 +374,13 @@ class MembershipStoreTab extends ConsumerWidget {
           .httpsCallable('adminGrantMembershipTier');
       await callable.call({'targetUid': target, 'tierId': tier.id, 'requestId': const Uuid().v4()});
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('تم إهداء ${tier.name} للمستخدم $target')));
+      ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(
+          content: Text(
+              'تم الإهداء ✓ — عضوية ${tier.name} لمدة ${tier.durationDays} يوم، وأُرسل إشعار فوري للمستخدم $target')));
     } on SupabaseFunctionException catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message ?? 'تعذّر الإهداء')));
+          .showSnackBarSfx(SnackBar(content: Text(e.message ?? 'تعذّر الإهداء')));
     }
   }
 
@@ -356,11 +494,11 @@ class MembershipStoreTab extends ConsumerWidget {
       }
 
       ref.invalidate(_membershipCatalogProvider);
-      messenger?.showSnackBar(const SnackBar(
+      messenger?.showSnackBarSfx(const SnackBar(
           content: Text('حُدّثت الشارة'),
           backgroundColor: Color(0xFF16A34A)));
     } catch (e) {
-      messenger?.showSnackBar(SnackBar(
+      messenger?.showSnackBarSfx(SnackBar(
           content: Text(e.toString().contains('OWNER_ONLY')
               ? 'هذا الإجراء للمالك فقط.'
               : 'تعذّر تحديث الشارة: $e'),
@@ -392,11 +530,11 @@ class MembershipStoreTab extends ConsumerWidget {
       ref.invalidate(_membershipCatalogProvider);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('تم حذف ${tier.name}')));
+          .showSnackBarSfx(SnackBar(content: Text('تم حذف ${tier.name}')));
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('تعذّر الحذف: $e')));
+          .showSnackBarSfx(SnackBar(content: Text('تعذّر الحذف: $e')));
     }
   }
 
@@ -418,6 +556,11 @@ class MembershipStoreTab extends ConsumerWidget {
     final unlockedCtrl = TextEditingController(text: tier.unlockedServiceCount.toString());
     final pointsCtrl = TextEditingController(text: tier.pointsGranted.toString());
     final gemsCtrl = TextEditingController(text: tier.gemsGranted.toString());
+    final curPrices = ref.read(_tierPricesProvider).valueOrNull?[tier.id];
+    final pricePointsCtrl =
+        TextEditingController(text: (curPrices?[0] ?? 0).toString());
+    final priceGemsCtrl =
+        TextEditingController(text: (curPrices?[1] ?? 0).toString());
     final emojiCtrl = TextEditingController(text: tier.badge.emoji);
 
     bool enabled = tier.enabled;
@@ -470,6 +613,17 @@ class MembershipStoreTab extends ConsumerWidget {
           .select('feature_key,name_ar')
           .eq('is_active', true)
           .order('feature_key'));
+      // الخدمات المحددة تُقرأ من قواعد العضوية الفعلية (نفس مصدر نافذة
+      // قواعد الخدمات) كي لا يختلف المحرران، وتنتهي بانتهاء العضوية.
+      try {
+        final rules = await sb.rpc('admin_get_membership_service_rules',
+            params: {'p_tier_id': tier.id});
+        serviceKeys
+          ..clear()
+          ..addAll(List<Map<String, dynamic>>.from(rules as List)
+              .where((r) => r['included'] == true && r['enabled'] != false)
+              .map((r) => r['feature_key'].toString()));
+      } catch (_) {}
       allAnimations = List<Map<String, dynamic>>.from(await sb
           .from('name_animation_catalog')
           .select('effect_key,name_ar')
@@ -650,6 +804,20 @@ class MembershipStoreTab extends ConsumerWidget {
                                   keyboardType: TextInputType.number,
                                   decoration: const InputDecoration(labelText: 'عدد الخدمات المفتوحة'))),
                         ]),
+                        sectionTitle('سعر الشراء من رصيد المستخدم (0 = غير متاح بهذه العملة)'),
+                        Row(children: [
+                          Expanded(
+                              child: TextField(
+                                  controller: pricePointsCtrl,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(labelText: 'السعر بالنقاط ⭐'))),
+                          const SizedBox(width: 8),
+                          Expanded(
+                              child: TextField(
+                                  controller: priceGemsCtrl,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(labelText: 'السعر بالجواهر 💎'))),
+                        ]),
                         sectionTitle('منح فوري عند الشراء'),
                         Row(children: [
                           Expanded(
@@ -664,7 +832,7 @@ class MembershipStoreTab extends ConsumerWidget {
                                   keyboardType: TextInputType.number,
                                   decoration: const InputDecoration(labelText: 'جواهر'))),
                         ]),
-                        sectionTitle('خدمات VIP تُمنح مع العضوية (${serviceKeys.length})'),
+                        sectionTitle('خدمات VIP ضمن العضوية — تتوقف بانتهائها (${serviceKeys.length})'),
                         SizedBox(
                           height: 220,
                           child: allServices.isEmpty
@@ -777,7 +945,8 @@ class MembershipStoreTab extends ConsumerWidget {
     if (saved != true) {
       for (final c in [
         nameCtrl, descCtrl, priceCtrl, durationCtrl, trialDaysCtrl,
-        orderCtrl, levelCtrl, unlockedCtrl, pointsCtrl, gemsCtrl, emojiCtrl
+        orderCtrl, levelCtrl, unlockedCtrl, pointsCtrl, gemsCtrl, emojiCtrl,
+        pricePointsCtrl, priceGemsCtrl
       ]) {
         c.dispose();
       }
@@ -792,13 +961,16 @@ class MembershipStoreTab extends ConsumerWidget {
     final unlocked = int.tryParse(unlockedCtrl.text.trim()) ?? 0;
     final points = int.tryParse(pointsCtrl.text.trim()) ?? 0;
     final gems = int.tryParse(gemsCtrl.text.trim()) ?? 0;
+    final pricePoints = int.tryParse(pricePointsCtrl.text.trim()) ?? 0;
+    final priceGems = int.tryParse(priceGemsCtrl.text.trim()) ?? 0;
     final name = nameCtrl.text.trim().isEmpty ? tier.name : nameCtrl.text.trim();
     final desc = descCtrl.text.trim();
     final emoji = emojiCtrl.text.trim();
 
     for (final c in [
       nameCtrl, descCtrl, priceCtrl, durationCtrl, trialDaysCtrl,
-      orderCtrl, levelCtrl, unlockedCtrl, pointsCtrl, gemsCtrl, emojiCtrl
+      orderCtrl, levelCtrl, unlockedCtrl, pointsCtrl, gemsCtrl, emojiCtrl,
+      pricePointsCtrl, priceGemsCtrl
     ]) {
       c.dispose();
     }
@@ -827,16 +999,22 @@ class MembershipStoreTab extends ConsumerWidget {
         'p_badge_color': badgeColor.toARGB32(),
         'p_features': features,
       });
+      await Supabase.instance.client.rpc('admin_set_membership_price', params: {
+        'p_tier_id': tier.id,
+        'p_price_points': pricePoints,
+        'p_price_gems': priceGems,
+      });
+      ref.invalidate(_tierPricesProvider);
       ref.invalidate(_membershipCatalogProvider);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('تم حفظ كل تعديلات العضوية ✓')));
+          .showSnackBarSfx(const SnackBar(content: Text('تم حفظ كل تعديلات العضوية ✓')));
     } catch (e) {
       unawaited(ErrorMonitor.report(e,
           screen: 'membership_full_editor', source: 'save'));
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('تعذّر الحفظ: $e')));
+          .showSnackBarSfx(SnackBar(content: Text('تعذّر الحفظ: $e')));
     }
   }
 }

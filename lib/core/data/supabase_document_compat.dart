@@ -16,6 +16,36 @@ class Timestamp {
   String toString() => _value.toIso8601String();
 }
 
+/// سوبابيس (Postgres) يُعيد حقول التاريخ عبر REST المباشر كنص ISO8601
+/// دائمًا — لا كجسم Timestamp (ذاك شكل Firestore القديم، ولا يصل فعليًا
+/// إلا عبر مخزن المستندات المتوافق SupabaseDocumentStore في هذا الملف،
+/// الذي يُعيد تغليفه صراحة في decodeValue). عشرة نماذج بيانات على الأقل
+/// في المشروع (محفظة، اشتراكات، هدايا، منشورات، تعليقات، بلاغات، طلبات
+/// السوق، طلبات الباترون، ملف الخياطة التجاري...) كانت تفترض الشكل
+/// الثاني حصرًا بـ"as Timestamp?"، فترمي استثناء "String is not a
+/// subtype of type 'Timestamp?'" في كل مرة يصل فيها صف حقيقي من جدول
+/// مباشرة — وهذا كان أكثر خطأ تكرارًا في المراقبة (١٠٢ مرة، ٣٥ مستخدمًا
+/// على broadcasts وحدها قبل إصلاحه هناك). هذا المحلِّل يقبل كل الأشكال
+/// المحتملة فعليًا بلا استثناء أبدًا.
+DateTime parseFlexibleTimestamp(dynamic raw, {DateTime? fallback}) {
+  if (raw is String) return DateTime.tryParse(raw) ?? (fallback ?? DateTime.now());
+  if (raw is Timestamp) return raw.toDate();
+  if (raw is DateTime) return raw;
+  if (raw is int) return DateTime.fromMillisecondsSinceEpoch(raw);
+  return fallback ?? DateTime.now();
+}
+
+/// النسخة التي تُرجِع null بدل الوقت الحالي — لحقل تاريخ اختياري حقًا
+/// (مثل startedAt/expiresAt اشتراك لم يبدأ أو لا ينتهي بعد).
+DateTime? parseFlexibleTimestampOrNull(dynamic raw) {
+  if (raw == null) return null;
+  if (raw is String) return DateTime.tryParse(raw);
+  if (raw is Timestamp) return raw.toDate();
+  if (raw is DateTime) return raw;
+  if (raw is int) return DateTime.fromMillisecondsSinceEpoch(raw);
+  return null;
+}
+
 class FieldValue {
   final String _op;
   final dynamic value;
@@ -651,7 +681,7 @@ class HttpsCallable {
         case 'purchaseMembership':
           result = await client.rpc('purchase_membership',
               params: _params(payload,
-                  {'p_tier_id': 'tierId', 'p_request_id': 'requestId'}));
+                  {'p_tier_id': 'tierId', 'p_request_id': 'requestId', 'p_currency': 'currency'}));
           break;
         case 'adminGrantMembershipTier':
           result = await client.rpc('admin_grant_membership_tier',

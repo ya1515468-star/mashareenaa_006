@@ -1,7 +1,48 @@
+/// سمايلات متحركة إضافية (موسيقى / أسهم / إنذار) — GIF متحرك فقط.
+const List<String> mashareenaChatExtraGifs = [
+  'assets/chat/gif_extra/music_dance.gif',
+  'assets/chat/gif_extra/music_dj.gif',
+  'assets/chat/gif_extra/music_guitar.gif',
+  'assets/chat/gif_extra/music_headphones.gif',
+  'assets/chat/gif_extra/music_singer.gif',
+  'assets/chat/gif_extra/arrow_down.gif',
+  'assets/chat/gif_extra/arrow_left.gif',
+  'assets/chat/gif_extra/arrow_right.gif',
+  'assets/chat/gif_extra/arrow_up.gif',
+  'assets/chat/gif_extra/alarm_siren.gif',
+  'assets/chat/gif_extra/alarm_warning.gif',
+];
+
+/// ملصقات نصية متحركة عريضة (دينية / مطلوب توظيف / إنذار) — GIF متحرك فقط.
+const List<String> mashareenaChatBannerGifs = [
+  'assets/chat/gif_banners/dini_alhamdulillah.gif',
+  'assets/chat/gif_banners/dini_allahuakbar.gif',
+  'assets/chat/gif_banners/dini_hawqala.gif',
+  'assets/chat/gif_banners/dini_istighfar.gif',
+  'assets/chat/gif_banners/dini_jumua.gif',
+  'assets/chat/gif_banners/dini_la_ilaha.gif',
+  'assets/chat/gif_banners/dini_salat_nabi.gif',
+  'assets/chat/gif_banners/dini_subhanallah.gif',
+  'assets/chat/gif_banners/job_embalaj.gif',
+  'assets/chat/gif_banners/job_kawa.gif',
+  'assets/chat/gif_banners/job_khayyatat.gif',
+  'assets/chat/gif_banners/job_khayyatin.gif',
+  'assets/chat/gif_banners/job_mechanic.gif',
+  'assets/chat/gif_banners/job_qassas.gif',
+  'assets/chat/gif_banners/job_quality.gif',
+  'assets/chat/gif_banners/job_workers.gif',
+  'assets/chat/gif_banners/alarm_inzar.gif',
+  'assets/chat/gif_banners/alarm_tanbih.gif',
+];
+
+/// هل المسار ملصق نصي عريض (يُعرض بحجم أعرض من السمايل العادي).
+bool isMashareenaBannerGif(String path) => path.contains('/gif_banners/');
+
 /// All shipped animated chat GIF/sticker assets.
 const List<String> mashareenaChatGifCatalog = [
   // أول سمايل من اليمين.
   'assets/chat/kolobok/stickers/owner_smoke.gif',
+  ...mashareenaChatExtraGifs,
   'assets/chat/kolobok/stickers/kolobok_001.gif',
   'assets/chat/kolobok/stickers/kolobok_002.gif',
   'assets/chat/kolobok/stickers/kolobok_003.gif',
@@ -507,4 +548,33 @@ const List<String> mashareenaChatGifCatalog = [
 /// أسماء السمايلات المسمّاة (تظهر تحت السمايل وعند الضغط المطوّل عليه).
 const Map<String, String> mashareenaChatGifNames = {
   'assets/chat/kolobok/stickers/owner_smoke.gif': 'مالك المنصة',
+  'assets/chat/gif_extra/music_headphones.gif': 'موسيقى: سماعات',
+  'assets/chat/gif_extra/music_singer.gif': 'موسيقى: غناء',
+  'assets/chat/gif_extra/music_dj.gif': 'موسيقى: دي جي',
+  'assets/chat/gif_extra/music_guitar.gif': 'موسيقى: غيتار',
+  'assets/chat/gif_extra/music_dance.gif': 'موسيقى: رقص',
+  'assets/chat/gif_extra/arrow_right.gif': 'سهم يمين',
+  'assets/chat/gif_extra/arrow_left.gif': 'سهم يسار',
+  'assets/chat/gif_extra/arrow_down.gif': 'سهم لأسفل',
+  'assets/chat/gif_extra/arrow_up.gif': 'سهم لأعلى',
+  'assets/chat/gif_extra/alarm_siren.gif': 'إنذار: سارينة',
+  'assets/chat/gif_extra/alarm_warning.gif': 'إنذار: تحذير',
+  'assets/chat/gif_banners/dini_subhanallah.gif': 'سبحان الله',
+  'assets/chat/gif_banners/dini_alhamdulillah.gif': 'الحمد لله',
+  'assets/chat/gif_banners/dini_allahuakbar.gif': 'الله أكبر',
+  'assets/chat/gif_banners/dini_la_ilaha.gif': 'لا إله إلا الله',
+  'assets/chat/gif_banners/dini_istighfar.gif': 'أستغفر الله',
+  'assets/chat/gif_banners/dini_hawqala.gif': 'لا حول ولا قوة إلا بالله',
+  'assets/chat/gif_banners/dini_salat_nabi.gif': 'اللهم صل على النبي',
+  'assets/chat/gif_banners/dini_jumua.gif': 'جمعة مباركة',
+  'assets/chat/gif_banners/job_khayyatin.gif': 'مطلوب خياطين',
+  'assets/chat/gif_banners/job_khayyatat.gif': 'مطلوب خياطات',
+  'assets/chat/gif_banners/job_embalaj.gif': 'مطلوب عاملات امبلاج',
+  'assets/chat/gif_banners/job_kawa.gif': 'مطلوب كوى',
+  'assets/chat/gif_banners/job_qassas.gif': 'مطلوب قصاص',
+  'assets/chat/gif_banners/job_quality.gif': 'مطلوب مراقبة جودة',
+  'assets/chat/gif_banners/job_mechanic.gif': 'مطلوب فنيين ماكينات',
+  'assets/chat/gif_banners/job_workers.gif': 'مطلوب عمال وعاملات',
+  'assets/chat/gif_banners/alarm_inzar.gif': 'إنذار',
+  'assets/chat/gif_banners/alarm_tanbih.gif': 'تنبيه هام',
 };

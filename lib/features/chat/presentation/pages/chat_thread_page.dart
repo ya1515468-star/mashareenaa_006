@@ -1,6 +1,7 @@
+import '../../../../core/widgets/mini_player_chip.dart';
+import '../../../../core/services/snack_sfx.dart';
 import '../widgets/voice_hold_button.dart';
 import '../../../../core/widgets/song_search_sheet.dart';
-import '../../data/gif_catalog.dart';
 import '../../../../core/providers/mini_player_provider.dart';
 import 'dart:async';
 import '../../../../core/monitoring/error_monitor.dart';
@@ -25,9 +26,9 @@ import '../../../rbac/presentation/widgets/server_username_display.dart';
 import '../../../subscriptions/presentation/widgets/membership_badge_widget.dart';
 import '../../domain/entities/chat_message_entity.dart';
 import '../providers/chat_provider.dart';
-import '../widgets/emoji_picker_sheet.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/reply_and_attachment_widgets.dart';
+import '../widgets/sticker_and_gif_sheet.dart';
 import '../widgets/typing_and_presence_widgets.dart';
 import '../../../vip/presentation/widgets/vip_presence_plus.dart';
 
@@ -288,7 +289,7 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
       final m = RegExp(
               r'(?:CHAT_RESTRICTED|RESTRICTED_[A-Z_]+|DM_LOCKED)\s*:\s*([^,\)]+)')
           .firstMatch(raw);
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(
             content: Text(m != null
                 ? m.group(1)!.trim()
@@ -311,83 +312,34 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
         );
   }
 
-  /// بحث أغنية/فيديو في الخاص: نفس منطق الغرفة — تُرسَل كرسالة نصّية
-  /// برابط يوتيوب (تُضمَّن تلقائيًا في الفقاعة)، بينما التشغيل اختياري
-  /// من زر "تشغيل" في المشغّل العائم المشترك بين الغرف والخاص.
+  /// بحث أغنية/فيديو في الخاص: لا شيء يُرسَل إلا بالضغط الصريح على زر
+  /// "إرسال" داخل لوحة البحث نفسها. عند الإرسال: تُرسَل كرسالة نصّية
+  /// برابط يوتيوب، وتُشغَّل فورًا حصرًا في المشغّل المصغّر العائم المشترك
+  /// بين الغرف والخاص معًا — لا تضمين تلقائي داخل الفقاعة.
   Future<void> _showSongSearch() async {
     final myUid = ref.read(authControllerProvider).valueOrNull?.uid;
     if (myUid == null) return;
-    await SongSearchSheet.show(
-      context,
-      onPreviewPlay: (videoId, title) {
-        ref.read(miniPlayerProvider.notifier).state =
-            MiniPlayerTrack(videoId: videoId, title: title, autoPlay: true);
-      },
-      onSelected: (videoId, title) async {
-        await ref.read(chatControllerProvider.notifier).sendMessage(
+    await SongSearchSheet.show(context, onSend: (videoId, title) async {
+      ref.read(miniPlayerProvider.notifier).state =
+          MiniPlayerTrack(videoId: videoId, title: title);
+      await ref.read(chatControllerProvider.notifier).sendMessage(
             fromUid: myUid,
             toUid: widget.otherUid,
             text: 'https://www.youtube.com/watch?v=$videoId',
             type: MessageType.text,
           );
-      },
-    );
+    });
   }
 
+  /// يفتح لوحة السمايلات الموحَّدة بتبويبَيْن: إيموجي ثابتة | GIF متحرّكة.
+  /// كلا التبويبين يُغلق الورقة بنفسه داخليًا بسياقه الخاص، فالدالتان هنا
+  /// منطق إرسال خالص بلا أي تعامل مع Navigator.
   Future<void> _showGifPicker(BuildContext context) async {
-    const gifs = mashareenaChatGifCatalog;
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: const Color(0xFF171126),
-      showDragHandle: true,
-      // بلا هذا كانت Wrap ترتّب من اليسار (اتجاه الودجت الافتراضي)، فيظهر
-      // أول سمايل (مالك المنصة) من أقصى اليسار لا اليمين — نفس الإصلاح
-      // المطبَّق في قائمة الغرفة.
-      builder: (sheetContext) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
-            child: Center(
-              child: Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final gif in gifs)
-                    Tooltip(
-                      message: mashareenaChatGifNames[gif] ?? '',
-                      triggerMode: mashareenaChatGifNames.containsKey(gif)
-                          ? TooltipTriggerMode.longPress
-                          : TooltipTriggerMode.manual,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () => Navigator.pop(sheetContext, gif),
-                        // لقمة لمس 40×40 حول صورة 25×25.
-                        child: SizedBox(
-                          width: 40,
-                          height: 40,
-                          child: Center(
-                            child: SizedBox(
-                              width: 25,
-                              height: 25,
-                              child: Image.asset(gif,
-                                  width: 25, height: 25,
-                                  fit: BoxFit.contain, gaplessPlayback: true),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+    await StickerAndGifSheet.show(
+      context,
+      onEmojiSelected: _sendEmoji,
+      onGifSelected: (gif) => _sendAttachment(MessageType.gif, gif, 'gif.gif'),
     );
-    if (selected == null || !context.mounted) return;
-    await _sendAttachment(MessageType.gif, selected, 'gif.gif');
   }
 
   Future<void> _sendEmoji(String emoji) async {
@@ -492,9 +444,9 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
     try {
       await Supabase.instance.client.rpc('delete_message',
           params: {'p_scope': 'dm', 'p_message_id': message.id});
-      m.showSnackBar(const SnackBar(content: Text('حُذفت الرسالة')));
+      m.showSnackBarSfx(const SnackBar(content: Text('حُذفت الرسالة')));
     } catch (e) {
-      m.showSnackBar(SnackBar(
+      m.showSnackBarSfx(SnackBar(
           content: Text(e.toString().contains('FORBIDDEN')
               ? 'لا يمكنك حذف رسالة عضو أعلى منك رتبة.'
               : 'تعذّر الحذف: $e')));
@@ -553,7 +505,7 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
       final reason =
           ref.read(giftControllerProvider.notifier).lastError?.trim();
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(
           content: Text(
             reason == null || reason.isEmpty
@@ -594,7 +546,7 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
     if (!mounted) return;
 
     final call = result.fold((failure) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text(failure.message)),
       );
       return null;
@@ -845,89 +797,83 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
                     })),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline, color: Color(0xFF22C55E)),
-                    tooltip: 'إرفاق',
-                    onPressed: () =>
-                        AttachmentMenu.show(context, onPicked: _sendAttachment),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.emoji_emotions_outlined, color: Color(0xFFF59E0B)),
-                    tooltip: 'إيموجي',
-                    onPressed: () => EmojiPickerSheet.show(context, _sendEmoji),
-                  ),
-                  // سمايلات متحركة: لم تكن موجودة إطلاقًا في الخاص رغم
-                  // وجودها في الغرف. الاختيار هنا يُرسِل فورًا (بلا صندوق
-                  // معاينة)، مطابقًا لنمط إرسال الإيموجي الفوري في هذه
-                  // الشاشة أصلًا.
-                  IconButton(
-                    icon: const Icon(Icons.gif_box_outlined, color: Color(0xFFEC4899)),
-                    tooltip: 'GIF',
-                    onPressed: () => _showGifPicker(context),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.music_note_rounded, color: Color(0xFF22D3EE)),
-                    tooltip: 'بحث أغنية',
-                    onPressed: _showSongSearch,
-                  ),
-                  // تسجيل بنمط واتساب: يبدأ بضغطة ويظل زر الميكروفون ظاهرًا، ثم
-                  // يظهر شريط الموجة مع إيقاف مؤقت/إرسال/حذف صريح.
-                  VoiceHoldButton(
-                    color: p.accent,
-                    privateChat: true,
-                    onUploaded: (url) async =>
+                  // ── زر مجمَّع: إرفاق (يضم الآن أي ملف + موسيقى أيضًا) + تسجيل صوت ──
+                  _AttachVoiceButton(
+                    accentColor: p.accent,
+                    onAttach: () => AttachmentMenu.show(
+                        context,
+                        onPicked: _sendAttachment,
+                        onMusicSearch: _showSongSearch),
+                    onVoiceUploaded: (url) async =>
                         _sendAttachment(MessageType.audio, url, 'voice.m4a'),
                   ),
+                  // ── إيموجي ──────────────────────────────────────────
+                  IconButton(
+                    icon: Icon(Icons.emoji_emotions_outlined, color: p.accent),
+                    tooltip: 'إيموجي وGIF',
+                    onPressed: () => _showGifPicker(context),
+                  ),
+                  // أيقونة المشغّل المصغَّر (تظهر فقط حين تُصغَّر نافذة اليوتيوب).
+                  const MiniPlayerChip(),
+                  // زر الموسيقى المستقل دُمج داخل زر + (مرفق) أعلاه —
+                  // بطاقة "موسيقى" في AttachmentMenu — تنفيذًا لبند نقل
+                  // الموسيقى والتسجيل إلى داخل زر +. المشغّل المصغّر
+                  // العائم (miniPlayerProvider) يبقى يعمل في الخلفية بلا
+                  // أي تغيير بصرف النظر عن مصدر تشغيله.
+                  // ── هدية ────────────────────────────────────────────
                   IconButton(
                     icon: const Text('🎁', style: TextStyle(fontSize: 18)),
                     tooltip: 'إرسال هدية',
                     onPressed: () => GiftPickerSheet.show(context, _sendGift),
                   ),
+                  // ── حقل الكتابة (Expanded بلا ازدحام) ──────────────
                   Expanded(
-                    child: TextField(
-                      controller: _textController,
-                      textAlign: TextAlign.right,
-                      style: TextStyle(
-                        // Same store-purchased message color the sent
-                        // bubble will render with (message_bubble.dart) —
-                        // one canonical source (profiles.message_color),
-                        // so what you see while typing is what gets sent,
-                        // per spec item 6.
-                        color: () {
-                          final v = ref
-                              .watch(currentProfileProvider)
-                              .valueOrNull
-                              ?.messageColor;
-                          return (v == null || v == 4294967295)
-                              ? p.textPrimary
-                              : Color(v);
-                        }(),
-                        fontSize: 14,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 120),
+                      child: TextField(
+                        controller: _textController,
+                        textAlign: TextAlign.right,
+                        maxLines: null,
+                        keyboardType: TextInputType.multiline,
+                        style: TextStyle(
+                          color: () {
+                            final v = ref
+                                .watch(currentProfileProvider)
+                                .valueOrNull
+                                ?.messageColor;
+                            return (v == null || v == 4294967295)
+                                ? p.textPrimary
+                                : Color(v);
+                          }(),
+                          fontSize: 14,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'اكتب رسالة...',
+                          hintStyle: TextStyle(color: p.textMuted),
+                          filled: true,
+                          fillColor: p.surfaceElevated,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide(color: p.divider),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide(color: p.divider),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide:
+                                BorderSide(color: p.accent, width: 1.4),
+                          ),
+                        ),
+                        onSubmitted: (_) => _send(),
                       ),
-                      decoration: InputDecoration(
-                        hintText: 'اكتب رسالة...',
-                        hintStyle: TextStyle(color: p.textMuted),
-                        filled: true,
-                        fillColor: p.surfaceElevated,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: p.divider),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: p.divider),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(color: p.accent, width: 1.4),
-                        ),
-                      ),
-                      onSubmitted: (_) => _send(),
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -1001,3 +947,67 @@ class _PinnedTopicBanner extends StatelessWidget {
     );
   }
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// _AttachVoiceButton — زر مدمج: نقر = إرفاق ملف، ضغط مطوّل = تسجيل صوتي
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _AttachVoiceButton extends StatefulWidget {
+  final Color accentColor;
+  final VoidCallback onAttach;
+  final Future<void> Function(String url) onVoiceUploaded;
+
+  const _AttachVoiceButton({
+    required this.accentColor,
+    required this.onAttach,
+    required this.onVoiceUploaded,
+  });
+
+  @override
+  State<_AttachVoiceButton> createState() => _AttachVoiceButtonState();
+}
+
+class _AttachVoiceButtonState extends State<_AttachVoiceButton> {
+  bool _voiceMode = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_voiceMode) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          VoiceHoldButton(
+            color: widget.accentColor,
+            onUploaded: (url) async {
+              setState(() => _voiceMode = false);
+              await widget.onVoiceUploaded(url);
+            },
+          ),
+          IconButton(
+            icon: Icon(Icons.attach_file_rounded, color: widget.accentColor, size: 20),
+            tooltip: 'إرفاق ملف',
+            visualDensity: VisualDensity.compact,
+            onPressed: () {
+              setState(() => _voiceMode = false);
+              widget.onAttach();
+            },
+          ),
+        ],
+      );
+    }
+
+    return GestureDetector(
+      onTap: widget.onAttach,
+      onLongPress: () => setState(() => _voiceMode = true),
+      child: Tooltip(
+        message: 'نقر: إرفاق | ضغط مطوّل: تسجيل صوتي',
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(Icons.add_circle_outline_rounded,
+              color: widget.accentColor, size: 24),
+        ),
+      ),
+    );
+  }
+}
+

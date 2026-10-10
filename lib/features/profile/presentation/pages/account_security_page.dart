@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -17,7 +18,7 @@ class AccountSecurityPage extends ConsumerWidget {
       BuildContext context, String? error, String success) async {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(error ?? success)));
+        .showSnackBarSfx(SnackBar(content: Text(error ?? success)));
   }
 
   @override

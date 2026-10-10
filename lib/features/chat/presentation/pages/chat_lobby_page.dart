@@ -1,19 +1,24 @@
-import '../../../../core/services/realtime_resilience.dart';
+import '../../../../core/widgets/mini_player_chip.dart';
+import '../../../../core/services/snack_sfx.dart';
 import '../widgets/room_mic_seats.dart';
 import '../widgets/animated_dice_roller.dart';
+import '../widgets/game_hub.dart';
+import '../widgets/trix_game.dart';
+import '../../../../core/services/server_sounds.dart';
+import '../../data/gif_catalog.dart';
 import '../widgets/forward_message_sheet.dart';
 import '../widgets/voice_message_player.dart';
 import '../providers/unread_dm_provider.dart';
 import '../../../../core/widgets/song_search_sheet.dart';
 import '../../../../core/providers/mini_player_provider.dart';
 import '../widgets/voice_hold_button.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../core/widgets/fullscreen_image_viewer.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/typography/local_glyph_text.dart';
@@ -24,6 +29,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/services/media_upload_service.dart';
+import '../../../../core/services/resilient_realtime_channel.dart';
 import '../../../../core/widgets/embedded_media_player.dart';
 import 'conversations_page.dart';
 import '../../../friends/presentation/pages/friends_list_page.dart';
@@ -55,11 +61,10 @@ import '../../../reports/presentation/pages/platform_safety_warnings_page.dart';
 import '../../../search/presentation/pages/search_page.dart';
 import '../../../subscriptions/presentation/pages/subscriptions_page.dart';
 import 'package:uuid/uuid.dart';
-import '../../data/gif_catalog.dart';
 import '../../../gifts/presentation/widgets/gift_picker_sheet.dart';
 import '../../domain/lobby_directory_service.dart';
 import '../../domain/chat_visual_size_service.dart';
-import '../widgets/emoji_picker_sheet.dart';
+import '../widgets/sticker_and_gif_sheet.dart';
 import '../widgets/mini_profile_popup.dart';
 import '../widgets/mini_chat_overlay.dart';
 import 'chat_thread_page.dart';
@@ -74,6 +79,16 @@ import 'sponsored_ads_page.dart';
 import '../widgets/chat_theme_picker_sheet.dart';
 import '../../data/services/chat_sound_service.dart';
 import '../../data/services/chat_sound_player.dart';
+
+/// true إن كان [url] مسار تخزين خامًا (لا رابطًا جاهزًا ولا أصلًا محليًا)
+/// — الحالة التي يُعيدها رفع إلى bucket خاص (chat-media-plus لمستخدمي
+/// VIP+)، ويحتاج توقيعًا عبر SupabaseService.resolvePrivateMediaUrl قبل
+/// أي عرض فعلي. bucket "media" العام يُعيد رابطًا كاملًا جاهزًا دائمًا،
+/// فلا تلتقطه هذه الدالة إطلاقًا — صفر تغيير سلوك للحالة الشائعة.
+bool _needsPrivateSigning(String url) =>
+    !url.startsWith('http://') &&
+    !url.startsWith('https://') &&
+    !url.startsWith('assets/');
 
 /// خلفية الغرفة الحقيقية من الخادم — بثّ حي فور تغييرها من أي مدير غرفة،
 /// يظهر لكل الأعضاء الحاضرين في اللحظة نفسها بلا حاجة لإعادة فتح الغرفة.
@@ -101,7 +116,6 @@ class ChatLobbyPage extends ConsumerStatefulWidget {
 class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
-  final _media = MediaUploadService();
   bool _sending = false;
   String? _error;
   bool _showMic = true;
@@ -132,6 +146,12 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   final Map<String, BuildContext> _publicMessageContexts = <String, BuildContext>{};
   List<Map<String, dynamic>> _mentionSuggestions = const [];
   Timer? _mentionTimer;
+  Timer? _blockWatchTimer;
+  RealtimeChannel? _diceChannel;
+  RealtimeChannel? _challengeChannel;
+  RealtimeChannel? _matchChannel;
+  final Set<String> _diceSeen = <String>{};
+  Timer? _roomTypingHeartbeat;
   Timer? _roomTypingStopTimer;
   Timer? _roomPresenceHeartbeat;
   final Map<String, String> _mentionUserIds = <String, String>{};
@@ -143,11 +163,18 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
 
   late Stream<List<Map<String, dynamic>>> _messages;
   late Stream<List<Map<String, dynamic>>> _globalEvents;
-  RealtimeChannel? _liveStateChannel;
-  RealtimeChannel? _rankChannel;
-  RealtimeChannel? _profileChannel;
-  RealtimeChannel? _incomingMessageChannel;
-  RealtimeChannel? _roomTypingChannel;
+  // كل قناة أدناه كانت .subscribe() بلا أي معالجة لحالتها — أي
+  // channelError أو timedOut (توكن منتهٍ، انقطاع لحظي) يُسقطها ميتة
+  // إلى الأبد بلا أي تعافٍ تلقائي، فيبدو الشات "متصلًا" ظاهريًا بينما
+  // الكتابة/الحضور/الرسائل الخاصة الواردة لم تَعُد تصل فعليًا. الآن كل
+  // قناة مغلَّفة بـResilientRealtimeChannel فتُعيد الاشتراك بقناة جديدة
+  // تلقائيًا بدل الموت الصامت — هذا هو تنفيذ "اتصال دائم لحظي لاينقطع".
+  ResilientRealtimeChannel? _liveStateRes;
+  ResilientRealtimeChannel? _rankRes;
+  ResilientRealtimeChannel? _profileRes;
+  ResilientRealtimeChannel? _incomingMessageRes;
+  ResilientRealtimeChannel? _roomTypingRes;
+  RealtimeChannel? get _roomTypingChannel => _roomTypingRes?.channel;
   bool _isRoomTyping = false;
   final Set<String> _roomTypingUids = <String>{};
 
@@ -207,19 +234,29 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
 
   @override
   void initState() {
+    // عند الدخول لغرفة مفتوحة كصفحة مستقلة: إن طُرد/حُظر المستخدم يُخرَج فورًا.
+    _blockWatchTimer = Timer.periodic(const Duration(seconds: 6), (_) async {
+      if (!mounted || !Navigator.of(context).canPop()) return;
+      try {
+        final msg = await Supabase.instance.client
+            .rpc('my_room_block_message', params: {'p_room_id': widget.roomId});
+        if (msg is String && msg.isNotEmpty && mounted) {
+          final nav = Navigator.of(context);
+          ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(msg)));
+          nav.pop();
+        }
+      } catch (_) {}
+    });
     super.initState();
     _controller.addListener(_refreshMentionSuggestions);
     _controller.addListener(_handleRoomTypingChanged);
-    _roomTypingChannel = _db.channel(
-      'room:$_roomId:typing',
-      // Broadcast channel عام؛ لا يحتاج ACL لقناة private ولا يمنع الرسائل بسبب صلاحيات topic.
-    )
-      ..onBroadcast(event: 'room_typing', callback: _onRoomTypingBroadcast)
-      ..subscribe((_, error) {
-        if (error != null) {
-          RealtimeResilience.instance.recoverAfterChannelFailure();
-        }
-      });
+    _roomTypingRes = ResilientRealtimeChannel(
+      client: _db,
+      build: (client) => client.channel(
+        'room:$_roomId:typing',
+        opts: const RealtimeChannelConfig(private: true),
+      )..onBroadcast(event: 'room_typing', callback: _onRoomTypingBroadcast),
+    );
     unawaited(_loadRoomControls());
     unawaited(_loadVisualSizeAccess());
     // لم تكن هناك أي ذاكرة لآخر غرفة دخلها المستخدم (البند ٨)؛ كل دخول
@@ -246,153 +283,146 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
         .stream(primaryKey: ['id'])
         .order('created_at', ascending: true)
         .limit(40);
+    _subscribeDice();
 
-    _liveStateChannel = _db.channel('chat-live-$_roomId')
-      ..onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'chat_rooms',
-          filter: PostgresChangeFilter(
-              type: PostgresChangeFilterType.eq, column: 'id', value: _roomId),
-          callback: (_) => unawaited(_loadRoomControls()))
-      ..onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'chat_room_members',
-          filter: PostgresChangeFilter(
-              type: PostgresChangeFilterType.eq,
-              column: 'room_id',
-              value: _roomId),
-          callback: (_) => unawaited(_loadRoomControls()))
-      ..onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'platform_chat_settings',
-          callback: (_) => unawaited(_loadRoomControls()))
+    _liveStateRes = ResilientRealtimeChannel(
+      client: _db,
+      build: (client) => client.channel('chat-live-$_roomId')
+        ..onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'chat_rooms',
+            filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq, column: 'id', value: _roomId),
+            callback: (_) => unawaited(_loadRoomControls()))
+        ..onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'chat_room_members',
+            filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq,
+                column: 'room_id',
+                value: _roomId),
+            callback: (_) => unawaited(_loadRoomControls()))
+        ..onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'platform_chat_settings',
+            callback: (_) => unawaited(_loadRoomControls())),
       // كان هنا مستمع على user_presence يستدعي _markRoomPresence (كتابة) عند
       // كل تغيّر في الحضور — وتلك الكتابة نفسها تغيّر user_presence، فتنشأ
       // حلقة لا تتوقف تتضاعف مع كل عضو في الغرفة: 692 ألف استدعاء لـ
       // set_my_presence مع 3 مستخدمين، أغرقت محرّك Realtime وأسقطت الاتصال.
       // الغرض كان تحديث عدّاد ترويسة الغرفة، والترويسة حُذفت؛ الحضور يبقى
       // دقيقًا بنبضة الـ45 ثانية وقائمة المتصلين الخادمية.
-      ..subscribe((_, error) {
-        if (error != null) {
-          RealtimeResilience.instance.recoverAfterChannelFailure();
-        }
-      });
+    );
 
     // Server broadcasts role updates on this exact topic.
-    _rankChannel = _db.channel('room:$_roomId:rank')
-      ..onBroadcast(
-        event: 'rank_changed',
-        callback: (_) {
-          if (!mounted) return;
-          setState(() => _rankRevision++);
-        },
-      )
-      ..onPostgresChanges(
-        event: PostgresChangeEvent.update,
-        schema: 'public',
-        table: 'gamification_stats',
-        callback: (payload) {
-          final changedUid = payload.newRecord['user_id']?.toString().trim();
-          if (changedUid != null && changedUid.isNotEmpty) {
-            ref.invalidate(serverUserRankBadgeProvider(changedUid));
-            ref.invalidate(
-              serverUserIdentityInRoomProvider((
-                uid: changedUid,
-                roomId: _roomId,
-              )),
-            );
-            ref.invalidate(serverUserIdentityProvider(changedUid));
-          }
-          if (!mounted) return;
-          setState(() => _rankRevision++);
-        },
-      )
-      ..subscribe((_, error) {
-        if (error != null) {
-          RealtimeResilience.instance.recoverAfterChannelFailure();
-        }
-      });
-
-    if (_user != null) {
-      _profileChannel = _db.channel('profile-sync-${_user!.id}')
+    _rankRes = ResilientRealtimeChannel(
+      client: _db,
+      build: (client) => client.channel('room:$_roomId:rank')
+        ..onBroadcast(
+          event: 'rank_changed',
+          callback: (_) {
+            if (!mounted) return;
+            setState(() => _rankRevision++);
+          },
+        )
         ..onPostgresChanges(
           event: PostgresChangeEvent.update,
           schema: 'public',
-          table: 'profiles',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'id',
-            value: _user!.id,
-          ),
+          table: 'gamification_stats',
           callback: (payload) {
-            final next = payload.newRecord;
-            final avatar = next['avatar_url']?.toString();
-            final uid = _user?.id;
-            if (uid != null) {
+            final changedUid = payload.newRecord['user_id']?.toString().trim();
+            if (changedUid != null && changedUid.isNotEmpty) {
+              ref.invalidate(serverUserRankBadgeProvider(changedUid));
               ref.invalidate(
-                serverUserIdentityInRoomProvider((uid: uid, roomId: _roomId)),
+                serverUserIdentityInRoomProvider((
+                  uid: changedUid,
+                  roomId: _roomId,
+                )),
               );
-              ref.invalidate(serverUserIdentityProvider(uid));
+              ref.invalidate(serverUserIdentityProvider(changedUid));
             }
-            if (mounted) {
-              setState(() {
-                _profileAvatarUrl = avatar;
-                _rankRevision++;
-              });
-            }
+            if (!mounted) return;
+            setState(() => _rankRevision++);
           },
-        )
-        ..subscribe((_, error) {
-        if (error != null) {
-          RealtimeResilience.instance.recoverAfterChannelFailure();
-        }
-      });
+        ),
+    );
+
+    if (_user != null) {
+      _profileRes = ResilientRealtimeChannel(
+        client: _db,
+        build: (client) => client.channel('profile-sync-${_user!.id}')
+          ..onPostgresChanges(
+            event: PostgresChangeEvent.update,
+            schema: 'public',
+            table: 'profiles',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'id',
+              value: _user!.id,
+            ),
+            callback: (payload) {
+              final next = payload.newRecord;
+              final avatar = next['avatar_url']?.toString();
+              final uid = _user?.id;
+              if (uid != null) {
+                ref.invalidate(
+                  serverUserIdentityInRoomProvider((uid: uid, roomId: _roomId)),
+                );
+                ref.invalidate(serverUserIdentityProvider(uid));
+              }
+              if (mounted) {
+                setState(() {
+                  _profileAvatarUrl = avatar;
+                  _rankRevision++;
+                });
+              }
+            },
+          ),
+      );
 
       // Auto-floats the mini chat the instant a private message ARRIVES,
       // for the recipient — not just for whoever opened it to send. RLS on
       // chat_messages already restricts delivery to actual participants, so
       // this only ever fires for messages that genuinely involve this user.
-      _incomingMessageChannel = _db.channel('incoming-private-${_user!.id}')
-        ..onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'chat_messages',
-          callback: (payload) async {
-            final row = payload.newRecord;
-            final senderUid = row['sender_uid']?.toString();
-            final myUid = _user?.id;
-            if (senderUid == null || myUid == null || senderUid == myUid) return;
-            // Respects "the user decides": never reopens a conversation the
-            // user explicitly closed during this room visit.
-            if (ref.read(dismissedThreadIdsProvider).contains(row['thread_id']?.toString())) return;
-            try {
-              final profile = await _db
-                  .from('profiles')
-                  .select('id,display_name,avatar_url')
-                  .eq('id', senderUid)
-                  .maybeSingle();
-              if (!mounted || profile == null) return;
-              ref.read(miniChatTargetProvider.notifier).state = MiniChatTarget(
-                threadId: row['thread_id']?.toString() ?? '',
-                peerUid: senderUid,
-                peerName: profile['display_name']?.toString() ?? 'عضو',
-                peerAvatar: profile['avatar_url']?.toString(),
-              );
-              ref.read(miniChatModeProvider.notifier).state = MiniChatMode.normal;
-            } catch (_) {
-              // Auto-opening is a convenience; a failure here must never
-              // interrupt the room.
-            }
-          },
-        )
-        ..subscribe((_, error) {
-        if (error != null) {
-          RealtimeResilience.instance.recoverAfterChannelFailure();
-        }
-      });
+      _incomingMessageRes = ResilientRealtimeChannel(
+        client: _db,
+        build: (client) => client.channel('incoming-private-${_user!.id}')
+          ..onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'chat_messages',
+            callback: (payload) async {
+              final row = payload.newRecord;
+              final senderUid = row['sender_uid']?.toString();
+              final myUid = _user?.id;
+              if (senderUid == null || myUid == null || senderUid == myUid) return;
+              // Respects "the user decides": never reopens a conversation the
+              // user explicitly closed during this room visit.
+              if (ref.read(dismissedThreadIdsProvider).contains(row['thread_id']?.toString())) return;
+              try {
+                final profile = await _db
+                    .from('profiles')
+                    .select('id,display_name,avatar_url')
+                    .eq('id', senderUid)
+                    .maybeSingle();
+                if (!mounted || profile == null) return;
+                ref.read(miniChatTargetProvider.notifier).state = MiniChatTarget(
+                  threadId: row['thread_id']?.toString() ?? '',
+                  peerUid: senderUid,
+                  peerName: profile['display_name']?.toString() ?? 'عضو',
+                  peerAvatar: profile['avatar_url']?.toString(),
+                );
+                ref.read(miniChatModeProvider.notifier).state = MiniChatMode.normal;
+              } catch (_) {
+                // Auto-opening is a convenience; a failure here must never
+                // interrupt the room.
+              }
+            },
+          ),
+      );
     }
 
     // إعلان دخول آمن يُنشأ على الخادم فقط.
@@ -405,6 +435,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   }
 
   String _friendlyChatError(Object error) {
+    playServerSound('error');
     String code = '';
     String message = '';
     if (error is PostgrestException) {
@@ -570,7 +601,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
           // شكل مُشفَّر بفاصل: اسم المرسل|نص المعاينة|رابط مصغّرة (قد يكون
           // فارغاً). البطاقة تعرض الصورة الفعلية حين يتوفر الرابط، لا
           // النص الوصفي وحده.
-          replyToPreview: reply == null ? null : '${reply['display_name']?.toString().trim().isNotEmpty == true ? reply!['display_name'] : 'عضو'}|${_replySourcePreviewText(reply)}|${_replySourceThumbnail(reply)}',
+          replyToPreview: reply == null ? null : '${reply['display_name']?.toString().trim().isNotEmpty == true ? reply['display_name'] : 'عضو'}|${_replySourcePreviewText(reply)}|${_replySourceThumbnail(reply)}',
           replyMode: reply == null ? 'none' : _replyMode,
         );
       }
@@ -616,6 +647,18 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
               onTap: () {
                 Navigator.pop(sheetContext);
                 _pickAttachment();
+              },
+            ),
+            // بحث الأغاني انتقل إلى داخل زر + (كان أيقونة مستقلة في شريط
+            // الكتابة) تنفيذًا لبند "نقل زر الموسيقى إلى داخل زر +".
+            ListTile(
+              leading:
+                  const Icon(Icons.music_note_rounded, color: Colors.white),
+              title: const Text('بحث أغنية',
+                  style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showSongSearch();
               },
             ),
             if (_showGames)
@@ -727,12 +770,20 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.grid_3x3, color: Color(0xFFDFA8FF)),
-                title: const Text('XO', style: TextStyle(color: Colors.white)),
-
+                leading: const Icon(Icons.sports_esports_rounded,
+                    color: Color(0xFFDFA8FF)),
+                title: const Text('ألعاب ثلاثية الأبعاد',
+                    style: TextStyle(color: Colors.white)),
+                subtitle: const Text('أربعة في صف • حجر ورقة مقص • العملة',
+                    style: TextStyle(color: Colors.white54, fontSize: 12)),
                 onTap: () {
                   Navigator.pop(sheetContext);
-                  _openXoPanel();
+                  showGameHub(context,
+                      roomId: _roomId,
+                      onIncoming: (req) async {
+                        forgetPromptedGameRequest(req['id']?.toString());
+                        await _routeGameRequest(req);
+                      });
                 },
               ),
             ],
@@ -742,66 +793,259 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     );
   }
 
-  /// القاعدة: اللعب حصرًا ضد الكمبيوتر أو ضد لاعب حقيقي. كانت اللعبة
-  /// السابقة لا هذا ولا ذاك فعليًا — تبادل لمس على نفس الجهاز بلا ذكاء
-  /// اصطناعي وبلا أي اتصال بالخادم. صار يُختار الوضع صراحة أولًا.
-  Future<void> _openXoPanel() async {
-    final mode = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: const Color(0xFF171126),
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Text('XO', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 14),
-            ListTile(
-              leading: const Icon(Icons.smart_toy_outlined, color: Color(0xFFDFA8FF)),
-              title: const Text('ضد الكمبيوتر', style: TextStyle(color: Colors.white)),
-              subtitle: const Text('ذكاء اصطناعي محلي، بلا رهان', style: TextStyle(color: Colors.white54, fontSize: 12)),
-              onTap: () => Navigator.pop(sheetContext, 'computer'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.people_alt_outlined, color: Color(0xFFDFA8FF)),
-              title: const Text('لاعب حقيقي', style: TextStyle(color: Colors.white)),
-              subtitle: const Text('مزامنة فورية عبر الخادم، برهان نقاط اختياري', style: TextStyle(color: Colors.white54, fontSize: 12)),
-              onTap: () => Navigator.pop(sheetContext, 'real'),
-            ),
-          ]),
-        ),
-      ),
-    );
-    if (mode == null || !mounted) return;
-    if (mode == 'computer') {
-      await showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: const Color(0xFF171126),
-        showDragHandle: true,
-        builder: (_) => const _XoPanel(),
-      );
-    } else {
-      await showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: const Color(0xFF171126),
-        isScrollControlled: true,
-        showDragHandle: true,
-        builder: (_) => _XoMultiplayerPanel(roomId: _roomId),
-      );
+  // ───────────────────── النرد (الرمية والتحدي) ─────────────────────
+  // النتيجة تُحسم في الخادم حصرًا (roll_dice_in_room / accept_dice_challenge)
+  // ثم تُعرَض الأرقام نفسها في النرد ثلاثي الأبعاد؛ لا يوجد أي رقم محلي.
+
+  void _subscribeDice() {
+    final me = _user?.id;
+    unawaited(ServerSounds.instance.prefetch());
+    _diceChannel = _db
+        .channel('dice-$_roomId-${DateTime.now().millisecondsSinceEpoch}')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'chat_global_events',
+          filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'room_id',
+              value: _roomId),
+          callback: (payload) => unawaited(_onDiceEvent(payload.newRecord)),
+        )
+        .subscribe();
+    if (me != null) {
+      _challengeChannel = _db
+          .channel('dice-challenge-$me-${DateTime.now().millisecondsSinceEpoch}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'game_requests',
+            filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq,
+                column: 'to_uid',
+                value: me),
+            callback: (payload) =>
+                unawaited(_routeGameRequest(payload.newRecord)),
+          )
+          .subscribe();
+      // المرسِل يدخل اللعبة تلقائيًا فور قبول الطرف الآخر (ينشأ صف المباراة).
+      _matchChannel = _db
+          .channel('game-match-$me-${DateTime.now().millisecondsSinceEpoch}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'game_matches',
+            filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq, column: 'p1', value: me),
+            callback: (payload) {
+              final id = payload.newRecord['id']?.toString();
+              if (id != null && mounted) unawaited(openGameMatch(context, id));
+            },
+          )
+          // التركس: المرسِل يدخل عند قبول الطلب (game_requests ← accepted).
+          .onPostgresChanges(
+            event: PostgresChangeEvent.update,
+            schema: 'public',
+            table: 'game_requests',
+            filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq,
+                column: 'from_uid',
+                value: me),
+            callback: (payload) {
+              final r = payload.newRecord;
+              final t = r['game_type']?.toString() ?? '';
+              final res = r['result'];
+              if (t.startsWith('trix_') &&
+                  r['status']?.toString() == 'accepted' &&
+                  res is Map &&
+                  res['game_id'] != null &&
+                  mounted) {
+                unawaited(openTrixGame(context, res['game_id'].toString()));
+              }
+            },
+          )
+          .subscribe();
+      unawaited(_checkPendingChallenge(me));
     }
   }
 
-  /// نرد سريع محلي (1-6) يُنشر النتيجة كرسالة عادية في الشات — إن
-  /// أراد المستخدم لعبة نرد كاملة بين طرفين مع رهان نقاط، فالإعداد
-  /// الخاص بها متاح مسبقًا من "تهيئة لعبة النرد" في الإعدادات؛ هذا
-  /// الزر هو "الرمية السريعة" الظاهرة داخل الشات نفسه.
+  Future<void> _checkPendingChallenge(String me) async {
+    try {
+      final since =
+          DateTime.now().toUtc().subtract(const Duration(minutes: 10)).toIso8601String();
+      final rows = await _db
+          .from('game_requests')
+          .select()
+          .eq('to_uid', me)
+          .eq('status', 'pending')
+          .inFilter('game_type', ['dice', 'connect4', 'rps', 'coin', 'trix_solo', 'trix_partner'])
+          .gte('created_at', since)
+          .order('created_at', ascending: false)
+          .limit(3);
+      for (final r in rows) {
+        if (!mounted) return;
+        await _routeGameRequest(Map<String, dynamic>.from(r));
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _routeGameRequest(Map<String, dynamic> req) async {
+    if (!mounted) return;
+    if (req['game_type']?.toString() == 'dice') {
+      await _promptDiceChallenge(req);
+    } else {
+      await promptGameRequest(context, req);
+    }
+  }
+
+  Future<void> _onDiceEvent(Map<String, dynamic> rec) async {
+    if (!mounted || rec['event_type']?.toString() != 'dice_roll') return;
+    final id = rec['id']?.toString() ?? '';
+    if (id.isNotEmpty && !_diceSeen.add(id)) return;
+    final payload = rec['payload'] is Map
+        ? Map<String, dynamic>.from(rec['payload'] as Map)
+        : const <String, dynamic>{};
+    final me = _user?.id;
+    if (payload['mode']?.toString() == 'duel') {
+      final fromRoll = (payload['from_roll'] as num?)?.toInt() ?? 1;
+      final toRoll = (payload['to_roll'] as num?)?.toInt() ?? 1;
+      final winner = payload['winner_uid']?.toString();
+      final fromName = (payload['from_name'] ?? 'عضو').toString();
+      final toName = (payload['to_name'] ?? 'عضو').toString();
+      final winnerName = winner == null || winner.isEmpty || winner == 'null'
+          ? null
+          : (winner == payload['from_uid']?.toString() ? fromName : toName);
+      await AnimatedDiceRoller.showDuel(
+        context,
+        fromName: fromName,
+        toName: toName,
+        fromRoll: fromRoll,
+        toRoll: toRoll,
+        stake: (payload['stake'] as num?)?.toInt() ?? 0,
+        winnerName: winnerName,
+        finishSound: winner == null || winner.isEmpty || winner == 'null'
+            ? 'game_draw'
+            : (winner == me ? 'game_win' : 'game_lose'),
+      );
+      return;
+    }
+    // رمية فردية من عضو آخر: صاحبها يراها في مساره الخاص.
+    if (rec['actor_uid']?.toString() == me) return;
+    final result = (payload['result'] as num?)?.toInt();
+    if (result == null) return;
+    final prize = (payload['prize'] as num?)?.toInt() ?? 0;
+    final who = (payload['from_name'] ?? 'عضو').toString();
+    await AnimatedDiceRoller.show(context, result,
+        label: who,
+        jackpot: prize > 0,
+        footer: prize > 0 ? '🎉 $who حصل على 6 وربح $prize نقطة!' : null);
+  }
+
+  Future<void> _promptDiceChallenge(Map<String, dynamic> req) async {
+    if (!mounted || req['game_type']?.toString() != 'dice') return;
+    if (req['status']?.toString() != 'pending') return;
+    final reqId = req['id']?.toString();
+    if (reqId == null || !_diceSeen.add('req-$reqId')) return;
+    final stake = (req['stake_points'] as num?)?.toInt() ?? 0;
+    var fromName = 'عضو';
+    try {
+      final row = await _db
+          .from('profiles')
+          .select('display_name,username')
+          .eq('id', req['from_uid'].toString())
+          .maybeSingle();
+      final n = (row?['display_name'] ?? row?['username'])?.toString().trim();
+      if (n != null && n.isNotEmpty) fromName = n;
+    } catch (_) {}
+    if (!mounted) return;
+    playServerSound('game_request');
+    final accept = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => AlertDialog(
+        title: const Text('تحدي نرد 🎲'),
+        content: Text(
+          stake > 0
+              ? '$fromName يتحداك بالنرد على $stake نقطة.\nيرمي كل منكما نردًا، والأعلى يربح $stake نقطة من الآخر، وعند التعادل لا يتغير شيء.'
+              : '$fromName يتحداك بنرد ودّي (بلا نقاط).',
+          textDirection: TextDirection.rtl,
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('رفض')),
+          FilledButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('قبول')),
+        ],
+      ),
+    );
+    if (!mounted || accept == null) return;
+    try {
+      if (!accept) {
+        await _db.rpc('decline_dice_challenge', params: {'p_request_id': reqId});
+        return;
+      }
+      final res = await _db.rpc('accept_dice_challenge', params: {'p_request_id': reqId});
+      if (res is! Map || !mounted) return;
+      // إن كان التحدي في هذه الغرفة فالحدث الحي يعرضه للجميع؛ وإلا نعرضه محليًا.
+      if (res['room_id']?.toString() != _roomId) {
+        final winner = res['winner_uid']?.toString();
+        await AnimatedDiceRoller.showDuel(
+          context,
+          fromName: (res['from_name'] ?? 'عضو').toString(),
+          toName: (res['to_name'] ?? 'عضو').toString(),
+          fromRoll: (res['from_roll'] as num).toInt(),
+          toRoll: (res['to_roll'] as num).toInt(),
+          stake: (res['stake'] as num?)?.toInt() ?? 0,
+          winnerName: winner == null || winner == 'null'
+              ? null
+              : (winner == res['from_uid']?.toString()
+                  ? res['from_name']?.toString()
+                  : res['to_name']?.toString()),
+          finishSound: winner == null || winner == 'null'
+              ? 'game_draw'
+              : (winner == _user?.id ? 'game_win' : 'game_lose'),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final raw = e.toString();
+      final msg = raw.contains('CHALLENGER_INSUFFICIENT_POINTS')
+          ? 'رصيد المتحدّي لا يكفي لهذا الرهان.'
+          : raw.contains('INSUFFICIENT_POINTS')
+              ? 'رصيدك من النقاط لا يكفي لقبول التحدي.'
+              : raw.contains('REQUEST_EXPIRED')
+                  ? 'انتهت صلاحية التحدي.'
+                  : raw.contains('BLOCKED')
+                      ? 'لا يمكن إكمال التحدي بسبب الحظر.'
+                      : 'تعذّر إكمال التحدي.';
+      ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(msg)));
+    }
+  }
+
+  /// رمية نرد سريعة: الخادم يحسم الرقم ويبثّه لكل من في الغرفة.
   Future<void> _rollDiceInChat() async {
     if (_user == null || _sending) return;
-    // النتيجة تُحدَّد هنا أولاً، ثم تُعرَض نفسها حرفياً في حوار النرد
-    // المتحرك؛ الحركة تنتهي على هذا الرقم بعينه فلا يحدث تضارب أبداً
-    // بين الوجه الذي يراه المستخدم والرقم الذي يُرسَل في الرسالة.
-    final roll = 1 + math.Random().nextInt(6);
-    await AnimatedDiceRoller.show(context, roll);
+    int roll;
+    try {
+      final raw = await _db.rpc('roll_dice_in_room', params: {'p_room_id': _roomId});
+      roll = (raw as num).toInt();
+    } catch (e) {
+      if (!mounted) return;
+      if (e.toString().contains('DICE_LIMIT_REACHED')) {
+        ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(
+            content: Text('استنفدت رميات النرد المسموحة (6 رميات كل 24 ساعة).')));
+      } else {
+        setState(() => _error = _friendlyChatError(e));
+      }
+      return;
+    }
+    if (!mounted) return;
+    await AnimatedDiceRoller.show(context, roll,
+        label: 'رميتك',
+        jackpot: roll == 6,
+        footer: roll == 6 ? '🎉 حصلت على 6 — ربحت 10000 نقطة!' : null);
     if (!mounted) return;
     const faces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
     try {
@@ -816,28 +1060,16 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     }
   }
 
+  /// "أي ملف من الهاتف" — بلا قيد امتداد بعد الآن (كانت FileType.custom
+  /// بقائمة امتدادات ثابتة تمنع رفع أي شيء خارجها، كملفات docx/pptx/apk).
+  /// الحد الفعلي للحجم يبقى مفروضًا خادميًا على مستوى سطل التخزين نفسه
+  /// (file_size_limit على bucket في Supabase Storage)، لا قيمة يختارها
+  /// التطبيق فقط؛ هذا الفحص المحلي مجرّد رسالة مبكرة ودودة تطابق الحد
+  /// الخادمي الحقيقي (10MB عادي/25MB لمشترك وسائط Plus) بدل حد 25MB ثابت
+  /// كان يسمح برفع ما بين 10 و25MB محليًا ثم يُرفَض خادميًا بخطأ غامض.
   Future<void> _pickAttachment() async {
     if (_user == null || _sending) return;
-    final result = await FilePicker.pickFiles(
-      allowMultiple: false,
-      withData: true,
-      type: FileType.custom,
-      allowedExtensions: [
-        'jpg',
-        'jpeg',
-        'png',
-        'webp',
-        'gif',
-        'mp4',
-        'webm',
-        'mov',
-        'mp3',
-        'm4a',
-        'wav',
-        'zip',
-        'pdf'
-      ],
-    );
+    final result = await FilePicker.pickFiles(allowMultiple: false, withData: true);
     if (result == null || result.files.isEmpty) return;
     final file = result.files.single;
     final bytes = file.bytes;
@@ -845,8 +1077,19 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       setState(() => _error = 'تعذر قراءة المرفق من الجهاز.');
       return;
     }
-    if (bytes.length > 10 * 1024 * 1024) {
-      setState(() => _error = 'الحد الأقصى للمرفقات في الغرفة 10MB.');
+    bool vipPlus = false;
+    try {
+      final vipRaw = await _db.rpc(
+        'get_profile_service_runtime',
+        params: {'p_feature_key': 'chat_media_plus'},
+      );
+      vipPlus = vipRaw is Map && vipRaw['enabled'] == true;
+    } catch (_) {}
+    final limit = vipPlus ? 25 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (bytes.length > limit) {
+      setState(() => _error = vipPlus
+          ? 'حد الوسائط Plus هو 25MB.'
+          : 'الحد الأساسي 10MB. فعّل وسائط Plus للوصول إلى 25MB.');
       return;
     }
     setState(() {
@@ -854,10 +1097,16 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       _error = null;
     });
     try {
-      final url = await _media.uploadBytes(
+      final uploader = MediaUploadService(bucket: vipPlus ? 'chat-media-plus' : 'media');
+      final url = await uploader.uploadBytes(
         bytes: bytes,
         fileName: file.name,
-        folder: 'chat/lobby',
+        // سياسة RLS على bucket "chat-media-plus" (VIP+) تفرض حرفيًا
+        // chat/attachments/<uid>/...؛ "chat/lobby" كان يُرفَض خادميًا
+        // بخطأ 403 لكل عضو VIP+ يرفع صورة/فيديو في شات الغرفة (مرصود
+        // فعليًا كـ"ليس لديك صلاحية رفع هذا الملف"). bucket "media"
+        // العادي لا يتقيّد بهذا، فالتوحيد هنا آمن للطرفين معًا.
+        folder: 'chat/attachments',
         uid: _user!.id,
       );
       final isImage = ['jpg', 'jpeg', 'png', 'webp', 'gif']
@@ -879,111 +1128,53 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     }
   }
 
-  /// اختيار GIF لا يرسله فورًا — يُخزَّن كمعلَّق فقط ويظهر كمعاينة
-  /// صغيرة أعلى صندوق الكتابة، ولا يُرسَل إلا بالضغط الصريح على زر
-  /// الإرسال (مطابقة حرفية لبند "لا تُرسَل السمايلات أو الـGIF إلا
-  /// عند اختيارها والضغط على زر الإرسال").
-  Future<void> _showGifPicker() async {
-    const gifs = mashareenaChatGifCatalog;
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: const Color(0xFF171126),
-      showDragHandle: true,
-      // بلا Directionality صريحة هنا كانت Wrap ترتّب العناصر من اليسار
-      // (الاتجاه الافتراضي)، فظهر "أول سمايل" المطلوب من اليمين في أقصى
-      // اليسار بدل أقصى اليمين — وبين 501 سمايلًا صغيرًا بدا وكأنه غائب.
-      builder: (sheetContext) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
-            child: Center(
-              child: Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final gif in gifs)
-                    Tooltip(
-                      // الاسم يظهر بالضغط المطوّل (مثل "مالك المنصة")
-                      message: mashareenaChatGifNames[gif] ?? '',
-                      triggerMode: mashareenaChatGifNames.containsKey(gif)
-                          ? TooltipTriggerMode.longPress
-                          : TooltipTriggerMode.manual,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () => Navigator.pop(sheetContext, gif),
-                        // لقمة لمس 40×40 حول صورة 25×25 — الحجم المرئي كما
-                        // هو، لكن الضغط لم يعد يحتاج دقة بكسل ليُسجَّل.
-                        child: SizedBox(
-                          width: 40,
-                          height: 40,
-                          child: Center(
-                            child: SizedBox(
-                              width: 25,
-                              height: 25,
-                              child: Image.asset(
-                                gif,
-                                width: 25,
-                                height: 25,
-                                fit: BoxFit.contain,
-                                gaplessPlayback: true,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
+  /// لوحة "السمايل" الموحَّدة: إيموجي ثابتة + GIF متحركة معًا بتبويبين
+  /// ضمن قسم واحد (بدل ظهور كل واحد منفصلاً بزر وورقة خاصة به).
+  /// اختيار إيموجي يُدرَج مباشرة في نص الرسالة الجاري كتابتها.
+  /// اختيار GIF لا يُرسَل فورًا — يُخزَّن كمعلَّق فقط ويظهر كمعاينة صغيرة
+  /// أعلى صندوق الكتابة، ولا يُرسَل إلا بالضغط الصريح على زر الإرسال
+  /// (مطابقة حرفية لبند "لا تُرسَل السمايلات أو الـGIF إلا عند اختيارها
+  /// والضغط على زر الإرسال").
+  Future<void> _showStickerAndGifPicker() async {
+    await StickerAndGifSheet.show(
+      context,
+      onEmojiSelected: (emoji) {
+        final selection = _controller.selection;
+        final text = _controller.text;
+        final insertAt = selection.isValid ? selection.start : text.length;
+        final newText = text.replaceRange(
+            insertAt, selection.isValid ? selection.end : text.length, emoji);
+        _controller.value = TextEditingValue(
+          text: newText,
+          selection: TextSelection.collapsed(offset: insertAt + emoji.length),
+        );
+      },
+      onGifSelected: (gif) {
+        if (_user == null || !mounted) return;
+        setState(() => _pendingGif = gif);
+      },
     );
-    if (selected == null || _user == null || !mounted) return;
-    setState(() => _pendingGif = selected);
   }
 
-  Future<void> _showEmojiPicker() async {
-    await EmojiPickerSheet.show(context, (emoji) {
-      final selection = _controller.selection;
-      final text = _controller.text;
-      final insertAt = selection.isValid ? selection.start : text.length;
-      final newText = text.replaceRange(
-          insertAt, selection.isValid ? selection.end : text.length, emoji);
-      _controller.value = TextEditingValue(
-        text: newText,
-        selection: TextSelection.collapsed(offset: insertAt + emoji.length),
-      );
-    });
-  }
-
-  /// بحث أغنية/فيديو ← عند الاختيار: يُرسَل كرسالة يوتيوب عادية في الغرفة
-  /// (فتُضمَّن في فقاعتها بمشغّل الفقاعة المحلي كأي رابط يُلصَق يدويًا)،
-  /// ويظهر تشغيله اختياريًا من زر "تشغيل" في المشغّل العائم.
+  /// بحث أغنية/فيديو ← لا شيء يُرسَل إلا بالضغط الصريح على زر "إرسال" داخل
+  /// لوحة البحث نفسها (SongSearchSheet). عند الإرسال: تُرسَل كرسالة يوتيوب
+  /// عادية في الغرفة، وتُشغَّل فورًا حصرًا في المشغّل المصغّر العائم — لا
+  /// تضمين تلقائي داخل الفقاعة (انظر EmbeddedMediaPlayer.routeYoutubeTo
+  /// FloatingPlayer: أي رابط يوتيوب في رسالة شات يفتح عبر هذا المشغّل
+  /// فقط، لا مشغّلاً مضمّنًا منفصلاً).
   Future<void> _showSongSearch() async {
     if (_user == null) return;
-    await SongSearchSheet.show(
-      context,
-      onPreviewPlay: (videoId, title) {
-        ref.read(miniPlayerProvider.notifier).state =
-            MiniPlayerTrack(videoId: videoId, title: title, autoPlay: true);
-      },
-      onSelected: (videoId, title) async {
-        try {
-          await _insertPublicMessage(
-          body: 'https://www.youtube.com/watch?v=$videoId',
-          message: 'https://www.youtube.com/watch?v=$videoId',
-          kind: 'text',
-        );
-          if (!mounted) return;
-          _scrollToEnd();
-        } catch (e) {
-          if (mounted) setState(() => _error = _friendlyChatError(e));
-        }
-      },
-    );
+    await SongSearchSheet.show(context, onSend: (videoId, title) async {
+      ref.read(miniPlayerProvider.notifier).state =
+          MiniPlayerTrack(videoId: videoId, title: title);
+      await _insertPublicMessage(
+        body: 'https://www.youtube.com/watch?v=$videoId',
+        message: 'https://www.youtube.com/watch?v=$videoId',
+        kind: 'text',
+      );
+      if (!mounted) return;
+      _scrollToEnd();
+    });
   }
 
   Future<void> _sendVoice(String url) async {
@@ -1140,10 +1331,10 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     try {
       await _db.rpc('delete_message',
           params: {'p_scope': 'room', 'p_message_id': row['id'].toString()});
-      m.showSnackBar(const SnackBar(content: Text('حُذفت الرسالة')));
+      m.showSnackBarSfx(const SnackBar(content: Text('حُذفت الرسالة')));
     } catch (e) {
       final t = e.toString();
-      m.showSnackBar(SnackBar(
+      m.showSnackBarSfx(SnackBar(
           content: Text(t.contains('MESSAGE_REMOVED_BY_MODERATOR')
               ? 'حذفت الإدارة هذه الرسالة نهائيًا.'
               : t.contains('TARGET_ROLE_TOO_HIGH') || t.contains('FORBIDDEN') || t.contains('MEMBER_NOT_FOUND')
@@ -1296,7 +1487,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                     final replayed = map['replayed'] == true;
                     final fromName = map['fromName']?.toString() ?? 'عضو';
                     final toName = map['toName']?.toString() ?? 'عضو';
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    ScaffoldMessenger.of(context).showSnackBarSfx(
                       SnackBar(
                         content: Text(
                           replayed
@@ -1307,7 +1498,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                     );
                   } catch (e) {
                     if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    ScaffoldMessenger.of(context).showSnackBarSfx(
                         SnackBar(content: Text('تعذر إرسال الهدية: $e')));
                   }
                 });
@@ -1385,12 +1576,12 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       );
       if (!mounted) return;
       setState(() => _chatThemeId = theme.id);
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text('تم حفظ ثيم "${theme.name}" لهذا الشات ✓')),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text('تعذّر حفظ الثيم: $e')),
       );
     }
@@ -1555,8 +1746,8 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     final channel = _roomTypingChannel;
     if (uid == null || channel == null) return;
     final hasText = _controller.text.trim().isNotEmpty;
+    _roomTypingHeartbeat?.cancel();
     _roomTypingStopTimer?.cancel();
-
     if (hasText != _isRoomTyping) {
       _isRoomTyping = hasText;
       unawaited(channel.sendBroadcastMessage(
@@ -1569,8 +1760,19 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
         },
       ));
     }
-
     if (hasText) {
+      _roomTypingHeartbeat = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!_isRoomTyping) return;
+        unawaited(channel.sendBroadcastMessage(
+          event: 'room_typing',
+          payload: <String, dynamic>{
+            'room_id': _roomId,
+            'user_id': uid,
+            'is_typing': true,
+            'ts': DateTime.now().toUtc().toIso8601String(),
+          },
+        ));
+      });
       _roomTypingStopTimer = Timer(const Duration(milliseconds: 3200), () {
         if (!_isRoomTyping) return;
         _isRoomTyping = false;
@@ -1644,9 +1846,17 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
 
   @override
   void dispose() {
+    _blockWatchTimer?.cancel();
+    final diceCh = _diceChannel;
+    if (diceCh != null) unawaited(_db.removeChannel(diceCh));
+    final chCh = _challengeChannel;
+    if (chCh != null) unawaited(_db.removeChannel(chCh));
+    final mCh = _matchChannel;
+    if (mCh != null) unawaited(_db.removeChannel(mCh));
     _mentionTimer?.cancel();
     _controller.removeListener(_refreshMentionSuggestions);
     _controller.removeListener(_handleRoomTypingChanged);
+    _roomTypingHeartbeat?.cancel();
     _roomTypingStopTimer?.cancel();
     _roomPresenceHeartbeat?.cancel();
     final uid = _user?.id;
@@ -1656,22 +1866,14 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
         payload: <String, dynamic>{'room_id': _roomId, 'user_id': uid, 'is_typing': false},
       ));
     }
-    unawaited(_roomTypingChannel?.unsubscribe());
+    unawaited(_roomTypingRes?.dispose());
     _publicMessageContexts.clear();
     _controller.dispose();
     _scroll.dispose();
-    final live = _liveStateChannel;
-    _liveStateChannel = null;
-    if (live != null) unawaited(_db.removeChannel(live));
-    final rankChannel = _rankChannel;
-    _rankChannel = null;
-    if (rankChannel != null) unawaited(_db.removeChannel(rankChannel));
-    final profileChannel = _profileChannel;
-    _profileChannel = null;
-    if (profileChannel != null) unawaited(_db.removeChannel(profileChannel));
-    final incomingChannel = _incomingMessageChannel;
-    _incomingMessageChannel = null;
-    if (incomingChannel != null) unawaited(_db.removeChannel(incomingChannel));
+    unawaited(_liveStateRes?.dispose());
+    unawaited(_rankRes?.dispose());
+    unawaited(_profileRes?.dispose());
+    unawaited(_incomingMessageRes?.dispose());
     if (_user != null) {
       unawaited(_db.rpc('set_my_presence',
           params: {'p_is_online': false, 'p_current_room_id': null}));
@@ -2082,9 +2284,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
               controller: _controller,
               sending: _sending,
               onAttach: _showQuickActionsSheet,
-              onGif: _showGifPicker,
-              onEmoji: _showEmojiPicker,
-              onSongSearch: _showSongSearch,
+              onSticker: _showStickerAndGifPicker,
               onVoice: _sendVoice,
               onSend: _sendText,
               textColor: () {
@@ -2140,7 +2340,10 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     // (miniChatTargetProvider != null، والوضع minimized)، فزر "رسالة" هنا
     // يعيدها إلى وضعها الطبيعي بدل فتح قائمة المحادثات من جديد — تمامًا
     // كما يفعل الضغط على الفقاعة المصغَّرة نفسها في mini_chat_overlay.dart.
-    if (ref.read(miniChatTargetProvider) != null) {
+    // تُستعاد فقط إن كانت مُصغَّرة فعلًا؛ إن كانت مفتوحة أصلًا فالضغط لا
+    // يفعل شيئًا (كان المستخدم يرى الزر «لا يُظهر المحادثات»)، فنفتح القائمة.
+    if (ref.read(miniChatTargetProvider) != null &&
+        ref.read(miniChatModeProvider) == MiniChatMode.minimized) {
       ref.read(miniChatModeProvider.notifier).state = MiniChatMode.normal;
       return;
     }
@@ -2259,7 +2462,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
           .order('created_at', ascending: true)
           .limit(150);
     });
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBarSfx(
       const SnackBar(
           content: Text('تم تحديث الشات'), duration: Duration(seconds: 1)),
     );
@@ -2325,7 +2528,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     final dragonUid = await LobbyDirectoryService.findPlatformOwnerUid();
     if (!mounted) return;
     if (dragonUid == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         const SnackBar(content: Text('تعذّر العثور على حساب DRAGON حاليًا')),
       );
       return;
@@ -2417,7 +2620,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                     onPressed: () async {
                       final name = roomName.trim();
                       if (name.isEmpty) {
-                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        ScaffoldMessenger.of(dialogContext).showSnackBarSfx(
                             const SnackBar(content: Text('أدخل اسم الغرفة.')));
                         return;
                       }
@@ -2443,7 +2646,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                                 builder: (_) => ChatLobbyPage(roomId: roomId)));
                       } catch (e) {
                         if (!dialogContext.mounted) return;
-                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        ScaffoldMessenger.of(dialogContext).showSnackBarSfx(
                             SnackBar(content: Text('تعذر إنشاء الغرفة: $e')));
                       }
                     },
@@ -3119,64 +3322,118 @@ class _ChatMessageRow extends ConsumerWidget {
     final url = row['attachment_url']?.toString() ?? '';
 
     if (type == 'gif') {
-      const gifSize = 25.0;
+      final banner = isMashareenaBannerGif(url);
+      final gifW = banner ? 150.0 : 25.0;
+      final gifH = banner ? 47.0 : 25.0;
       final image = url.startsWith('assets/')
-          ? Image.asset(url, width: gifSize, height: gifSize, fit: BoxFit.contain)
-          : Image.network(url, width: gifSize, height: gifSize, fit: BoxFit.contain, gaplessPlayback: true);
-      final tile = SizedBox(width: gifSize, height: gifSize, child: image);
+          ? Image.asset(url, width: gifW, height: gifH, fit: BoxFit.contain)
+          : Image.network(url, width: gifW, height: gifH, fit: BoxFit.contain, gaplessPlayback: true);
+      final tile = SizedBox(width: gifW, height: gifH, child: image);
       if (onGifTap == null || url.isEmpty) return tile;
       // لقمة لمس 40×40 حول صورة 25×25 — نفس منطق الاختيار من القائمة،
       // فلا يبدو الضغط على فقاعة مرسَلة "لا يعمل" لضيق مساحته الفعلية.
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => onGifTap!(url),
-        child: SizedBox(width: 40, height: 40, child: Center(child: tile)),
+        child: SizedBox(width: banner ? gifW : 40, height: banner ? gifH : 40, child: Center(child: tile)),
       );
     }
     if (type == 'image' && url.isNotEmpty) {
       // الضغط يفتح الصورة كاملة، وزر النقاط الثلاث في العارض يفتح قائمة الفقاعة.
-      return Builder(
-        builder: (context) => GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => showFullscreenImage(context, url, onMore: onLongPress),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Image.network(url,
-                width: 220,
-                height: 170,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
-                    Text('تعذر تحميل الصورة', style: TextStyle(color: textColor))),
-          ),
-        ),
-      );
+      Widget buildImage(String u) => Builder(
+            builder: (context) => GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => showFullscreenImage(context, u, onMore: onLongPress),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.network(u,
+                    width: 220,
+                    height: 170,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        Text('تعذر تحميل الصورة', style: TextStyle(color: textColor))),
+              ),
+            ),
+          );
+      // mediaUrl قد يكون مسار تخزين خامًا (لا رابطًا جاهزًا) حين يأتي من
+      // bucket خاص — chat-media-plus لمستخدمي VIP+ — فيحتاج توقيعًا عبر
+      // جلسة القارئ الحالية قبل أي عرض فعلي؛ راجع التعليق على
+      // _needsPrivateSigning أعلى الملف وSupabaseService.resolvePrivateMediaUrl.
+      if (_needsPrivateSigning(url)) {
+        return FutureBuilder<String>(
+          future: SupabaseService.resolvePrivateMediaUrl(
+              bucket: 'chat-media-plus', pathOrUrl: url),
+          builder: (context, snap) => snap.hasData
+              ? buildImage(snap.data!)
+              : const SizedBox(
+                  width: 220,
+                  height: 170,
+                  child: Center(
+                      child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2))),
+                ),
+        );
+      }
+      return buildImage(url);
     }
     // كانت الرسائل الصوتية تُفتح خارج التطبيق عبر launchUrl تمامًا كالملفات
     // والفيديو — لا مشغّل داخلي إطلاقًا. صوت الغرفة الآن يُشغَّل من الفقاعة
     // نفسها حصرًا؛ الفيديو والملف يبقيان بفتح خارجي كما كانا.
     if (type == 'audio' && url.isNotEmpty) {
+      if (_needsPrivateSigning(url)) {
+        return FutureBuilder<String>(
+          future: SupabaseService.resolvePrivateMediaUrl(
+              bucket: 'chat-media-plus', pathOrUrl: url),
+          builder: (context, snap) => snap.hasData
+              ? VoiceMessagePlayer(url: snap.data!)
+              : const SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: Center(
+                      child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2))),
+                ),
+        );
+      }
       return VoiceMessagePlayer(url: url);
     }
     if ((type == 'video' || type == 'file') && url.isNotEmpty) {
       final icon = type == 'video' ? Icons.play_circle_fill : Icons.insert_drive_file;
-      return InkWell(
-        onTap: () async {
-          final uri = Uri.tryParse(url);
-          if (uri != null) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          }
-        },
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, color: const Color(0xFF7D32A6), size: 30),
-          const SizedBox(width: 8),
-          Flexible(
-              child: Text(body.isEmpty ? 'مرفق' : body,
-                  style: TextStyle(
-                      color: textColor, fontWeight: FontWeight.w700))),
-          const SizedBox(width: 6),
-          const Icon(Icons.open_in_new, size: 16),
-        ]),
-      );
+      Widget buildOpenRow(String u) => InkWell(
+            onTap: () async {
+              final uri = Uri.tryParse(u);
+              if (uri != null) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(icon, color: const Color(0xFF7D32A6), size: 30),
+              const SizedBox(width: 8),
+              Flexible(
+                  child: Text(body.isEmpty ? 'مرفق' : body,
+                      style: TextStyle(
+                          color: textColor, fontWeight: FontWeight.w700))),
+              const SizedBox(width: 6),
+              const Icon(Icons.open_in_new, size: 16),
+            ]),
+          );
+      if (_needsPrivateSigning(url)) {
+        return FutureBuilder<String>(
+          future: SupabaseService.resolvePrivateMediaUrl(
+              bucket: 'chat-media-plus', pathOrUrl: url),
+          builder: (context, snap) => snap.hasData
+              ? buildOpenRow(snap.data!)
+              : const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2)),
+        );
+      }
+      return buildOpenRow(url);
     }
     // اليوتيوب/تيك توك: إن كان جسم الرسالة رابطًا خامًا من هاتين
     // المنصتين، يُضمَّن مباشرة عبر EmbeddedMediaPlayer (يوتيوب فعليًا
@@ -3185,10 +3442,23 @@ class _ChatMessageRow extends ConsumerWidget {
     if (type == 'text' && _linkPattern.hasMatch(trimmedBody)) {
       final normalized =
           trimmedBody.startsWith('http') ? trimmedBody : 'https://$trimmedBody';
+      // يوتيوب: البطاقة نفسها (EmbeddedMediaPlayer مع routeYoutubeToFloating
+      // Player) تملك ضغطتها الخاصة لتشغيل المشغّل العائم مباشرة — لا حاجة
+      // لـonVideoTap هنا، وتفعيله أيضًا كان سيفتح "مشغل الوسائط" الذي
+      // يُضمِّن الفيديو من جديد داخل الغرفة، فيناقض "حصرًا بمشغل عائم".
+      // تيك توك يبقى بسلوكه القديم (فتح مشغل الوسائط) لأنه غير مطلوب تغييره.
+      final isYoutubeLink = Uri.tryParse(normalized)?.host.toLowerCase().contains('youtu') ?? false;
       return InkWell(
-        onTap: onVideoTap == null ? null : () => onVideoTap!(normalized),
+        onTap: (onVideoTap == null || isYoutubeLink)
+            ? null
+            : () => onVideoTap!(normalized),
         borderRadius: BorderRadius.circular(12),
-        child: SizedBox(width: 240, child: EmbeddedMediaPlayer(url: normalized)),
+        child: SizedBox(
+            width: 240,
+            // يوتيوب يُشغَّل حصرًا عبر المشغّل العائم العام لا تضمينًا داخل
+            // الفقاعة — تيك توك يبقى كما هو.
+            child: EmbeddedMediaPlayer(
+                url: normalized, routeYoutubeToFloatingPlayer: true)),
       );
     }
     final metadata = row['metadata'] is Map
@@ -3612,11 +3882,11 @@ class _GlobalEventOverlay extends StatefulWidget {
 }
 
 class _GlobalEventOverlayState extends State<_GlobalEventOverlay> {
-  final AudioPlayer _royalPlayer = AudioPlayer();
   Timer? _hideTimer;
   bool _visible = true;
 
-  String _effectSoundAsset(String effect) {
+  /// أصوات الدخول الملكي محفوظة في الخادم (royal_<effect>) وليست في المشروع.
+  String _effectSoundKey(String effect) {
     const allowed = <String>{
       'lion_fire',
       'lion_gold',
@@ -3629,18 +3899,8 @@ class _GlobalEventOverlayState extends State<_GlobalEventOverlay> {
       'cosmic_gate',
       'golden_rain',
     };
-    return allowed.contains(effect) ? 'audio/royal/$effect.wav' : 'audio/royal/lion_fire.wav';
+    return allowed.contains(effect) ? 'royal_$effect' : 'royal_lion_fire';
   }
-
-  Future<void> playRoyalSound(String asset) async {
-    try {
-      await _royalPlayer.stop();
-      await _royalPlayer.play(AssetSource(asset));
-    } catch (_) {
-      // Visual royal entry must remain usable when browser audio is blocked.
-    }
-  }
-
 
   @override
   void initState() {
@@ -3651,7 +3911,7 @@ class _GlobalEventOverlayState extends State<_GlobalEventOverlay> {
             : null)
         : null;
     if (effect != null) {
-      unawaited(playRoyalSound(_effectSoundAsset(effect)));
+      unawaited(ServerSounds.instance.play(_effectSoundKey(effect), volume: 1.0));
     }
     final expires = DateTime.tryParse(widget.event['expires_at']?.toString() ?? '');
     if (expires != null) {
@@ -4402,9 +4662,7 @@ class _Composer extends StatelessWidget {
   final TextEditingController controller;
   final bool sending;
   final VoidCallback onAttach;
-  final VoidCallback onGif;
-  final VoidCallback onEmoji;
-  final VoidCallback onSongSearch;
+  final VoidCallback onSticker;
   final Future<void> Function(String url) onVoice;
   final VoidCallback onSend;
   final Color? textColor;
@@ -4413,9 +4671,7 @@ class _Composer extends StatelessWidget {
     required this.controller,
     required this.sending,
     required this.onAttach,
-    required this.onGif,
-    required this.onEmoji,
-    required this.onSongSearch,
+    required this.onSticker,
     required this.onVoice,
     required this.onSend,
     this.textColor,
@@ -4428,14 +4684,14 @@ class _Composer extends StatelessWidget {
     Widget actionButton({
       required IconData icon,
       required VoidCallback onPressed,
-      required Color color,
       String? tooltip,
     }) {
       return IconButton(
         tooltip: tooltip,
         onPressed: sending ? null : onPressed,
         splashRadius: 22,
-        icon: Icon(icon, size: 21, color: color),
+        icon: Icon(icon, size: 21),
+        color: p.accentBright,
         disabledColor: p.textMuted,
       );
     }
@@ -4541,33 +4797,24 @@ class _Composer extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 2),
+          // السمايل: إيموجي ثابتة + GIF متحركة معًا بتبويبين ضمن قسم واحد
+          // (بدل زرين/ورقتين منفصلتين).
           actionButton(
             icon: Icons.emoji_emotions_outlined,
-            onPressed: onEmoji,
-            color: const Color(0xFFF59E0B),
-            tooltip: 'الرموز',
+            onPressed: onSticker,
+            tooltip: 'السمايلات',
           ),
-          actionButton(
-            icon: Icons.gif_box_outlined,
-            onPressed: onGif,
-            color: const Color(0xFFEC4899),
-            tooltip: 'GIF',
-          ),
-          actionButton(
-            icon: Icons.music_note_rounded,
-            onPressed: onSongSearch,
-            color: const Color(0xFF22D3EE),
-            tooltip: 'بحث أغنية',
-          ),
+          // أيقونة المشغّل المصغَّر (تظهر فقط حين تُصغَّر نافذة اليوتيوب).
+          const MiniPlayerChip(),
+          // زر الموسيقى دُمج داخل زر + (مرفق) كأحد خياراته — "بحث أغنية"
+          // في _showQuickActionsSheet — بدل أيقونة مستقلة هنا.
           actionButton(
             icon: Icons.add_circle_outline_rounded,
             onPressed: onAttach,
-            color: const Color(0xFF22C55E),
             tooltip: 'مرفق',
           ),
-          // تسجيل بنمط واتساب: يبدأ بضغطة ويظل زر الميكروفون ظاهرًا، ثم
-          // يظهر شريط الموجة مع إيقاف مؤقت/إرسال/حذف صريح.
-          VoiceHoldButton(onUploaded: onVoice, privateChat: false),
+          // تسجيل بنمط واتساب: اضغط مطوّلًا، حرّر للإرسال، اسحب للإلغاء أو للقفل.
+          VoiceHoldButton(onUploaded: onVoice),
         ],
       ),
     );
@@ -4650,402 +4897,6 @@ class _PendingGifBar extends StatelessWidget {
             child: const Icon(Icons.close, color: Colors.white54, size: 18),
           ),
         ],
-      ),
-    );
-  }
-}
-
-const _xoLines = <List<int>>[
-  [0, 1, 2], [3, 4, 5], [6, 7, 8],
-  [0, 3, 6], [1, 4, 7], [2, 5, 8],
-  [0, 4, 8], [2, 4, 6],
-];
-
-bool _xoWon(List<String> cells, String p) =>
-    _xoLines.any((line) => line.every((i) => cells[i] == p));
-
-/// ضد الكمبيوتر: المستخدم X دائمًا، والآلة O تلعب بخوارزمية Minimax كاملة
-/// (تفحص كل الاحتمالات حتى نهاية اللعبة) — لا عشوائية ولا "ذكاء مزيّف"؛
-/// أفضل ما يمكن لعبه فعليًا، فلا يُهزَم إلا بالتعادل في أحسن الأحوال.
-class _XoPanel extends StatefulWidget {
-  const _XoPanel();
-  @override
-  State<_XoPanel> createState() => _XoPanelState();
-}
-
-class _XoPanelState extends State<_XoPanel> {
-  final List<String> _cells = List.filled(9, '');
-  bool _userTurn = true;
-  bool _thinking = false;
-
-  int? _bestMoveFor(List<String> cells, String player) {
-    final other = player == 'X' ? 'O' : 'X';
-    int? bestIdx;
-    var bestScore = -999;
-    for (var i = 0; i < 9; i++) {
-      if (cells[i].isNotEmpty) continue;
-      final next = List<String>.from(cells)..[i] = player;
-      final score = -_minimax(next, other, 1);
-      if (score > bestScore) {
-        bestScore = score;
-        bestIdx = i;
-      }
-    }
-    return bestIdx;
-  }
-
-  int _minimax(List<String> cells, String player, int depth) {
-    final other = player == 'X' ? 'O' : 'X';
-    if (_xoWon(cells, other)) return -(10 - depth);
-    if (!cells.contains('')) return 0;
-    var best = -999;
-    for (var i = 0; i < 9; i++) {
-      if (cells[i].isNotEmpty) continue;
-      final next = List<String>.from(cells)..[i] = player;
-      final score = -_minimax(next, other, depth + 1);
-      if (score > best) best = score;
-    }
-    return best;
-  }
-
-  Future<void> _play(int index) async {
-    if (!_userTurn || _thinking || _cells[index].isNotEmpty) return;
-    if (_xoWon(_cells, 'X') || _xoWon(_cells, 'O')) return;
-    setState(() {
-      _cells[index] = 'X';
-      _userTurn = false;
-    });
-    if (_xoWon(_cells, 'X') || !_cells.contains('')) return;
-    setState(() => _thinking = true);
-    // تأخير بسيط يجعل حركة الآلة محسوسة لا فورية صماء.
-    await Future.delayed(const Duration(milliseconds: 420));
-    if (!mounted) return;
-    final move = _bestMoveFor(_cells, 'O');
-    setState(() {
-      if (move != null) _cells[move] = 'O';
-      _thinking = false;
-      _userTurn = true;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final xWon = _xoWon(_cells, 'X');
-    final oWon = _xoWon(_cells, 'O');
-    final draw = !xWon && !oWon && !_cells.contains('');
-    final status = xWon
-        ? 'فزت! 🎉'
-        : oWon
-            ? 'فازت الآلة'
-            : draw
-                ? 'تعادل'
-                : _thinking
-                    ? 'الآلة تفكّر...'
-                    : 'دورك (X)';
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('XO — ضد الكمبيوتر',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900)),
-            const SizedBox(height: 6),
-            Text(status, style: const TextStyle(color: Colors.white70)),
-            const SizedBox(height: 12),
-            GridView.builder(
-              shrinkWrap: true,
-              itemCount: 9,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3, mainAxisSpacing: 6, crossAxisSpacing: 6),
-              itemBuilder: (_, i) => InkWell(
-                onTap: () => _play(i),
-                child: Container(
-                  decoration: BoxDecoration(
-                      color: const Color(0xFF2A1837),
-                      borderRadius: BorderRadius.circular(12)),
-                  alignment: Alignment.center,
-                  child: Text(_cells[i],
-                      style: TextStyle(
-                          color: _cells[i] == 'X' ? const Color(0xFFFFD700) : Colors.white,
-                          fontSize: 32,
-                          fontWeight: FontWeight.w900)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () => setState(() {
-                for (var i = 0; i < _cells.length; i++) {
-                  _cells[i] = '';
-                }
-                _userTurn = true;
-                _thinking = false;
-              }),
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('إعادة'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// ضد لاعب حقيقي: صالات مفتوحة في الغرفة نفسها (xo_lobbies)، الانضمام
-/// يخصم الرهان من الطرفين خادميًا، واللوحة بعدها متزامنة لحظيًا
-/// (xo_games) — كل حركة تُتحقَّق من الدور والخانة على الخادم، فلا غش
-/// ممكن من أي طرف مهما عُدِّل التطبيق محليًا.
-class _XoMultiplayerPanel extends StatefulWidget {
-  final String roomId;
-  const _XoMultiplayerPanel({required this.roomId});
-  @override
-  State<_XoMultiplayerPanel> createState() => _XoMultiplayerPanelState();
-}
-
-class _XoMultiplayerPanelState extends State<_XoMultiplayerPanel> {
-  final _db = Supabase.instance.client;
-  String? _myGameId;
-  String? _myLobbyId;
-
-  Stream<List<Map<String, dynamic>>> get _openLobbies => _db
-      .from('xo_lobbies')
-      .stream(primaryKey: ['id'])
-      .eq('room_id', widget.roomId)
-      .order('created_at', ascending: false);
-
-  Future<void> _openLobby() async {
-    final wagerCtrl = TextEditingController(text: '50');
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: const Text('فتح صالة XO'),
-        content: TextField(
-          controller: wagerCtrl,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'الرهان (نقاط ⭐)'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('إلغاء')),
-          FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('فتح')),
-        ],
-      ),
-    );
-    if (ok != true || !mounted) return;
-    final wager = int.tryParse(wagerCtrl.text.trim()) ?? 0;
-    if (wager <= 0) return;
-    final m = ScaffoldMessenger.of(context);
-    try {
-      final lobbyId = await _db.rpc('open_xo_lobby',
-          params: {'p_room_id': widget.roomId, 'p_wager_points': wager});
-      setState(() => _myLobbyId = lobbyId.toString());
-    } catch (e) {
-      final t = e.toString();
-      m.showSnackBar(SnackBar(content: Text(
-        t.contains('INSUFFICIENT_POINTS') ? 'رصيدك من النقاط لا يكفي لهذا الرهان.'
-        : t.contains('LOBBY_ALREADY_OPEN') ? 'لديك صالة مفتوحة أصلًا في هذه الغرفة.'
-        : 'تعذّر فتح الصالة: $e',
-      )));
-    }
-  }
-
-  Future<void> _join(String lobbyId) async {
-    final m = ScaffoldMessenger.of(context);
-    try {
-      final gameId = await _db.rpc('join_xo_lobby', params: {'p_lobby_id': lobbyId});
-      if (mounted) setState(() => _myGameId = gameId.toString());
-    } catch (e) {
-      final t = e.toString();
-      m.showSnackBar(SnackBar(content: Text(
-        t.contains('INSUFFICIENT_POINTS') ? 'رصيدك من النقاط لا يكفي.'
-        : t.contains('CANNOT_JOIN_OWN_LOBBY') ? 'لا يمكنك الانضمام لصالتك أنت.'
-        : t.contains('LOBBY_NOT_AVAILABLE') ? 'هذه الصالة لم تعد متاحة.'
-        : 'تعذّر الانضمام: $e',
-      )));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final activeGameId = _myGameId;
-    if (activeGameId != null) {
-      return _XoLiveBoard(gameId: activeGameId, onExit: () => setState(() => _myGameId = null));
-    }
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('XO — لاعب حقيقي',
-              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 10),
-          if (_myLobbyId == null)
-            FilledButton.icon(
-              onPressed: _openLobby,
-              icon: const Icon(Icons.add_circle_outline),
-              label: const Text('افتح صالة جديدة'),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: const Color(0xFF2A1837), borderRadius: BorderRadius.circular(10)),
-              child: const Row(children: [
-                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                SizedBox(width: 10),
-                Expanded(child: Text('بانتظار انضمام لاعب آخر…', style: TextStyle(color: Colors.white70))),
-              ]),
-            ),
-          const Divider(color: Colors.white24, height: 28),
-          const Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: Text('صالات مفتوحة الآن', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700))),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 220,
-            child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: _openLobbies,
-              builder: (context, snap) {
-                final all = snap.data ?? const [];
-                final myUid = _db.auth.currentUser?.id;
-                // صالتي الخاصة قد تتحول لـactive بمجرد انضمام أحد — نلتقط
-                // ذلك فورًا وننتقل للوحة الحية.
-                if (_myLobbyId != null) {
-                  final mine = all.where((l) => l['id'] == _myLobbyId).firstOrNull;
-                  if (mine != null && mine['status'] == 'active' && mine['game_id'] != null) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted) setState(() => _myGameId = mine['game_id'].toString());
-                    });
-                  }
-                }
-                final open = all.where((l) => l['status'] == 'open' && l['creator_uid'] != myUid).toList();
-                if (open.isEmpty) {
-                  return const Center(child: Text('لا صالات مفتوحة حاليًا', style: TextStyle(color: Colors.white38)));
-                }
-                return ListView.separated(
-                  itemCount: open.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 6),
-                  itemBuilder: (_, i) {
-                    final l = open[i];
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(color: const Color(0xFF2A1837), borderRadius: BorderRadius.circular(10)),
-                      child: Row(children: [
-                        Expanded(child: Text('رهان ${l['wager_points']} نقطة', style: const TextStyle(color: Colors.white))),
-                        FilledButton(onPressed: () => _join(l['id'].toString()), child: const Text('انضم')),
-                      ]),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ]),
-      ),
-    );
-  }
-}
-
-/// اللوحة الحية: تتزامن عبر Realtime مع صف xo_games — أي حركة من أي طرف
-/// تظهر فورًا عند الآخر بلا تحديث يدوي، لأن كل الحقيقة في قاعدة البيانات
-/// لا في حالة محلية.
-class _XoLiveBoard extends StatefulWidget {
-  final String gameId;
-  final VoidCallback onExit;
-  const _XoLiveBoard({required this.gameId, required this.onExit});
-  @override
-  State<_XoLiveBoard> createState() => _XoLiveBoardState();
-}
-
-class _XoLiveBoardState extends State<_XoLiveBoard> {
-  final _db = Supabase.instance.client;
-  bool _moving = false;
-
-  Future<void> _play(int cell) async {
-    if (_moving) return;
-    setState(() => _moving = true);
-    final m = ScaffoldMessenger.maybeOf(context);
-    try {
-      await _db.rpc('play_xo_move', params: {'p_game_id': widget.gameId, 'p_cell': cell});
-    } catch (e) {
-      final t = e.toString();
-      m?.showSnackBar(SnackBar(content: Text(
-        t.contains('NOT_YOUR_TURN') ? 'ليس دورك الآن.'
-        : t.contains('CELL_TAKEN') ? 'هذه الخانة مشغولة.'
-        : t.contains('GAME_NOT_ACTIVE') ? 'انتهت هذه اللعبة.'
-        : 'تعذّر تنفيذ الحركة: $e',
-      )));
-    } finally {
-      if (mounted) setState(() => _moving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final myUid = _db.auth.currentUser?.id;
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-        child: StreamBuilder<List<Map<String, dynamic>>>(
-          stream: _db.from('xo_games').stream(primaryKey: ['id']).eq('id', widget.gameId),
-          builder: (context, snap) {
-            final rows = snap.data ?? const [];
-            if (rows.isEmpty) {
-              return const SizedBox(height: 240, child: Center(child: CircularProgressIndicator()));
-            }
-            final g = rows.first;
-            final board = (g['board'] as List?)?.map((e) => e?.toString() ?? '').toList() ?? List.filled(9, '');
-            final status = g['status']?.toString() ?? 'active';
-            final turnUid = g['turn_uid']?.toString();
-            final winnerUid = g['winner_uid']?.toString();
-            final isX = g['player_x_uid']?.toString() == myUid;
-            final mySymbol = isX ? 'X' : 'O';
-            final myTurn = status == 'active' && turnUid == myUid;
-            final statusText = status == 'finished'
-                ? (winnerUid == null ? 'تعادل — أُعيد الرهان لكما' : (winnerUid == myUid ? 'فزت! 🎉' : 'خسرت'))
-                : (myTurn ? 'دورك ($mySymbol)' : 'دور الخصم…');
-            return Column(mainAxisSize: MainAxisSize.min, children: [
-              Text('XO — لاعب حقيقي',
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 6),
-              Text(statusText, style: const TextStyle(color: Colors.white70)),
-              const SizedBox(height: 12),
-              GridView.builder(
-                shrinkWrap: true,
-                itemCount: 9,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3, mainAxisSpacing: 6, crossAxisSpacing: 6),
-                itemBuilder: (_, i) => InkWell(
-                  onTap: myTurn && board[i].isEmpty ? () => _play(i) : null,
-                  child: Container(
-                    decoration: BoxDecoration(
-                        color: const Color(0xFF2A1837), borderRadius: BorderRadius.circular(12)),
-                    alignment: Alignment.center,
-                    child: Text(board[i],
-                        style: TextStyle(
-                            color: board[i] == 'X' ? const Color(0xFFFFD700) : Colors.white,
-                            fontSize: 32,
-                            fontWeight: FontWeight.w900)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              if (status != 'active')
-                FilledButton(onPressed: widget.onExit, child: const Text('إغلاق'))
-              else
-                TextButton(
-                  onPressed: () async {
-                    try {
-                      await _db.rpc('abandon_xo_game', params: {'p_game_id': widget.gameId});
-                    } catch (_) {}
-                    widget.onExit();
-                  },
-                  child: const Text('الانسحاب', style: TextStyle(color: Colors.redAccent)),
-                ),
-            ]);
-          },
-        ),
       ),
     );
   }

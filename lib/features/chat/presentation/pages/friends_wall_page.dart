@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/services/snack_sfx.dart';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -134,10 +135,10 @@ class _FriendsWallPageState extends ConsumerState<FriendsWallPage> {
                     if (uid.isEmpty) return;
                     try {
                       await Supabase.instance.client.rpc('owner_set_wall_access', params: {'p_user_id': uid, 'p_enabled': true});
-                      m?.showSnackBar(const SnackBar(content: Text('مُنحت الصلاحية')));
+                      m?.showSnackBarSfx(const SnackBar(content: Text('مُنحت الصلاحية')));
                       uidCtrl.clear();
                     } catch (e) {
-                      m?.showSnackBar(SnackBar(content: Text('تعذّر: $e')));
+                      m?.showSnackBarSfx(SnackBar(content: Text('تعذّر: $e')));
                     }
                   },
                   child: const Text('منح'),
@@ -148,10 +149,10 @@ class _FriendsWallPageState extends ConsumerState<FriendsWallPage> {
                     if (uid.isEmpty) return;
                     try {
                       await Supabase.instance.client.rpc('owner_set_wall_access', params: {'p_user_id': uid, 'p_enabled': false});
-                      m?.showSnackBar(const SnackBar(content: Text('سُحبت الصلاحية')));
+                      m?.showSnackBarSfx(const SnackBar(content: Text('سُحبت الصلاحية')));
                       uidCtrl.clear();
                     } catch (e) {
-                      m?.showSnackBar(SnackBar(content: Text('تعذّر: $e')));
+                      m?.showSnackBarSfx(SnackBar(content: Text('تعذّر: $e')));
                     }
                   },
                   child: const Text('سحب', style: TextStyle(color: Colors.redAccent)),
@@ -173,7 +174,7 @@ class _FriendsWallPageState extends ConsumerState<FriendsWallPage> {
                   if (d.mounted) Navigator.pop(d);
                   await _loadOwnerState();
                 } catch (e) {
-                  m?.showSnackBar(SnackBar(content: Text('تعذّر الحفظ: $e')));
+                  m?.showSnackBarSfx(SnackBar(content: Text('تعذّر الحفظ: $e')));
                 }
               },
               child: const Text('حفظ'),
@@ -289,20 +290,37 @@ class _FriendsWallPageState extends ConsumerState<FriendsWallPage> {
                       ]),
                     if (images.length < 12)
                       InkWell(
-                        onTap: uploadingImage ? null : () async {
-                          final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85);
-                          if (picked == null) return;
-                          final bytes = await picked.readAsBytes();
-                          setDialogState(() {
-                            images.add(_PickedImage.local(bytes, picked.name));
-                          });
-                        },
+                        // uploadingImage كانت مُعلنة ولا تُغيَّر أبدًا (bool
+                        // ميت فعليًا، وهذا ما رصده التحليل الساكن كـdead_code
+                        // على فرع null) — فلا كان ثمة ما يمنع ضغطًا مزدوجًا
+                        // أثناء قراءة صورة كبيرة، ولا مؤشر تحميل أثناء ذلك.
+                        onTap: uploadingImage
+                            ? null
+                            : () async {
+                                final picked = await ImagePicker().pickImage(
+                                    source: ImageSource.gallery, imageQuality: 85);
+                                if (picked == null) return;
+                                setDialogState(() => uploadingImage = true);
+                                try {
+                                  final bytes = await picked.readAsBytes();
+                                  setDialogState(() {
+                                    images.add(_PickedImage.local(bytes, picked.name));
+                                  });
+                                } finally {
+                                  setDialogState(() => uploadingImage = false);
+                                }
+                              },
                         child: Container(
                           width: 72, height: 72,
                           decoration: BoxDecoration(
                               border: Border.all(color: Colors.white30),
                               borderRadius: BorderRadius.circular(10)),
-                          child: const Icon(Icons.add_a_photo_outlined, color: Colors.white54),
+                          child: uploadingImage
+                              ? const Padding(
+                                  padding: EdgeInsets.all(22),
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.add_a_photo_outlined, color: Colors.white54),
                         ),
                       ),
                   ]),
@@ -334,12 +352,12 @@ class _FriendsWallPageState extends ConsumerState<FriendsWallPage> {
                 final so = int.tryParse(sort.text.trim());
                 if (name.text.trim().isEmpty || sku.text.trim().isEmpty || n == null || usd == null || syp == null ||
                     so == null || (usd <= 0 && syp <= 0) || n < 0 || usd < 0 || syp < 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(
                       content: Text('تحقق من الاسم وSKU والمخزون، واكتب سعرًا بالدولار أو الليرة.')));
                   return;
                 }
                 if (images.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(context).showSnackBarSfx(
                       const SnackBar(content: Text('أضف صورة واحدة على الأقل من الهاتف.')));
                   return;
                 }
@@ -389,7 +407,7 @@ class _FriendsWallPageState extends ConsumerState<FriendsWallPage> {
                 } catch (e) {
                   setDialogState(() => saving = false);
                   if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الحفظ الخادمي: $e')));
+                  ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('فشل الحفظ الخادمي: $e')));
                 }
               },
               icon: saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.save_rounded),
@@ -420,7 +438,7 @@ class _FriendsWallPageState extends ConsumerState<FriendsWallPage> {
       await Supabase.instance.client.rpc('platform_wall_delete_product', params: {'p_id': product['id']});
       if (mounted) ref.invalidate(platformWallProductsProvider);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الحذف الخادمي: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('فشل الحذف الخادمي: $e')));
     }
   }
 
@@ -548,7 +566,7 @@ class _ProductCardState extends ConsumerState<_ProductCard> {
       await _loadEngagement();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text('تعذر تحديث الإعجاب: $e')),
       );
     }
@@ -589,7 +607,7 @@ class _ProductCardState extends ConsumerState<_ProductCard> {
       if (mounted) setState(() => _comments += 1);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text('تعذر نشر التعليق: $e')),
       );
     }

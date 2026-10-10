@@ -102,3 +102,7 @@ jobs:
         with:
           files: out/*.apk
           generate_release_notes: true
+
+      - name: Remove temporary signing files
+        if: always()
+        run: rm -f android/app/mashareena-upload.jks android/key.properties

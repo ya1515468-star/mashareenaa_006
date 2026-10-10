@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -51,7 +52,7 @@ class _PointsGemsExchangePageState
     final amount = int.tryParse(_amountController.text.trim());
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('أدخل رقمًا صحيحًا')));
+          .showSnackBarSfx(const SnackBar(content: Text('أدخل رقمًا صحيحًا')));
       return;
     }
     final unlimited =
@@ -67,10 +68,10 @@ class _PointsGemsExchangePageState
     setState(() => _busy = false);
     result.fold(
       (failure) => ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(failure.message))),
+          .showSnackBarSfx(SnackBar(content: Text(failure.message))),
       (converted) {
         _amountController.clear();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(
             content: Text(_pointsToGems
                 ? 'تم تحويلها إلى $converted جوهرة ✓'
                 : 'تم تحويلها إلى $converted نقطة ✓')));

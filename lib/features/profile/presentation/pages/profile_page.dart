@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/error/exceptions.dart';
 import '../../../../core/services/media_upload_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/embedded_media_player.dart';
@@ -23,6 +25,7 @@ import '../../../subscriptions/presentation/pages/subscriptions_page.dart';
 import '../../../subscriptions/presentation/providers/subscription_provider.dart';
 import '../../../subscriptions/presentation/widgets/appear_offline_toggle.dart';
 import '../../../subscriptions/presentation/widgets/membership_badge_widget.dart';
+import '../../../subscriptions/presentation/widgets/membership_countdown_chip.dart';
 import '../../domain/entities/profile_entity.dart';
 import '../../domain/profile_storage_cleanup.dart';
 import '../providers/profile_provider.dart';
@@ -284,6 +287,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                             SubscriptionCatalog.free.badge,
                         fontSize: 12,
                       ),
+                      const MembershipCountdownChip(),
                       const SizedBox(height: 8),
                       if (profile.statusText != null &&
                           profile.statusText!.isNotEmpty) ...[
@@ -637,14 +641,14 @@ class _ProfileMusicPlayerState extends State<_ProfileMusicPlayer> {
 Future<void> _openSocialLink(BuildContext context, String value) async {
   final raw = value.trim();
   if (raw.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBarSfx(
       const SnackBar(content: Text('رابط التواصل غير متاح')),
     );
     return;
   }
   final uri = Uri.tryParse(raw);
   if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBarSfx(
       const SnackBar(content: Text('رابط التواصل غير صالح')),
     );
     return;
@@ -652,13 +656,13 @@ Future<void> _openSocialLink(BuildContext context, String value) async {
   try {
     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         const SnackBar(content: Text('فشل فتح رابط التواصل')),
       );
     }
   } catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text('فشل فتح رابط التواصل: $e')),
       );
     }
@@ -768,8 +772,23 @@ Future<void> _pickAndUploadProfileImage(
   String? uploadedUrl;
   try {
     final uid = profile.uid;
-    uploadedUrl = await MediaUploadService(bucket: 'profile-avatars').uploadFile(
-      file: cropped,
+    // الخلفية لا تمرّ بالقص فاسمها من المنتقي قد يخلو من امتداد (خاصةً على
+    // الويب: blob بلا .jpg) فيُرفض كـ«نوع غير مسموح». نستنتج الامتداد من
+    // توقيع الملف نفسه ونسمّيه صراحةً.
+    final upBytes = await cropped.readAsBytes();
+    String upExt = 'jpg';
+    if (upBytes.length > 12) {
+      if (upBytes[0] == 0x89 && upBytes[1] == 0x50) {
+        upExt = 'png';
+      } else if (upBytes[0] == 0x47 && upBytes[1] == 0x49) {
+        upExt = 'gif';
+      } else if (upBytes[0] == 0x52 && upBytes[1] == 0x49 && upBytes[8] == 0x57) {
+        upExt = 'webp';
+      }
+    }
+    uploadedUrl = await MediaUploadService(bucket: 'profile-avatars').uploadBytes(
+      bytes: upBytes,
+      fileName: '${cover ? 'cover' : 'avatar'}.$upExt',
       folder: uid,
       uid: uid,
     );
@@ -847,7 +866,9 @@ Future<void> _pickAndUploadProfileImage(
       // الآن أولًا.
       error: raw.contains('AVATAR_QUOTA_EXCEEDED')
           ? raw.substring(raw.indexOf('AVATAR_QUOTA_EXCEEDED') + 'AVATAR_QUOTA_EXCEEDED:'.length).trim()
-          : 'تعذر إكمال العملية الآن. تحقق من الاتصال ثم أعد المحاولة.',
+          : (e is ServerException && e.message.trim().isNotEmpty)
+              ? e.message
+              : 'تعذر إكمال العملية الآن. تحقق من الاتصال ثم أعد المحاولة.',
     );
   }
 }

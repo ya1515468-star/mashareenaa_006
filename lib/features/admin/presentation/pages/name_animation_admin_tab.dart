@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -40,21 +41,21 @@ class _NameAnimationAdminTabState extends ConsumerState<NameAnimationAdminTab> {
       if (!f.name.toLowerCase().endsWith('.gif')) throw StateError('GIF_REQUIRED');
       setState(() { _bytes = Uint8List.fromList(f.bytes!); _filename = f.name; _lastUploadOk = null; });
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
   }
 
   Future<void> _upload({String existingKey = ''}) async {
     final bytes = _bytes;
     if (bytes == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اختر ملف GIF للحيوان أولًا.')));
+      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('اختر ملف GIF للحيوان أولًا.')));
       return;
     }
     final name = _name.text.trim().isEmpty ? _filename.replaceFirst(RegExp(r'\.gif$', caseSensitive: false), '') : _name.text.trim();
     final p = int.tryParse(_points.text.trim());
     final g = int.tryParse(_gems.text.trim());
     if (p == null || g == null || p < 0 || g < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('السعر غير صالح.')));
+      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('السعر غير صالح.')));
       return;
     }
     setState(() { _busy = true; _uploadProgress = 0; _lastUploadOk = null; _lastUploadMessage = ''; });
@@ -82,12 +83,12 @@ class _NameAnimationAdminTabState extends ConsumerState<NameAnimationAdminTab> {
         _bytes = null;
         _filename = '';
       });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_lastUploadMessage), backgroundColor: Colors.green.shade700));
+      ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_lastUploadMessage), backgroundColor: Colors.green.shade700));
     } catch (e) {
       final message = _friendly(e);
       if (mounted) {
         setState(() { _uploadProgress = null; _lastUploadOk = false; _lastUploadMessage = message; });
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red.shade700));
+        ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(message), backgroundColor: Colors.red.shade700));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -138,7 +139,7 @@ class _NameAnimationAdminTabState extends ConsumerState<NameAnimationAdminTab> {
       });
       ref.invalidate(nameAnimationCatalogProvider);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     } finally {
       name.dispose(); points.dispose(); gems.dispose(); order.dispose();
     }
@@ -151,7 +152,7 @@ class _NameAnimationAdminTabState extends ConsumerState<NameAnimationAdminTab> {
       });
       ref.invalidate(nameAnimationCatalogProvider);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
   }
 
@@ -190,7 +191,7 @@ class _NameAnimationAdminTabState extends ConsumerState<NameAnimationAdminTab> {
     } catch (e) {
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+      ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
   }
 

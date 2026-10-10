@@ -1,4 +1,5 @@
 import '../../../../core/data/supabase_document_compat.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
@@ -157,7 +158,7 @@ class _AccountChoiceSettingTileState extends State<AccountChoiceSettingTile> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text('تعذر حفظ الإعداد: $e')),
       );
     }
@@ -261,7 +262,7 @@ class _AccountSwitchSettingTileState extends State<AccountSwitchSettingTile> {
               } catch (e) {
                 if (!context.mounted) return;
                 setState(() => _value = !v);
-                ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(context).showSnackBarSfx(
                   SnackBar(content: Text('تعذر حفظ الإعداد: $e')),
                 );
               }

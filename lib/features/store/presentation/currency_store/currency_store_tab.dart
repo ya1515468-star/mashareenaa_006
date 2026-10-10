@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -590,13 +591,13 @@ class _PackageEditorSheetState extends ConsumerState<_PackageEditorSheet> {
       );
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           const SnackBar(content: Text('تم الحفظ'), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
         );
       }
@@ -626,7 +627,7 @@ class _PackageEditorSheetState extends ConsumerState<_PackageEditorSheet> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
         );
       }
@@ -921,7 +922,7 @@ class CurrencyStorePurchaseFlow {
     );
     if (confirmed != true) return;
 
-    messenger?.showSnackBar(const SnackBar(
+    messenger?.showSnackBarSfx(const SnackBar(
         content: Text('جارٍ تنفيذ الشراء…'),
         duration: Duration(seconds: 2)));
 
@@ -929,7 +930,7 @@ class CurrencyStorePurchaseFlow {
         packageId: package['id'].toString());
 
     messenger?.hideCurrentSnackBar();
-    messenger?.showSnackBar(SnackBar(
+    messenger?.showSnackBarSfx(SnackBar(
       content: Text(result.ok ? result.successMessage : (result.error ?? '')),
       backgroundColor:
           result.ok ? const Color(0xFF16A34A) : const Color(0xFFDC2626),

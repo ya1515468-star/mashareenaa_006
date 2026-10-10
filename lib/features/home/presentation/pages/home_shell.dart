@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/services/server_sounds.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../calls/domain/entities/call_entity.dart';
 import '../../../calls/presentation/pages/active_call_page.dart';
@@ -40,6 +41,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   bool _roomLoading = false;
   String? _handledCallId;
   ProviderSubscription<AsyncValue<CallEntity?>>? _incomingCallSubscription;
+  StreamSubscription<AuthState>? _authSubscription;
+  Timer? _roomRetryTimer;
+  Timer? _guardTimer;
+  bool _guardBusy = false;
+  bool _guardDialogOpen = false;
 
   @override
   void initState() {
@@ -53,12 +59,88 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         if (call != null) _handleIncomingCall(call);
       },
     );
+    // "تعذّر فتح الشات" كان غالبًا سباقًا عابرًا مع الجلسة لا انقطاعًا
+    // حقيقيًا: أول نداء RPC لحظة فتح الشاشة قد يسبق تحديث توكن منتهٍ
+    // لحظيًا (خصوصًا على الويب)، فيفشل مرة واحدة ويُعلَّق المستخدم إلى
+    // الأبد بانتظار نقرة "إعادة المحاولة" اليدوية. الآن: أي signedIn أو
+    // tokenRefreshed لاحق يُعيد المحاولة تلقائيًا ما دامت الشاشة عالقة
+    // على خطأ — اتصال "لا ينقطع" حقيقيًا بدل محاولة واحدة فقط.
+    _authSubscription =
+        Supabase.instance.client.auth.onAuthStateChange.listen((state) {
+      if (!mounted) return;
+      final relevant = state.event == AuthChangeEvent.signedIn ||
+          state.event == AuthChangeEvent.tokenRefreshed;
+      if (relevant && _roomError != null && !_roomLoading) {
+        unawaited(_loadCurrentRoom());
+      }
+    });
     _loadCurrentRoom();
+    // إعادة محاولة تلقائية صامتة: أول دخول بعد تسجيل الدخول قد يفشل لحظيًا
+    // (الجلسة لم تُجهَّز بعد) ثم ينجح بعد ثوانٍ؛ لا نترك المستخدم أمام
+    // «تعذّر فتح الشات» بانتظار نقرة يدوية.
+    _roomRetryTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted) return;
+      if (_currentRoomId == null && !_roomLoading) {
+        unawaited(_loadCurrentRoom());
+      }
+    });
+    // حارس العقوبات: المقبرة = إخراج كامل من التطبيق، والطرد/الحظر = إخراج
+    // من تلك الغرفة فقط. الفحص خادمي كل 6 ثوانٍ.
+    _guardTimer = Timer.periodic(const Duration(seconds: 6), (_) => unawaited(_runGuard()));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final initialCall = ref.read(incomingRingingCallProvider).valueOrNull;
       if (initialCall != null) _handleIncomingCall(initialCall);
     });
+  }
+
+  Future<void> _notifyBlocked(String title, String body) async {
+    if (!mounted || _guardDialogOpen) return;
+    _guardDialogOpen = true;
+    playServerSound('moderation');
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (c) => AlertDialog(
+          title: Text(title),
+          content: Text(body, textDirection: TextDirection.rtl),
+          actions: [FilledButton(onPressed: () => Navigator.pop(c), child: const Text('حسنًا'))],
+        ),
+      );
+    } finally {
+      _guardDialogOpen = false;
+    }
+  }
+
+  Future<void> _runGuard() async {
+    if (_guardBusy || !mounted) return;
+    final client = Supabase.instance.client;
+    if (client.auth.currentSession == null) return;
+    _guardBusy = true;
+    try {
+      final st = await client.rpc('get_my_security_state');
+      if (st is Map && st['blocked'] == true) {
+        final reason = (st['reason'] ?? '').toString().trim();
+        if (!mounted) return;
+        unawaited(client.auth.signOut());
+        await _notifyBlocked('تم عزلك إلى المقبرة',
+            'تم إخراجك من التطبيق ولا يمكنك الدخول.${reason.isEmpty ? '' : '\nالسبب: $reason'}');
+        return;
+      }
+      final rid = _currentRoomId;
+      if (rid != null) {
+        final msg = await client.rpc('my_room_block_message', params: {'p_room_id': rid});
+        if (msg is String && msg.isNotEmpty) {
+          setState(() => _currentRoomId = null);
+          unawaited(_loadCurrentRoom());
+          await _notifyBlocked('إخراج من الغرفة', msg);
+        }
+      }
+    } catch (_) {
+    } finally {
+      _guardBusy = false;
+    }
   }
 
   Future<void> _loadOwnerFlag() async {
@@ -73,32 +155,60 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   }
 
   Future<void> _loadCurrentRoom() async {
-    if (!mounted) return;
+    if (!mounted || _roomLoading) return;
     setState(() {
-      _roomLoading = false;
+      _roomLoading = true;
       _roomError = null;
     });
-    try {
-      // كانت تجلب الغرفة الأقدم تاريخ إنشاء دائمًا، بلا أي قرار من المالك
-      // وبلا أي ذاكرة لآخر غرفة دخلها المستخدم فعليًا — نفس الغرفة
-      // للجميع بالصدفة. get_entry_room تُرجع آخر غرفة صالحة للعضو العائد،
-      // وإلا الغرفة التي عيّنها المالك "افتراضية"، وإلا الأقدم كخط أخير.
-      final roomId = (await Supabase.instance.client
-              .rpc('get_entry_room')
-              .timeout(const Duration(seconds: 8)))
-          ?.toString();
-      if (roomId == null || roomId.isEmpty) {
-        await _fallbackToLiveRoom('تعذّر العثور على غرفة عامة نشطة حالياً.');
-        return;
-      }
-      setState(() {
-        _currentRoomId = roomId;
-        _roomError = null;
-      });
-    } catch (error) {
+    // كانت محاولة واحدة فقط بمهلة 8 ثوانٍ: أي سباق عابر (توكن يُحدَّث،
+    // انقطاع شبكي لحظي) يُعلِّق المستخدم على شاشة الخطأ إلى الأبد بانتظار
+    // نقرة يدوية. الآن محاولات متتالية بتأخير متصاعد قبل الاستسلام
+    // لخط الدفاع الثاني — تنفيذ فعلي لـ"اتصال دائم لحظي لاينقطع" في أول
+    // نقطة دخول للشات، لا فقط في قنوات Realtime بعد فتحه.
+    Object? lastError;
+    // لا نستدعي الخادم قبل جاهزية الجلسة (سبب الفشل العابر بعد الدخول).
+    for (var i = 0;
+        i < 10 && Supabase.instance.client.auth.currentSession == null;
+        i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 500));
       if (!mounted) return;
-      await _fallbackToLiveRoom('تعذّر فتح الشات. تحقق من الاتصال.');
     }
+    for (final delay in const [
+      Duration.zero,
+      Duration(seconds: 2),
+      Duration(seconds: 5),
+    ]) {
+      if (delay > Duration.zero) await Future<void>.delayed(delay);
+      if (!mounted) return;
+      try {
+        // كانت تجلب الغرفة الأقدم تاريخ إنشاء دائمًا، بلا أي قرار من المالك
+        // وبلا أي ذاكرة لآخر غرفة دخلها المستخدم فعليًا — نفس الغرفة
+        // للجميع بالصدفة. get_entry_room تُرجع آخر غرفة صالحة للعضو العائد،
+        // وإلا الغرفة التي عيّنها المالك "افتراضية"، وإلا الأقدم كخط أخير.
+        final roomId = (await Supabase.instance.client
+                .rpc('get_entry_room')
+                .timeout(const Duration(seconds: 8)))
+            ?.toString();
+        if (roomId != null && roomId.isNotEmpty) {
+          setState(() {
+            _currentRoomId = roomId;
+            _roomError = null;
+            _roomLoading = false;
+          });
+          return;
+        }
+        // نجح النداء لكن بلا أي غرفة — نتيجة قاطعة من الخادم لا خطأ عابر،
+        // فلا قيمة لإعادة محاولتها؛ ينتقل مباشرة لخط الدفاع الثاني.
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (!mounted) return;
+    await _fallbackToLiveRoom(lastError == null
+        ? 'تعذّر العثور على غرفة عامة نشطة حالياً.'
+        : 'تعذّر فتح الشات. تحقق من الاتصال.');
   }
 
   /// لا قيمة ميتة مكتوبة يدويًا بعد الآن؛ عند أي فشل في get_entry_room
@@ -120,9 +230,15 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       setState(() {
         _currentRoomId = (liveId != null && liveId.isNotEmpty) ? liveId : null;
         _roomError = errorMessage;
+        _roomLoading = false;
       });
     } catch (_) {
-      if (mounted) setState(() => _roomError = errorMessage);
+      if (mounted) {
+        setState(() {
+          _roomError = errorMessage;
+          _roomLoading = false;
+        });
+      }
     }
   }
 
@@ -233,7 +349,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   void dispose() {
+    _roomRetryTimer?.cancel();
+    _guardTimer?.cancel();
     _incomingCallSubscription?.close();
+    unawaited(_authSubscription?.cancel());
     super.dispose();
   }
 

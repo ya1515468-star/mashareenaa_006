@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -77,7 +78,7 @@ class MyPatternRequestsPage extends ConsumerWidget {
                                           final url = Uri.tryParse(r.resultVideoUrl!);
                                           if (url == null || !await launchUrl(url, mode: LaunchMode.platformDefault)) {
                                             if (context.mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
+                                              ScaffoldMessenger.of(context).showSnackBarSfx(
                                                 const SnackBar(content: Text('تعذر فتح رابط الفيديو.')),
                                               );
                                             }

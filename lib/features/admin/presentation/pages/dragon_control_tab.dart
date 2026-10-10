@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -83,13 +84,13 @@ class DragonControlTab extends ConsumerWidget {
       });
       ref.invalidate(dragonStoreItemsProvider);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
             const SnackBar(content: Text('تم حفظ العنصر على الخادم')));
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('فشل الحفظ: $e')));
+            .showSnackBarSfx(SnackBar(content: Text('فشل الحفظ: $e')));
       }
     }
   }
@@ -133,13 +134,13 @@ class DragonControlTab extends ConsumerWidget {
       ref.invalidate(dragonMembershipTiersProvider);
       ref.invalidate(dragonTierRulesProvider(result.id));
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(
             content: Text('تم حفظ خطة العضوية على الخادم')));
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('فشل حفظ الخطة: $e')));
+            .showSnackBarSfx(SnackBar(content: Text('فشل حفظ الخطة: $e')));
       }
     }
   }
@@ -369,7 +370,7 @@ class _TierRulesDialog extends ConsumerStatefulWidget {
 class _TierRulesDialogState extends ConsumerState<_TierRulesDialog>{
   late final Map<String,bool> included={for(final s in widget.services) s['feature_key'].toString(): widget.existing[s['feature_key'].toString()]?['included']==true};
   bool busy=false;
-  Future<void> _save() async {if(busy)return;setState(()=>busy=true);try{for(final s in widget.services){final key=s['feature_key'].toString();await Supabase.instance.client.rpc('admin_set_membership_service_rule',params:{'p_tier_id':widget.tierId,'p_feature_key':key,'p_included':included[key]==true,'p_purchase_separately':included[key]!=true,'p_owner_only':widget.existing[key]?['owner_only']==true,'p_vip_only':widget.existing[key]?['vip_only']==true,'p_temporary':widget.existing[key]?['temporary']!=false,'p_event_only':widget.existing[key]?['event_only']==true,'p_duration_days':(widget.existing[key]?['duration_days'] as num?)?.toInt(),'p_enabled':true});}if(mounted)Navigator.pop(context);}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('فشل تحديث الخدمات: $e')));}finally{if(mounted)setState(()=>busy=false);}}
+  Future<void> _save() async {if(busy)return;setState(()=>busy=true);try{for(final s in widget.services){final key=s['feature_key'].toString();await Supabase.instance.client.rpc('admin_set_membership_service_rule',params:{'p_tier_id':widget.tierId,'p_feature_key':key,'p_included':included[key]==true,'p_purchase_separately':included[key]!=true,'p_owner_only':widget.existing[key]?['owner_only']==true,'p_vip_only':widget.existing[key]?['vip_only']==true,'p_temporary':widget.existing[key]?['temporary']!=false,'p_event_only':widget.existing[key]?['event_only']==true,'p_duration_days':(widget.existing[key]?['duration_days'] as num?)?.toInt(),'p_enabled':true});}if(mounted)Navigator.pop(context);}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content:Text('فشل تحديث الخدمات: $e')));}finally{if(mounted)setState(()=>busy=false);}}
   @override Widget build(BuildContext context)=>AlertDialog(title:Text('خدمات ${widget.tierId}'),content:SizedBox(width:420,height:520,child:ListView(children:[for(final s in widget.services)CheckboxListTile(value:included[s['feature_key'].toString()]??false,onChanged:busy?null:(v)=>setState(()=>included[s['feature_key'].toString()]=v==true),title:Text(s['name_ar']?.toString()??s['feature_key'].toString()),subtitle:Text(s['feature_key'].toString()),dense:true)])),actions:[TextButton(onPressed:busy?null:()=>Navigator.pop(context),child:const Text('إلغاء')),FilledButton(onPressed:busy?null:_save,child:busy?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)):const Text('حفظ'))]);
 }
 

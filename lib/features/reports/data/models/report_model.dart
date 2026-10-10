@@ -23,7 +23,7 @@ class ReportModel extends ReportEntity {
       reason: map['reason'] as String? ?? '',
       status: ReportStatusX.fromWire(map['status'] as String?),
       resolvedBy: map['resolvedBy'] as String?,
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: parseFlexibleTimestamp(map['createdAt']),
       evidenceUrl: map['evidenceUrl'] as String?,
     );
   }

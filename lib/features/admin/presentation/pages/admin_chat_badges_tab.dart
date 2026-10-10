@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import '../../../../core/services/snack_sfx.dart';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -431,12 +432,12 @@ class _AdminChatBadgesTabState extends ConsumerState<AdminChatBadgesTab> {
 
   void _showMessage(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(message)));
   }
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Theme.of(context).colorScheme.error));
+    ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(message), backgroundColor: Theme.of(context).colorScheme.error));
   }
 
   @override

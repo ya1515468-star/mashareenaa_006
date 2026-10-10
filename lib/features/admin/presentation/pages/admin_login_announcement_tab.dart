@@ -1,4 +1,5 @@
 import 'package:file_picker/file_picker.dart' as fp;
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -153,7 +154,7 @@ class _AdminLoginAnnouncementTabState extends State<AdminLoginAnnouncementTab> {
                               if (url != null) setLocal(() => image.text = url);
                             } catch (e) {
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+                                ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
                               }
                             }
                           },
@@ -238,7 +239,7 @@ class _AdminLoginAnnouncementTabState extends State<AdminLoginAnnouncementTab> {
                     if (dialogContext.mounted) Navigator.pop(dialogContext);
                     if (mounted) setState(() => _future = _load());
                   } catch (e) {
-                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
                   }
                 },
                 child: const Text('حفظ'),
@@ -261,7 +262,7 @@ class _AdminLoginAnnouncementTabState extends State<AdminLoginAnnouncementTab> {
       await Supabase.instance.client.rpc('admin_archive_login_announcement', params: {'p_id': id});
       if (mounted) setState(() => _future = _load());
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
   }
 

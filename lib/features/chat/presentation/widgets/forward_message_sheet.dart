@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -82,9 +83,9 @@ class _ForwardBodyState extends ConsumerState<_ForwardBody> {
       if (!ok) throw StateError('فشل الإرسال');
       if (!mounted) return;
       Navigator.pop(context);
-      m?.showSnackBar(SnackBar(content: Text('أُعيد التوجيه إلى ${thread['other_name'] ?? 'المحادثة'} ✓')));
+      m?.showSnackBarSfx(SnackBar(content: Text('أُعيد التوجيه إلى ${thread['other_name'] ?? 'المحادثة'} ✓')));
     } catch (e) {
-      m?.showSnackBar(SnackBar(content: Text('تعذّر إعادة التوجيه: $e')));
+      m?.showSnackBarSfx(SnackBar(content: Text('تعذّر إعادة التوجيه: $e')));
     } finally {
       if (mounted) setState(() => _sendingTo = null);
     }

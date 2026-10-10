@@ -22,6 +22,7 @@ class StoreMembershipCard extends StatefulWidget {
   final String? currentTierId;
   final bool ownerMode;
   final VoidCallback? onPurchase;
+  final String? priceText;
   final VoidCallback? onGift;
   final VoidCallback? onEditPrice;
   final VoidCallback? onDelete;
@@ -35,6 +36,7 @@ class StoreMembershipCard extends StatefulWidget {
     this.currentTierId,
     required this.ownerMode,
     this.onPurchase,
+    this.priceText,
     this.onGift,
     this.onEditPrice,
     this.onDelete,
@@ -215,7 +217,7 @@ class _StoreMembershipCardState extends State<StoreMembershipCard>
             ],
           ),
           const SizedBox(height: 3),
-          Text(widget.tier.price.formatted,
+          Text((widget.priceText?.isNotEmpty ?? false) ? widget.priceText! : widget.tier.price.formatted,
               style: TextStyle(
                   color: tierColor,
                   fontSize: 13,

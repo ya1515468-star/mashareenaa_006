@@ -22,8 +22,7 @@ class WalletModel extends WalletEntity {
         minorUnits: wallet['usdMinorUnits'] as int? ?? 0,
         currency: Currency.usd,
       ),
-      updatedAt:
-          (wallet['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      updatedAt: parseFlexibleTimestamp(wallet['updatedAt']),
     );
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/mini_chat_overlay.dart';
@@ -136,14 +137,14 @@ class ConversationsPage extends ConsumerWidget {
     try {
       await _db.rpc('set_my_dm_lock', params: {'p_locked': !current});
       ref.invalidate(myDmLockProvider);
-      messenger?.showSnackBar(SnackBar(
+      messenger?.showSnackBarSfx(SnackBar(
         content: Text(!current
             ? '🔒 أُقفل الخاص — لن تستقبل رسائل إلا ممن تتابعهم'
             : '🔓 فُتح الخاص'),
         backgroundColor: const Color(0xFF16A34A),
       ));
     } catch (e) {
-      messenger?.showSnackBar(SnackBar(
+      messenger?.showSnackBarSfx(SnackBar(
           content: Text('تعذّر التغيير: $e'),
           backgroundColor: const Color(0xFFDC2626)));
     }
@@ -177,11 +178,11 @@ class ConversationsPage extends ConsumerWidget {
       final r = await _db.rpc('clear_all_my_threads');
       ref.invalidate(myThreadsProvider);
       final n = (r is Map ? r['hidden'] : 0) ?? 0;
-      messenger?.showSnackBar(SnackBar(
+      messenger?.showSnackBarSfx(SnackBar(
           content: Text('مُسحت $n محادثة'),
           backgroundColor: const Color(0xFF16A34A)));
     } catch (e) {
-      messenger?.showSnackBar(SnackBar(
+      messenger?.showSnackBarSfx(SnackBar(
           content: Text('تعذّر المسح: $e'),
           backgroundColor: const Color(0xFFDC2626)));
     }
@@ -321,24 +322,24 @@ class _ThreadTile extends ConsumerWidget {
         case 'clear':
           await _db.rpc('clear_my_thread',
               params: {'p_thread_id': thread['id'].toString()});
-          messenger?.showSnackBar(const SnackBar(
+          messenger?.showSnackBarSfx(const SnackBar(
               content: Text('مُسح محتوى المحادثة'),
               backgroundColor: Color(0xFF16A34A)));
         case 'hide':
           await _db.rpc('hide_my_thread',
               params: {'p_thread_id': thread['id'].toString()});
-          messenger?.showSnackBar(const SnackBar(
+          messenger?.showSnackBarSfx(const SnackBar(
               content: Text('حُذفت من قائمتك'),
               backgroundColor: Color(0xFF16A34A)));
         case 'lock':
           await _db.rpc('set_my_dm_lock', params: {'p_locked': true});
-          messenger?.showSnackBar(const SnackBar(
+          messenger?.showSnackBarSfx(const SnackBar(
               content: Text('🔒 أُقفل الخاص'),
               backgroundColor: Color(0xFF16A34A)));
       }
       onChanged();
     } catch (e) {
-      messenger?.showSnackBar(SnackBar(
+      messenger?.showSnackBarSfx(SnackBar(
           content: Text('تعذّر التنفيذ: $e'),
           backgroundColor: const Color(0xFFDC2626)));
     }
@@ -350,11 +351,11 @@ class _ThreadTile extends ConsumerWidget {
       await _db.rpc('hide_my_thread',
           params: {'p_thread_id': thread['id'].toString()});
       onChanged();
-      messenger?.showSnackBar(const SnackBar(
+      messenger?.showSnackBarSfx(const SnackBar(
           content: Text('حُذفت من قائمتك'),
           backgroundColor: Color(0xFF16A34A)));
     } catch (e) {
-      messenger?.showSnackBar(SnackBar(
+      messenger?.showSnackBarSfx(SnackBar(
           content: Text('تعذّر الحذف: $e'),
           backgroundColor: const Color(0xFFDC2626)));
     }

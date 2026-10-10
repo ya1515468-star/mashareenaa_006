@@ -3,6 +3,7 @@ import '../../domain/repositories/chat_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/error/exceptions.dart';
+import '../../../../core/services/resilient_realtime_channel.dart';
 import '../../domain/entities/chat_message_entity.dart';
 import '../models/chat_message_model.dart';
 import '../models/chat_thread_model.dart';
@@ -55,7 +56,13 @@ abstract class ChatRemoteDataSource {
 
 class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
   final SupabaseClient supabase;
-  final Map<String, RealtimeChannel> _typingChannels = <String, RealtimeChannel>{};
+  // كانت قنوات typing/الرسائل الخاصة .subscribe() بلا أي معالجة لحالتها،
+  // فتنقطع الكتابة أو تنبيه الرسالة الواردة بصمت عند أي channelError/
+  // timedOut ولا تعود تعمل أبدًا حتى يُعاد فتح الشاشة بالكامل. الآن مُغلَّفة
+  // بـResilientRealtimeChannel لتُعيد الاشتراك تلقائيًا — تنفيذ "اتصال دائم
+  // لحظي لاينقطع" على مستوى طبقة البيانات لا الواجهة فقط.
+  final Map<String, ResilientRealtimeChannel> _typingChannels =
+      <String, ResilientRealtimeChannel>{};
 
   ChatRemoteDataSourceImpl(this.supabase);
 
@@ -79,6 +86,7 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
   Stream<List<ChatMessageModel>> watchMessages(String threadId) {
     final controller = StreamController<List<ChatMessageModel>>.broadcast();
     final byId = <String, ChatMessageModel>{};
+    StreamSubscription? dbSub;
     Timer? expiryTimer;
 
     void emit() {
@@ -108,38 +116,55 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
       emit();
     });
 
-    // One live data path for DM messages. Supabase stream() already combines
-    // the initial database snapshot with subsequent Realtime changes, so a
-    // second Broadcast listener on the same messages would duplicate events
-    // and increase Realtime channel pressure.
-    final messageStream = supabase
+    dbSub = supabase
         .from('chat_messages')
         .stream(primaryKey: ['id'])
         .eq('thread_id', threadId)
         .order('created_at', ascending: false)
-        .limit(200);
+        .limit(200)
+        .listen((rows) {
+          byId
+            ..clear()
+            ..addEntries(rows.map((row) {
+              final id = row['id'].toString();
+              return MapEntry(
+                id,
+                ChatMessageModel.fromMap(
+                  id,
+                  threadId,
+                  Map<String, dynamic>.from(row),
+                ),
+              );
+            }));
+          emit();
+        }, onError: controller.addError);
 
-    final streamSub = messageStream.listen((rows) {
-      byId
-        ..clear()
-        ..addEntries(rows.map((row) {
-          final id = row['id'].toString();
-          return MapEntry(
-            id,
-            ChatMessageModel.fromMap(
-              id,
-              threadId,
-              Map<String, dynamic>.from(row),
-            ),
-          );
-        }));
-      emit();
-    }, onError: controller.addError);
+    final channelRes = ResilientRealtimeChannel(
+      client: supabase,
+      build: (client) => client.channel(
+        'dm:$threadId:messages',
+        opts: const RealtimeChannelConfig(private: true),
+      )..onBroadcast(event: 'message', callback: (payload) {
+          final record = payload['record'];
+          if (record is! Map) return;
+          final map = Map<String, dynamic>.from(record);
+          final id = map['id']?.toString();
+          if (id == null || id.isEmpty) return;
+          final op = payload['op']?.toString() ?? 'INSERT';
+          if (op == 'DELETE') {
+            byId.remove(id);
+          } else {
+            byId[id] = ChatMessageModel.fromMap(id, threadId, map);
+          }
+          emit();
+        }),
+    );
 
     controller.onCancel = () async {
       expiryTimer?.cancel();
-      await streamSub.cancel();
-      _typingChannels.remove(threadId);
+      await dbSub?.cancel();
+      await channelRes.dispose();
+      await _typingChannels.remove(threadId)?.dispose();
       await controller.close();
     };
     return controller.stream;
@@ -318,15 +343,15 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
     required String uid,
     required bool isTyping,
   }) async {
-    final channel = _typingChannels[threadId] ??
-        supabase.channel(
-          'chat:thread:$threadId',
-          opts: const RealtimeChannelConfig(private: true),
-        );
-    if (!_typingChannels.containsKey(threadId)) {
-      _typingChannels[threadId] = channel;
-      channel.subscribe();
-    }
+    final res = _typingChannels[threadId] ??= ResilientRealtimeChannel(
+      client: supabase,
+      build: (client) => client.channel(
+        'chat:thread:$threadId',
+        opts: const RealtimeChannelConfig(private: true),
+      ),
+    );
+    final channel = res.channel;
+    if (channel == null) return; // بين محاولتي إعادة اشتراك — سترسل النبضة التالية.
     await channel.sendBroadcastMessage(
       event: 'typing',
       payload: <String, dynamic>{
@@ -342,41 +367,36 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
   Stream<List<String>> watchTypingRealtime(String threadId) {
     final controller = StreamController<List<String>>.broadcast();
     final state = <String, DateTime>{};
-    final channel = supabase.channel(
-      'chat:thread:$threadId',
-      opts: const RealtimeChannelConfig(private: true),
+    // أي قناة سابقة مخزَّنة لهذا threadId (أنشأتها publishTypingRealtime
+    // مثلًا) يجب التخلص منها قبل استبدالها، لا تركها مشتركة ومنسية.
+    unawaited(_typingChannels.remove(threadId)?.dispose());
+    final res = ResilientRealtimeChannel(
+      client: supabase,
+      build: (client) => client.channel(
+        'chat:thread:$threadId',
+        opts: const RealtimeChannelConfig(private: true),
+      )..onBroadcast(
+          event: 'typing',
+          callback: (payload) {
+            final uid = payload['user_id']?.toString();
+            if (uid == null || uid.isEmpty) return;
+            final isTyping = payload['is_typing'] == true;
+            final now = DateTime.now().toUtc();
+            if (isTyping) {
+              state[uid] = now;
+            } else {
+              state.remove(uid);
+            }
+            state.removeWhere((_, at) => now.difference(at).inMilliseconds > 4200);
+            controller.add(state.keys.toList(growable: false));
+          },
+        ),
     );
-    _typingChannels[threadId] = channel;
-    channel.onBroadcast(
-      event: 'typing',
-      callback: (payload) {
-        final uid = payload['user_id']?.toString();
-        if (uid == null || uid.isEmpty) return;
-        final isTyping = payload['is_typing'] == true;
-        final now = DateTime.now().toUtc();
-        if (isTyping) {
-          state[uid] = now;
-        } else {
-          state.remove(uid);
-        }
-        state.removeWhere((_, at) => now.difference(at).inMilliseconds > 4200);
-        controller.add(state.keys.toList(growable: false));
-      },
-    );
-    channel.subscribe((status, error) {
-      if (status == RealtimeSubscribeStatus.channelError ||
-          status == RealtimeSubscribeStatus.timedOut ||
-          status == RealtimeSubscribeStatus.closed) {
-        if (!controller.isClosed) {
-          controller.addError(
-            StateError('typing realtime disconnected: $status'),
-          );
-        }
-      }
-    });
+    _typingChannels[threadId] = res;
     controller.onCancel = () async {
-      await channel.unsubscribe();
-      if (!controller.isClosed) await controller.close();
+      await res.dispose();
+      _typingChannels.remove(threadId);
+      await controller.close();
     };
     return controller.stream;
   }
@@ -414,9 +434,13 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
         .map((rows) {
           if (rows.isEmpty) return const UserPresence(isOnline: false);
           final row = rows.first;
+          final seen = _parseDate(row['last_seen']);
+          // "متصل" فقط إن كانت النبضة حديثة (الخادم ينهي الجلسات العالقة كل دقيقة).
+          final fresh = seen != null &&
+              DateTime.now().toUtc().difference(seen.toUtc()).inSeconds <= 120;
           return UserPresence(
-            isOnline: row['is_online'] == true,
-            lastSeen: _parseDate(row['last_seen']),
+            isOnline: row['is_online'] == true && fresh,
+            lastSeen: seen,
           );
         });
   }

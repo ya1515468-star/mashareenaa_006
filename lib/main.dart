@@ -1,3 +1,5 @@
+import 'core/navigation/app_navigator.dart';
+import 'features/ai_assistant/presentation/ai_assistant_fab.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'core/services/realtime_resilience.dart';
@@ -57,6 +59,7 @@ class MashareenaApp extends ConsumerWidget {
     final theme = AppTheme.fromPalette(palette);
 
     return MaterialApp(
+      navigatorKey: appNavigatorKey,
       title: 'مشاريعنا | Mashareena',
       debugShowCheckedModeBanner: false,
       theme: theme,
@@ -74,6 +77,7 @@ class MashareenaApp extends ConsumerWidget {
             child: Stack(children: [
               child ?? const SizedBox.shrink(),
               const GlobalMiniPlayer(),
+              const AiAssistantFab(),
             ]),
           ),
         );

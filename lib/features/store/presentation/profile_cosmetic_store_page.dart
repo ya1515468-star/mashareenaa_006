@@ -1,5 +1,6 @@
 // ignore_for_file: prefer_const_constructors
 import 'currency_store/currency_store_tab.dart';
+import '../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart' as fp;
@@ -196,13 +197,13 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
     }
     if (!owned && !owner && !free) {
       if (!mounted) return;
-      final currency=await showModalBottomSheet<String>(context:context,builder:(c)=>SafeArea(child:Column(mainAxisSize:MainAxisSize.min,children:[const SizedBox(height:12),const Text('اختر طريقة الشراء', style: TextStyle(fontSize:18,fontWeight:FontWeight.w900)),ListTile(leading:const Icon(Icons.star,color:Colors.amber),title:Text('${item.pricePoints} نقطة'),onTap:()=>Navigator.pop(c,'points')),ListTile(leading:const Icon(Icons.diamond,color:Colors.cyan),title:Text('${item.priceGems} جوهرة'),onTap:()=>Navigator.pop(c,'gems')),const SizedBox(height:12)])));
+      final currency=await showModalBottomSheet<String>(context:context,builder:(c)=>SafeArea(child:Column(mainAxisSize:MainAxisSize.min,children:[const SizedBox(height:12),const Text('اختر طريقة الشراء', style: TextStyle(fontSize:18,fontWeight:FontWeight.w900)),if(item.pricePoints>0||item.priceGems<=0)ListTile(leading:const Icon(Icons.star,color:Colors.amber),title:Text('${item.pricePoints} نقطة'),onTap:()=>Navigator.pop(c,'points')),if(item.priceGems>0||item.pricePoints<=0)ListTile(leading:const Icon(Icons.diamond,color:Colors.cyan),title:Text('${item.priceGems} جوهرة'),onTap:()=>Navigator.pop(c,'gems')),const SizedBox(height:12)])));
       if (currency == null) { return; }
       if (!mounted) return;
       final priceText = currency == 'points' ? '${item.pricePoints} نقطة' : '${item.priceGems} جوهرة';
       final ok = await _confirmStoreAction(title: 'تأكيد الشراء', action: 'شراء', itemName: item.nameAr, detail: 'سيتم خصم $priceText من رصيدك وشراء «${item.nameAr}». هل تريد المتابعة؟');
       if (!ok) return;
-      try { await Supabase.instance.client.rpc('purchase_profile_cosmetic',params:{'p_item_key':item.key,'p_currency':currency,'p_request_id': const Uuid().v4()}); } catch(e){ if (!mounted) return; ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e)))); return; }
+      try { await Supabase.instance.client.rpc('purchase_profile_cosmetic',params:{'p_item_key':item.key,'p_currency':currency,'p_request_id': const Uuid().v4()}); } catch(e){ if (!mounted) return; ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e)))); return; }
       ref.invalidate(myProfileCosmeticOwnershipProvider);
     }
     try {
@@ -241,8 +242,8 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       // نسخة بعينها هنا. لكنه autoDispose أصلًا: يُهدَم فور إغلاق
       // شاشة الشات ويُعاد جلبه من الصفر عند فتحها مجددًا، فلا يبقى
       // بيانات قديمة معلَّقة لأكثر من الجلسة الحالية للغرفة المفتوحة.
-      if (!mounted) return; ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الحفظ وتحديث البروفايل')));
-    } catch(e){ if (!mounted) return; ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e)))); }
+      if (!mounted) return; ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم الحفظ وتحديث البروفايل')));
+    } catch(e){ if (!mounted) return; ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e)))); }
   }
 
   /// Every "⋮" owner menu on the store cards (cosmetics/frames/name
@@ -304,9 +305,9 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       ref.invalidate(nameTemplateCatalogProvider);
       ref.invalidate(messageColorCatalogProvider);
       ref.invalidate(serverAvatarFramesProvider);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم حفظ التعديلات ✓'), backgroundColor: Colors.green.shade700));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تم حفظ التعديلات ✓'), backgroundColor: Colors.green.shade700));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     } finally {
       name.dispose(); points.dispose(); gems.dispose(); order.dispose();
     }
@@ -331,9 +332,9 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       ref.invalidate(profileCosmeticCatalogProvider);
       ref.invalidate(nameTemplateCatalogProvider);
       ref.invalidate(messageColorCatalogProvider);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم حذف «${item.nameAr}» نهائيًا ✓'), backgroundColor: Colors.green.shade700));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تم حذف «${item.nameAr}» نهائيًا ✓'), backgroundColor: Colors.green.shade700));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
   }
 
@@ -624,11 +625,11 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       ref.invalidate(serverUserIdentityInRoomProvider);
       if (layer == 'name_animal') ref.invalidate(nameAnimationCatalogProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: const Text('تم الإلغاء ✓'), backgroundColor: Colors.green.shade700),
       );
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
   }
 
@@ -897,7 +898,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                               if (!confirmed) return;
                               await EquippedItemsService.equip(uid: uid, category: item.category, itemId: item.id);
                               ref.invalidate(currentProfileProvider);
-                              if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تفعيل الإطار الملون ✓')));
+                              if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم تفعيل الإطار الملون ✓')));
                             } else {
                               final confirmed = await _confirmStoreAction(
                                 title: 'تأكيد الشراء',
@@ -908,8 +909,8 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                               if (!confirmed) return;
                               final result = await sl<PurchaseStoreItemUseCase>().call(uid: uid, item: item);
                               result.fold(
-                                (failure) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(failure.message))); },
-                                (_) { ref.invalidate(storeOwnedItemsProvider(uid)); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم شراء الإطار الملون ✓'))); },
+                                (failure) { if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(failure.message))); },
+                                (_) { ref.invalidate(storeOwnedItemsProvider(uid)); if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم شراء الإطار الملون ✓'))); },
                               );
                             }
                           },
@@ -1140,12 +1141,12 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       ref.invalidate(serverUserIdentityProvider);
       ref.invalidate(serverUserIdentityInRoomProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text('تم حذف الإطار من الخادم ✓ ${resultMap['cleared_profiles'] != null ? 'تم تنظيف ${resultMap['cleared_profiles']} بروفايل' : ''}')),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text(_friendly(e))),
       );
     }
@@ -1192,7 +1193,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
         ref.invalidate(myProfileCosmeticOwnershipProvider);
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+        ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
         return;
       }
     }
@@ -1203,10 +1204,10 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       ref.invalidate(serverUserIdentityProvider);
       ref.invalidate(serverUserIdentityInRoomProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تفعيل الإطار من الخادم ✓')));
+      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم تفعيل الإطار من الخادم ✓')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+      ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
   }
 
@@ -1231,7 +1232,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
     final file = picked.files.single;
     final bytes = file.bytes;
     if (bytes == null || bytes.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         const SnackBar(content: Text('تعذر قراءة ملف الإطار.')));
       return;
     }
@@ -1242,13 +1243,13 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
         : '';
     const supported = {'gif', 'png', 'jpg', 'jpeg', 'webp', 'bmp'};
     if (!supported.contains(extension)) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text('صيغة الإطار غير مدعومة: .$extension')),
       );
       return;
     }
     if (bytes.length > 8 * 1024 * 1024) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         const SnackBar(content: Text('حجم الإطار يجب ألا يتجاوز 8MB.')),
       );
       return;
@@ -1261,7 +1262,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
     if (extension == 'gif') {
       final info = GifInspector.inspect(Uint8List.fromList(bytes));
       if (info == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           const SnackBar(content: Text('الملف المختار ليس GIF صالحًا.')),
         );
         return;
@@ -1271,7 +1272,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       frameCount = info.numFrames;
       durationMs = info.durationMs;
       if (frameCount < 1 || frameCount > 120 || durationMs < 16 || durationMs > 120000) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           const SnackBar(content: Text('بيانات حركة GIF غير صالحة.')),
         );
         return;
@@ -1286,7 +1287,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
         codec.dispose();
       } catch (_) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           const SnackBar(content: Text('تعذر قراءة صورة الإطار.')),
         );
         return;
@@ -1294,7 +1295,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
     }
     if (sourceWidth < 64 || sourceWidth > 2048 || sourceHeight < 64 || sourceHeight > 2048) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text('أبعاد الإطار يجب أن تكون بين 64×64 و2048×2048. الحجم الحالي: $sourceWidth×$sourceHeight.')),
       );
       return;
@@ -1462,13 +1463,13 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
         );
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text('تمت إضافة الإطار وضبط فتحة الصورة تلقائيًا ${frameKey.isEmpty ? 'بنجاح ✓' : '($frameKey) ✓'}')),
       );
     } catch (e) {
       closeProgressDialog();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text('تعذر إضافة الإطار: ${_friendly(e)}')),
       );
     } finally {
@@ -1714,8 +1715,11 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             const SizedBox(height: 10),
             const Text('اختر طريقة الشراء', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-            ListTile(leading: const Icon(Icons.star, color: Colors.amber), title: Text('${item.pricePoints} نقطة'), onTap: () => Navigator.pop(c, 'points')),
-            ListTile(leading: const Icon(Icons.diamond, color: Colors.cyan), title: Text('${item.priceGems} جوهرة'), onTap: () => Navigator.pop(c, 'gems')),
+            // لا نعرض عملة سعرها صفر (الخادم يرفضها PRICE_NOT_SET).
+            if (item.pricePoints > 0 || item.priceGems <= 0)
+              ListTile(leading: const Icon(Icons.star, color: Colors.amber), title: Text('${item.pricePoints} نقطة'), onTap: () => Navigator.pop(c, 'points')),
+            if (item.priceGems > 0 || item.pricePoints <= 0)
+              ListTile(leading: const Icon(Icons.diamond, color: Colors.cyan), title: Text('${item.priceGems} جوهرة'), onTap: () => Navigator.pop(c, 'gems')),
           ]),
         ),
       );
@@ -1728,7 +1732,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
         ref.invalidate(myNameAnimationOwnershipProvider);
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+        ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
         return;
       }
     }
@@ -1737,10 +1741,10 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       final uid = Supabase.instance.client.auth.currentUser?.id;
       if (uid != null) ref.invalidate(activeNameAnimationProvider(uid));
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تفعيل الحيوان فوق الاسم ✓')));
+      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم تفعيل الحيوان فوق الاسم ✓')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+      ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
   }
 
@@ -1792,9 +1796,9 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
         'p_request_id': const Uuid().v4(),
       });
       ref.invalidate(nameAnimationCatalogProvider);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم حفظ التعديلات ✓'), backgroundColor: Colors.green.shade700));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تم حفظ التعديلات ✓'), backgroundColor: Colors.green.shade700));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     } finally {
       name.dispose(); points.dispose(); gems.dispose(); order.dispose();
     }
@@ -1817,9 +1821,9 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
         await Supabase.instance.client.storage.from('name-animations').remove([storagePath]).catchError((_) => <FileObject>[]);
       }
       ref.invalidate(nameAnimationCatalogProvider);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم حذف «${item.nameAr}» نهائيًا ✓'), backgroundColor: Colors.green.shade700));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تم حذف «${item.nameAr}» نهائيًا ✓'), backgroundColor: Colors.green.shade700));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
   }
 
@@ -2037,9 +2041,9 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
         ),
       );
       ref.invalidate(nameAnimationCatalogProvider);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم رفع الحيوان وإضافته للمتجر ✓')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم رفع الحيوان وإضافته للمتجر ✓')));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendly(e))));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
   }
 
@@ -2347,7 +2351,7 @@ class _AddRemoteFrameDialogState extends State<_AddRemoteFrameDialog> {
               (max != null && max < min);
 
           if (invalid) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            ScaffoldMessenger.of(context).showSnackBarSfx(
               const SnackBar(content: Text('تحقق من بيانات الإطار.')),
             );
             return;
@@ -2429,7 +2433,7 @@ class _MessageTextStyleSectionState
         ref.invalidate(serverUserIdentityProvider(uid));
       }
     } catch (e) {
-      messenger?.showSnackBar(SnackBar(content: Text('تعذّر الحفظ: $e')));
+      messenger?.showSnackBarSfx(SnackBar(content: Text('تعذّر الحفظ: $e')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -2600,10 +2604,10 @@ class _RoleColorTabState extends State<_RoleColorTab> {
     try {
       await op();
       await _load();
-      m.showSnackBar(SnackBar(content: Text(ok)));
+      m.showSnackBarSfx(SnackBar(content: Text(ok)));
     } catch (e) {
       final t = e.toString();
-      m.showSnackBar(SnackBar(content: Text(t.contains('INSUFFICIENT')
+      m.showSnackBarSfx(SnackBar(content: Text(t.contains('INSUFFICIENT')
           ? 'رصيدك لا يكفي.'
           : t.contains('ITEM_NOT_OWNED') ? 'اشترِ العنصر أولًا.' : 'تعذّر التنفيذ: $t')));
     } finally {

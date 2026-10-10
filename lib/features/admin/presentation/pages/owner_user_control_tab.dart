@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/services/snack_sfx.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -767,7 +768,7 @@ class _UserDetailSheet extends ConsumerWidget {
   /// يستعلم مزوّد GeoIP بالـIP المحفوظ للعضو ويحفظ النتيجة خادميًا.
   Future<void> _resolveLocation(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
-    messenger?.showSnackBar(const SnackBar(
+    messenger?.showSnackBarSfx(const SnackBar(
         content: Text('جارٍ الاستنتاج من الـIP…'),
         duration: Duration(seconds: 2)));
     try {
@@ -775,14 +776,14 @@ class _UserDetailSheet extends ConsumerWidget {
       ref.invalidate(ownerUserDetailProvider(userId));
       onChanged();
       messenger?.hideCurrentSnackBar();
-      messenger?.showSnackBar(SnackBar(
+      messenger?.showSnackBarSfx(SnackBar(
         content: Text(err ?? 'حُدّد الموقع من الـIP'),
         backgroundColor:
             err == null ? const Color(0xFF16A34A) : const Color(0xFFF59E0B),
       ));
     } catch (e) {
       messenger?.hideCurrentSnackBar();
-      messenger?.showSnackBar(SnackBar(
+      messenger?.showSnackBarSfx(SnackBar(
           content: Text('تعذّر الاستنتاج: $e'),
           backgroundColor: const Color(0xFFDC2626)));
     }
@@ -885,7 +886,7 @@ class _UserDetailSheet extends ConsumerWidget {
       await op();
       ref.invalidate(ownerUserDetailProvider(userId));
       onChanged();
-      messenger?.showSnackBar(SnackBar(
+      messenger?.showSnackBarSfx(SnackBar(
           content: Text(successMsg),
           backgroundColor: const Color(0xFF16A34A)));
     } catch (e) {
@@ -894,7 +895,7 @@ class _UserDetailSheet extends ConsumerWidget {
           : e.toString().contains('OWNER_ONLY')
               ? 'هذا الإجراء للمالك فقط.'
               : 'فشل الإجراء: $e';
-      messenger?.showSnackBar(SnackBar(
+      messenger?.showSnackBarSfx(SnackBar(
           content: Text(msg), backgroundColor: const Color(0xFFDC2626)));
     }
   }

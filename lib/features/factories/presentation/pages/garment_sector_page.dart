@@ -1,4 +1,5 @@
 import '../../../rbac/presentation/widgets/server_username_display.dart';
+import '../../../../core/services/snack_sfx.dart';
 import '../../../../core/services/media_upload_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
@@ -410,9 +411,9 @@ class _SectorsTab extends ConsumerWidget {
         return;
       }
       ref.invalidate(garmentSectorsProvider);
-      m?.showSnackBar(const SnackBar(content: Text('تم الحفظ')));
+      m?.showSnackBarSfx(const SnackBar(content: Text('تم الحفظ')));
     } catch (e) {
-      m?.showSnackBar(SnackBar(content: Text('تعذّر: $e')));
+      m?.showSnackBarSfx(SnackBar(content: Text('تعذّر: $e')));
     } finally {
       name.dispose();
       emoji.dispose();
@@ -448,7 +449,7 @@ class _SectorsTab extends ConsumerWidget {
     }
     final trimmedName = name.text.trim();
     if (trimmedName.isEmpty) {
-      m?.showSnackBar(const SnackBar(content: Text('اكتب اسم القطاع أولًا')));
+      m?.showSnackBarSfx(const SnackBar(content: Text('اكتب اسم القطاع أولًا')));
       name.dispose();
       emoji.dispose();
       return;
@@ -461,12 +462,12 @@ class _SectorsTab extends ConsumerWidget {
         'icon_emoji': emoji.text.trim(),
       });
       ref.invalidate(garmentSectorsProvider);
-      m?.showSnackBar(const SnackBar(content: Text('أُنشئ القطاع')));
+      m?.showSnackBarSfx(const SnackBar(content: Text('أُنشئ القطاع')));
     } catch (e) {
       final msg = e.toString().contains('duplicate key') || e.toString().contains('23505')
           ? 'يوجد قطاع بهذا الاسم أو بمعرّف مطابق له فعلًا — جرّب اسمًا مختلفًا.'
           : 'تعذّر الإنشاء: $e';
-      m?.showSnackBar(SnackBar(content: Text(msg)));
+      m?.showSnackBarSfx(SnackBar(content: Text(msg)));
     } finally {
       name.dispose();
       emoji.dispose();
@@ -646,9 +647,9 @@ class _ServiceAdsTab extends ConsumerWidget {
                       await GarmentActions.setAdStatus(id, status);
                     }
                     ref.invalidate(garmentServiceAdsProvider(sector));
-                    m?.showSnackBar(const SnackBar(content: Text('تم التنفيذ')));
+                    m?.showSnackBarSfx(const SnackBar(content: Text('تم التنفيذ')));
                   } catch (e) {
-                    m?.showSnackBar(SnackBar(content: Text('تعذّر: $e')));
+                    m?.showSnackBarSfx(SnackBar(content: Text('تعذّر: $e')));
                   }
                 },
               ),
@@ -731,9 +732,9 @@ class _PublishServiceAdSheetState
         _lat = pos.latitude;
         _lng = pos.longitude;
       });
-      m?.showSnackBar(const SnackBar(content: Text('حُدّد موقعك')));
+      m?.showSnackBarSfx(const SnackBar(content: Text('حُدّد موقعك')));
     } catch (e) {
-      m?.showSnackBar(SnackBar(content: Text('تعذّر تحديد الموقع: $e')));
+      m?.showSnackBarSfx(SnackBar(content: Text('تعذّر تحديد الموقع: $e')));
     } finally {
       if (mounted) setState(() => _locating = false);
     }
@@ -755,7 +756,7 @@ class _PublishServiceAdSheetState
 
   Future<void> _submit() async {
     if (_title.text.trim().isEmpty || _service == null || _sector == null) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(const SnackBar(
+      ScaffoldMessenger.maybeOf(context)?.showSnackBarSfx(const SnackBar(
           content: Text('اختر الخدمة والقطاع واكتب عنوانًا')));
       return;
     }
@@ -804,12 +805,12 @@ class _PublishServiceAdSheetState
         publicationCurrency: _currency,
       );
       if (mounted) Navigator.pop(context, true);
-      messenger?.showSnackBar(const SnackBar(
+      messenger?.showSnackBarSfx(const SnackBar(
           content: Text('نُشر الإعلان'),
           backgroundColor: Color(0xFF16A34A)));
     } catch (e) {
       final s = e.toString();
-      messenger?.showSnackBar(SnackBar(
+      messenger?.showSnackBarSfx(SnackBar(
         content: Text(s.contains('INSUFFICIENT')
             ? 'رصيدك لا يكفي لرسوم النشر.'
             : s.contains('QUOTA')
@@ -1370,9 +1371,9 @@ class _PublicationFeesDialogState extends ConsumerState<_PublicationFeesDialog> 
       }
       ref.invalidate(garmentPublicationFeesProvider);
       nav.pop();
-      m.showSnackBar(const SnackBar(content: Text('حُفظت أسعار النشر')));
+      m.showSnackBarSfx(const SnackBar(content: Text('حُفظت أسعار النشر')));
     } catch (e) {
-      m.showSnackBar(SnackBar(content: Text('تعذّر الحفظ: $e')));
+      m.showSnackBarSfx(SnackBar(content: Text('تعذّر الحفظ: $e')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

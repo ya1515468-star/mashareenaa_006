@@ -15,8 +15,8 @@ class UserSubscriptionModel extends UserSubscriptionEntity {
     return UserSubscriptionModel(
       uid: uid,
       tierId: sub['tierId'] as String? ?? SubscriptionCatalog.freeTierId,
-      startedAt: (sub['startedAt'] as Timestamp?)?.toDate(),
-      expiresAt: (sub['expiresAt'] as Timestamp?)?.toDate(),
+      startedAt: parseFlexibleTimestampOrNull(sub['startedAt']),
+      expiresAt: parseFlexibleTimestampOrNull(sub['expiresAt']),
     );
   }
 }

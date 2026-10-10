@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/widgets/cross_platform_image.dart';
@@ -55,7 +56,7 @@ class _SubmitPatternRequestPageState
       if (mounted) setState(() => _isUploading = false);
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('تعذّر رفع الصورة: $e')));
+          .showSnackBarSfx(SnackBar(content: Text('تعذّر رفع الصورة: $e')));
       return;
     }
     if (!mounted) return;
@@ -76,7 +77,7 @@ class _SubmitPatternRequestPageState
     final navigator = Navigator.of(context);
 
     if (success) {
-      messenger.showSnackBar(
+      messenger.showSnackBarSfx(
         const SnackBar(content: Text('تم إرسال طلبك وخصم الرسوم من محفظتك')),
       );
       navigator.pushReplacement(
@@ -87,7 +88,7 @@ class _SubmitPatternRequestPageState
         await MediaUploadService().deleteFile(imageUrl);
       } catch (_) {}
       if (!mounted) return;
-      messenger.showSnackBar(
+      messenger.showSnackBarSfx(
         const SnackBar(content: Text('تعذر إرسال الطلب الآن. تحقق من البيانات والاتصال ثم أعد المحاولة.')),
       );
     }

@@ -1,4 +1,5 @@
 import 'package:video_player/video_player.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
@@ -33,6 +34,27 @@ class _PublishReelSheetState extends ConsumerState<PublishReelSheet> {
   bool _uploading = false;
   bool _publishing = false;
   String? _error;
+
+  /// الموافقة على شروط الاستخدام ودليل المجتمع (يفرضها الخادم قبل أي نشر).
+  /// null = جارٍ التحقق، true = موافق مسبقًا فلا نعرض الخانة.
+  bool? _legalOk;
+  bool _legalChecked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLegal();
+  }
+
+  Future<void> _loadLegal() async {
+    try {
+      final r = await Supabase.instance.client
+          .rpc('has_current_ugc_legal_acceptance');
+      if (mounted) setState(() => _legalOk = r == true);
+    } catch (_) {
+      if (mounted) setState(() => _legalOk = false);
+    }
+  }
 
   static const List<Map<String, String>> _categories = [
     {'key': 'packaging', 'label': 'أمبلاج 📦'},
@@ -141,12 +163,22 @@ class _PublishReelSheetState extends ConsumerState<PublishReelSheet> {
       return;
     }
 
+    if (_legalOk != true && !_legalChecked) {
+      setState(() => _error =
+          'يجب الموافقة على شروط الاستخدام ودليل المجتمع قبل النشر (فعّل الخانة أعلاه).');
+      return;
+    }
+
     setState(() {
       _publishing = true;
       _error = null;
     });
 
     try {
+      if (_legalOk != true) {
+        await Supabase.instance.client.rpc('accept_required_legal_documents');
+        _legalOk = true;
+      }
       final tags = _tagsCtrl.text
           .split(',')
           .map((t) => t.trim())
@@ -168,7 +200,7 @@ class _PublishReelSheetState extends ConsumerState<PublishReelSheet> {
         // وتقفز له؛ النشر كان ينجح فعليًا لكن لا يظهر فورًا لأن القائمة
         // لا تتحرك لرأسها حيث يُدرَج الريل الجديد (الأحدث أولًا).
         Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           const SnackBar(
             content: Text('✅ نُشر الريل وخُصمت رسوم النشر من رصيدك'),
             backgroundColor: Color(0xFF2D7A4F),
@@ -378,6 +410,23 @@ class _PublishReelSheetState extends ConsumerState<PublishReelSheet> {
                     borderSide: BorderSide(color: Colors.white24)),
               ),
             ),
+
+            if (_legalOk == false) ...[
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                value: _legalChecked,
+                onChanged: (v) => setState(() => _legalChecked = v ?? false),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                activeColor: const Color(0xFFFFD700),
+                checkColor: Colors.black,
+                title: const Text(
+                  'أوافق على شروط الاستخدام وسياسة الخصوصية ودليل المجتمع، وأتعهّد بعدم نشر محتوى مسيء أو مخالف.',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ),
+            ],
 
             if (_error != null) ...[
               const SizedBox(height: 12),

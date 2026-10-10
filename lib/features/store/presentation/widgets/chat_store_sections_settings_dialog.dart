@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:file_picker/file_picker.dart' as fp;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -115,14 +116,14 @@ class _SectionEditorState extends State<_SectionEditor> {
     final file = picked.files.single;
     final bytes = file.bytes;
     if (bytes == null || bytes.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         const SnackBar(content: Text('تعذر قراءة الملف المختار.')));
       return;
     }
     final ext = file.name.contains('.') ? file.name.split('.').last.toLowerCase() : 'png';
     const supported = {'png', 'jpg', 'jpeg', 'webp', 'gif'};
     if (!supported.contains(ext)) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text('صيغة غير مدعومة: .$ext (المسموح: png، jpg، webp، gif)')));
       return;
     }

@@ -1,4 +1,5 @@
 import 'dart:ui' as ui;
+import '../../../../core/services/snack_sfx.dart';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -315,7 +316,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
     setState(() => _message = message);
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
+    messenger.showSnackBarSfx(
       SnackBar(
         content: Text(message, textDirection: TextDirection.rtl),
         duration: const Duration(seconds: 4),
@@ -1031,7 +1032,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
                                 if (file == null || file.bytes == null || file.bytes!.isEmpty) return;
                                 if ((file.extension ?? '').toLowerCase() != 'gif') {
                                   if (sheetContext.mounted) {
-                                    ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                    ScaffoldMessenger.of(sheetContext).showSnackBarSfx(
                                       const SnackBar(content: Text('صورة الترحيب يجب أن تكون GIF.')),
                                     );
                                   }
@@ -1039,7 +1040,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
                                 }
                                 if (file.bytes!.length > 8 * 1024 * 1024) {
                                   if (sheetContext.mounted) {
-                                    ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                    ScaffoldMessenger.of(sheetContext).showSnackBarSfx(
                                       const SnackBar(content: Text('صورة الترحيب أكبر من 8MB.')),
                                     );
                                   }
@@ -1050,7 +1051,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
                                   codec = await ui.instantiateImageCodec(file.bytes!);
                                   if (codec.frameCount < 2) {
                                     if (sheetContext.mounted) {
-                                      ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                      ScaffoldMessenger.of(sheetContext).showSnackBarSfx(
                                         const SnackBar(content: Text('يجب أن يكون GIF متحركًا ويحتوي على إطارين أو أكثر.')),
                                       );
                                     }
@@ -1086,7 +1087,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
                                     );
                                   } catch (_) {}
                                   if (sheetContext.mounted) {
-                                    ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                    ScaffoldMessenger.of(sheetContext).showSnackBarSfx(
                                       SnackBar(content: Text('فشل رفع صورة الترحيب: $e')),
                                     );
                                   }
@@ -1115,7 +1116,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
                                   }
                                 } catch (e) {
                                   if (sheetContext.mounted) {
-                                    ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                    ScaffoldMessenger.of(sheetContext).showSnackBarSfx(
                                       SnackBar(content: Text('تعذر حفظ بوت الترحيب: $e')),
                                     );
                                   }

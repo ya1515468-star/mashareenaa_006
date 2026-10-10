@@ -28,7 +28,7 @@ class PostModel extends PostEntity {
       likesCount: map['likesCount'] as int? ?? 0,
       commentsCount: map['commentsCount'] as int? ?? 0,
       isHidden: map['isHidden'] as bool? ?? false,
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: parseFlexibleTimestamp(map['createdAt']),
     );
   }
 

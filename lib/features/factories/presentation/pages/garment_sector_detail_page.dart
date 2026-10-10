@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import '../widgets/garment_contact_gate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -189,9 +190,9 @@ class _BusinessTile extends StatelessWidget {
           return;
       }
       onChanged();
-      m?.showSnackBar(const SnackBar(content: Text('تم التنفيذ')));
+      m?.showSnackBarSfx(const SnackBar(content: Text('تم التنفيذ')));
     } catch (e) {
-      m?.showSnackBar(SnackBar(content: Text('تعذّر: $e')));
+      m?.showSnackBarSfx(SnackBar(content: Text('تعذّر: $e')));
     } finally {
       name.dispose();
       desc.dispose();
@@ -321,7 +322,7 @@ class _AddBusinessSheetState extends ConsumerState<_AddBusinessSheet> {
   Future<void> _submit() async {
     final m = ScaffoldMessenger.maybeOf(context);
     if (_name.text.trim().isEmpty) {
-      m?.showSnackBar(const SnackBar(content: Text('اكتب اسم المنشأة')));
+      m?.showSnackBarSfx(const SnackBar(content: Text('اكتب اسم المنشأة')));
       return;
     }
     final fees = await ref.read(garmentPublicationFeesProvider.future);
@@ -363,11 +364,11 @@ class _AddBusinessSheetState extends ConsumerState<_AddBusinessSheet> {
       if (id == null || id.isEmpty) throw StateError('BUSINESS_NOT_CREATED');
       await GarmentActions.publishBusiness(businessId: id, currency: _currency);
       if (mounted) Navigator.pop(context, true);
-      m?.showSnackBar(const SnackBar(
+      m?.showSnackBarSfx(const SnackBar(
           content: Text('خُصمت الرسوم ونُشرت المنشأة'), backgroundColor: Color(0xFF16A34A)));
     } catch (e) {
       final t = e.toString();
-      m?.showSnackBar(SnackBar(
+      m?.showSnackBarSfx(SnackBar(
           content: Text(t.contains('INSUFFICIENT')
               ? 'رصيدك لا يكفي لرسوم النشر.'
               : 'تعذّر إنشاء المنشأة: $t'),

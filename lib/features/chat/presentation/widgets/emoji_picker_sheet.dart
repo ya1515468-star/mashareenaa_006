@@ -238,25 +238,21 @@ class QuickReactionBar extends StatelessWidget {
   }
 }
 
-class EmojiPickerSheet extends StatefulWidget {
+/// المحتوى الفعلي لمنتقي الإيموجي (بحث + "الأكثر استخدامًا" + الفئات) بلا
+/// أي غلاف خاص بورقة كاملة الشاشة — مُستخرَج هنا ليُستعمَل في موضعين:
+/// منتقي الإيموجي المستقل (EmojiPickerSheet، لردود الفعل السريعة على رسالة)
+/// ومنتقي "السمايل والـGIF" المدمج (StickerAndGifSheet) كتبويب واحد داخله،
+/// حتى لا يظهر كل واحد منفصلًا بعد الآن.
+class EmojiPickerContent extends StatefulWidget {
   final ValueChanged<String> onSelect;
-  const EmojiPickerSheet({super.key, required this.onSelect});
-
-  static Future<void> show(
-      BuildContext context, ValueChanged<String> onSelect) {
-    return showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => EmojiPickerSheet(onSelect: onSelect),
-    );
-  }
+  final ScrollController? scrollController;
+  const EmojiPickerContent({super.key, required this.onSelect, this.scrollController});
 
   @override
-  State<EmojiPickerSheet> createState() => _EmojiPickerSheetState();
+  State<EmojiPickerContent> createState() => _EmojiPickerContentState();
 }
 
-class _EmojiPickerSheetState extends State<EmojiPickerSheet> {
+class _EmojiPickerContentState extends State<EmojiPickerContent> {
   static const _kRecentKey = 'recent_emojis';
   List<String> _recent = [];
   String _query = '';
@@ -266,6 +262,12 @@ class _EmojiPickerSheetState extends State<EmojiPickerSheet> {
   void initState() {
     super.initState();
     _loadRecent();
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadRecent() async {
@@ -304,6 +306,70 @@ class _EmojiPickerSheetState extends State<EmojiPickerSheet> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+          child: TextField(
+            textAlign: TextAlign.right,
+            style: TextStyle(color: p.textPrimary),
+            decoration: InputDecoration(
+              hintText: 'ابحث عن فئة (وجوه، قلوب، أعمال...)',
+              prefixIcon: Icon(Icons.search, color: p.textMuted),
+            ),
+            onChanged: (v) {
+              _debounce?.cancel();
+              _debounce = Timer(const Duration(milliseconds: 200), () {
+                if (mounted) setState(() => _query = v.trim());
+              });
+            },
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            controller: widget.scrollController,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            children: [
+              if (_query.isNotEmpty)
+                _EmojiGrid(emojis: _filtered, onTap: _pick)
+              else ...[
+                if (_recent.isNotEmpty) ...[
+                  const _SectionTitle(
+                      title: 'الأكثر استخدامًا', icon: Icons.history),
+                  _EmojiGrid(emojis: _recent, onTap: _pick),
+                ],
+                for (final category in _categories) ...[
+                  _SectionTitle(
+                      title: category.nameAr, icon: category.icon),
+                  _EmojiGrid(emojis: category.emojis, onTap: _pick),
+                ],
+              ],
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class EmojiPickerSheet extends StatelessWidget {
+  final ValueChanged<String> onSelect;
+  const EmojiPickerSheet({super.key, required this.onSelect});
+
+  static Future<void> show(
+      BuildContext context, ValueChanged<String> onSelect) {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => EmojiPickerSheet(onSelect: onSelect),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
     return DraggableScrollableSheet(
       initialChildSize: 0.62,
       minChildSize: 0.4,
@@ -324,45 +390,9 @@ class _EmojiPickerSheetState extends State<EmojiPickerSheet> {
                 decoration: BoxDecoration(
                     color: p.divider, borderRadius: BorderRadius.circular(4)),
               ),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: TextField(
-                  textAlign: TextAlign.right,
-                  style: TextStyle(color: p.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'ابحث عن فئة (وجوه، قلوب، أعمال...)',
-                    prefixIcon: Icon(Icons.search, color: p.textMuted),
-                  ),
-                  onChanged: (v) {
-                    _debounce?.cancel();
-                    _debounce = Timer(const Duration(milliseconds: 200), () {
-                      if (mounted) setState(() => _query = v.trim());
-                    });
-                  },
-                ),
-              ),
               Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  children: [
-                    if (_query.isNotEmpty)
-                      _EmojiGrid(emojis: _filtered, onTap: _pick)
-                    else ...[
-                      if (_recent.isNotEmpty) ...[
-                        const _SectionTitle(
-                            title: 'الأكثر استخدامًا', icon: Icons.history),
-                        _EmojiGrid(emojis: _recent, onTap: _pick),
-                      ],
-                      for (final category in _categories) ...[
-                        _SectionTitle(
-                            title: category.nameAr, icon: category.icon),
-                        _EmojiGrid(emojis: category.emojis, onTap: _pick),
-                      ],
-                    ],
-                    const SizedBox(height: 20),
-                  ],
-                ),
+                child: EmojiPickerContent(
+                    onSelect: onSelect, scrollController: scrollController),
               ),
             ],
           ),

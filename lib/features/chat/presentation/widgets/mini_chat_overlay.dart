@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart' as fp;
@@ -528,7 +529,7 @@ Future<void> showChatWallpaperDialog(
                       if (dialogContext.mounted) {
                         final needsVip =
                             e.toString().contains('FEATURE_REQUIRED_CHAT_WALLPAPER');
-                        ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(
+                        ScaffoldMessenger.of(dialogContext).showSnackBarSfx(SnackBar(
                           content: Text(needsVip
                               ? 'خلفية المحادثة خدمة VIP — فعّلها من خدمات VIP أولًا.'
                               : 'تعذر حفظ الخلفية.'),

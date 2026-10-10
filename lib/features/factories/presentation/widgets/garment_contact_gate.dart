@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -95,7 +96,7 @@ class _GarmentContactGateState extends ConsumerState<GarmentContactGate> {
       );
     } catch (e) {
       final t = e.toString();
-      m?.showSnackBar(SnackBar(content: Text(
+      m?.showSnackBarSfx(SnackBar(content: Text(
         t.contains('INSUFFICIENT_GEMS') ? 'رصيدك من الجواهر لا يكفي.'
         : t.contains('INSUFFICIENT_POINTS') ? 'رصيدك من النقاط لا يكفي.'
         : t.contains('CANNOT_UNLOCK_OWN') ? 'هذا منشورك أنت.'

@@ -24,7 +24,7 @@ class LedgerEntryModel extends LedgerEntryEntity {
       ),
       counterpartyUid: map['counterpartyUid'] as String?,
       note: map['note'] as String?,
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: parseFlexibleTimestamp(map['createdAt']),
     );
   }
 

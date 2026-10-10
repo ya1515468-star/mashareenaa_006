@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import '../../../../core/typography/local_glyph_text.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -42,7 +43,7 @@ class _ChatNotificationSettingsPageState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('تعذر حفظ الإعداد: $e')));
+            .showSnackBarSfx(SnackBar(content: Text('تعذر حفظ الإعداد: $e')));
       }
     } finally {
       if (mounted) setState(() => saving = false);

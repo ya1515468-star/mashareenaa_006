@@ -1,25 +1,39 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import '../theme/app_theme.dart';
 import '../providers/mini_player_provider.dart';
-import 'youtube_thumbnail.dart';
 import 'tiktok_web_player_stub.dart'
     if (dart.library.html) 'tiktok_web_player_web.dart';
 
 /// يكتشف نوع الرابط الموسيقي/المرئي المُشارَك ويعرضه المناسب:
 /// - رابط يوتيوب (watch أو youtu.be): يُضمَّن مباشرة داخل التطبيق
-///   عبر WebView مضبوط على وضع التضمين الرسمي (youtube.com/embed).
+///   عبر WebView مضبوط على وضع التضمين الرسمي (youtube.com/embed) —
+///   إلا إن طُلب [routeYoutubeToFloatingPlayer]، فتُعرَض بطاقة مصغّرة
+///   تُشغِّل الأغنية حصرًا عبر المشغّل العائم العام بدل تضمينها هنا
+///   (مطلوب لرسائل الشات تحديدًا: "تشغيله حصرًا بمشغل عائم").
 /// - أي رابط آخر (SoundCloud، Spotify، إلخ): بطاقة تشغيل بسيطة تفتح
 ///   الرابط في التطبيق الخارجي المناسب عبر url_launcher، لأن تضمين
 ///   كل منصة موسيقى بمشغلها الخاص يحتاج SDK منفصلًا لكل منصة.
 class EmbeddedMediaPlayer extends StatelessWidget {
   final String url;
-  const EmbeddedMediaPlayer({super.key, required this.url});
+  /// true لرسائل الشات (غرفة أو خاص): يوتيوب يفتح عبر المشغّل العائم
+  /// فقط، لا تضمينًا داخل الفقاعة. false (الافتراضي) يحافظ على السلوك
+  /// القديم في السياقات الأخرى (الملف الشخصي، حائط الأصدقاء) التي لم
+  /// يطلب أحد تغييرها.
+  final bool routeYoutubeToFloatingPlayer;
+  const EmbeddedMediaPlayer({
+    super.key,
+    required this.url,
+    this.routeYoutubeToFloatingPlayer = false,
+  });
 
   bool get _youtubeSearch {
     final uri = Uri.tryParse(url);
@@ -58,6 +72,9 @@ class EmbeddedMediaPlayer extends StatelessWidget {
   Widget build(BuildContext context) {
     final videoId = _youtubeVideoId;
     if (videoId != null) {
+      if (routeYoutubeToFloatingPlayer) {
+        return _YoutubeFloatingLaunchCard(videoId: videoId);
+      }
       return _YoutubeEmbed(videoId: videoId);
     }
     if (_youtubeSearch) return _YoutubeSearchEmbed(url: url);
@@ -174,76 +191,191 @@ class _YoutubeEmbed extends StatelessWidget {
   Widget build(BuildContext context) => _InlineYoutubePlayer(videoId: videoId);
 }
 
-class _InlineYoutubePlayer extends ConsumerWidget {
+/// بطاقة مصغّرة لرابط يوتيوب داخل رسائل الشات: لا تضمين فيديو هنا إطلاقًا
+/// — الضغط عليها يُشغِّل الأغنية حصرًا عبر المشغّل العائم العام
+/// (miniPlayerProvider)، المستمر في الخلفية وعبر التنقّل بين الشاشات،
+/// بدل مشغّل مضمَّن مستقل داخل كل فقاعة رسالة على حدة.
+class _YoutubeFloatingLaunchCard extends ConsumerStatefulWidget {
   final String videoId;
-  const _InlineYoutubePlayer({required this.videoId});
+  const _YoutubeFloatingLaunchCard({required this.videoId});
+  @override
+  ConsumerState<_YoutubeFloatingLaunchCard> createState() =>
+      _YoutubeFloatingLaunchCardState();
+}
+
+class _YoutubeFloatingLaunchCardState
+    extends ConsumerState<_YoutubeFloatingLaunchCard> {
+  String? _title;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return ClipRRect(
+  void initState() {
+    super.initState();
+    unawaited(_fetchTitle());
+  }
+
+  /// يوتيوب يوفّر نقطة oEmbed عامة (بلا مفتاح API) تُرجع عنوان الفيديو
+  /// الحقيقي؛ بدونها لا سبيل لمعرفة اسم الأغنية من مجرّد رابط مُرسَل كنص.
+  Future<void> _fetchTitle() async {
+    try {
+      final res = await http.get(Uri.parse(
+          'https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${widget.videoId}&format=json'));
+      if (res.statusCode == 200 && mounted) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        setState(() => _title = data['title']?.toString());
+      }
+    } catch (_) {
+      // عنوان افتراضي يكفي؛ هذا تجميل لا أكثر.
+    }
+  }
+
+  void _playInFloatingPlayer() {
+    ref.read(miniPlayerProvider.notifier).state = MiniPlayerTrack(
+      videoId: widget.videoId,
+      title: _title ?? 'فيديو يوتيوب',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final nowPlaying =
+        ref.watch(miniPlayerProvider)?.videoId == widget.videoId;
+    const gold = Color(0xFFFFD700);
+    return InkWell(
       borderRadius: BorderRadius.circular(14),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          ref.read(miniPlayerProvider.notifier).state = MiniPlayerTrack(
-            videoId: videoId,
-            title: 'فيديو يوتيوب',
-            autoPlay: true,
-          );
-        },
-        child: Container(
-          width: double.infinity,
-          color: Colors.black,
-          child: AspectRatio(
-            aspectRatio: 16 / 9,
-            child: Stack(
-              fit: StackFit.expand,
+      onTap: _playInFloatingPlayer,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: p.surfaceHighlight,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: nowPlaying ? gold : p.divider),
+        ),
+        child: Row(children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              'https://i.ytimg.com/vi/${widget.videoId}/hqdefault.jpg',
+              width: 56,
+              height: 40,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 56,
+                height: 40,
+                color: Colors.black26,
+                child: const Icon(Icons.music_note, color: Colors.white38, size: 18),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                YoutubeThumbnail(videoId: videoId),
-                const Center(
-                  child: SizedBox(
-                    width: 70,
-                    height: 70,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.play_arrow_rounded,
-                        color: Color(0xFFEF1745),
-                        size: 44,
-                      ),
-                    ),
-                  ),
+                Text(
+                  _title ?? 'فيديو يوتيوب',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: p.textPrimary, fontSize: 12.5, fontWeight: FontWeight.w700),
                 ),
-                Positioned(
-                  top: 10,
-                  left: 10,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xCC111111),
-                      borderRadius: BorderRadius.circular(13),
-                      border: Border.all(color: Colors.white24),
-                    ),
-                    child: const Text(
-                      'YouTube',
-                      style: TextStyle(
-                        color: Color(0xFF22C55E),
-                        fontWeight: FontWeight.w900,
-                        fontSize: 9,
-                      ),
-                    ),
-                  ),
+                const SizedBox(height: 2),
+                Text(
+                  nowPlaying ? 'قيد التشغيل في المشغّل العائم' : 'اضغط للتشغيل في المشغّل العائم',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: nowPlaying ? gold : p.textMuted, fontSize: 10.5),
                 ),
               ],
             ),
           ),
-        ),
+          Icon(
+            nowPlaying ? Icons.graphic_eq_rounded : Icons.play_circle_fill_rounded,
+            color: nowPlaying ? gold : p.accent,
+            size: 26,
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _InlineYoutubePlayer extends StatefulWidget {
+  final String videoId;
+  const _InlineYoutubePlayer({required this.videoId});
+  @override
+  State<_InlineYoutubePlayer> createState() => _InlineYoutubePlayerState();
+}
+
+class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
+  // ثلاث محاولات متتالية هنا أخطأت، وأوثّقها حتى لا تتكرر الدائرة نفسها:
+  //   ١) الإعداد الافتراضي للمكتبة → "This video is unavailable, 152-4".
+  //   ٢) ضبط origin على نطاق التطبيق، ظنًّا أنه Referer فقط → اتضح من
+  //      مصدر المكتبة (assets/player.html) أن نفس القيمة تُستعمل أيضًا
+  //      كـhost الذي يُحمَّل منه مشغّل يوتيوب نفسه، وهو نطاق وهمي غير
+  //      موجود، فلم يُحمَّل أي شيء — الصندوق الأسود.
+  //   ٣) إبقاء host الحقيقي، ثم إعادة تحميل المشغّل مرة واحدة بعد
+  //      جهوزيته بـbaseUrl مختلف لتصحيح الـReferer → هذه إعادة التحميل
+  //      نفسها قاطعت تهيئة جلسة يوتيوب في منتصفها، فأنتج يوتيوب خطأه
+  //      العام "An error occurred. (Playback ID: …)" — جلسة بدأت فعلًا
+  //      (host صحيح) لكن تعطّلت بسبب تدخّلي، لا بسبب يوتيوب.
+  //
+  // لا مزيد من التدخل اليدوي بمسار المصادقة. هذا هو الاستعمال القياسي
+  // للمكتبة بإعدادها الافتراضي تمامًا — نفس ما تستعمله غالبية التطبيقات
+  // المنشورة بهذه الحزمة بنجاح لفيديوهات يوتيوب العامة العادية.
+  late final YoutubePlayerController _controller = YoutubePlayerController.fromVideoId(
+    videoId: widget.videoId,
+    autoPlay: true,
+    params: const YoutubePlayerParams(
+      showControls: true,
+      showFullscreenButton: true,
+      // Browsers commonly block autoplay with sound; start muted so the link starts immediately,
+      // while YouTube's own controls allow the user to unmute.
+      mute: true,
+      strictRelatedVideos: false,
+    ),
+  );
+
+  // يوتيوب يستخدم WebView داخليًا، والـWebView يبقى حيًّا لحظيًا بعد
+  // dispose() ريثما يُنظَّف الـplatform view. أي frame callback مجدوَل
+  // منه (كتحديث لون الخلفية) قد يُستدعى بعد أن صار الـState
+  // "defunct" فيحاول الوصول إلى context ويرمي "This widget has been
+  // unmounted". العلم يمنع أي عمل إضافي بعد التفكيك بلا الحاجة لتغيير
+  // الحزمة نفسها.
+  bool _disposed = false;
+
+  @override
+  void didUpdateWidget(covariant _InlineYoutubePlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_disposed) return;
+    if (oldWidget.videoId != widget.videoId) {
+      _controller.loadVideoById(videoId: widget.videoId);
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _controller.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_disposed) return const SizedBox.shrink();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      // يوتيوب يشترط ألا يقل المشغّل المضمَّن عن 200×200 بكسل. في فقاعة الشات
+      // كان ارتفاعه بنسبة 16:9 حوالي 146 فقط (عرض الفقاعة ~258)، فيُرفض.
+      // النسبة تُحسب بحيث لا يقل الارتفاع عن 200 مهما كان عرض الفقاعة.
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final w = c.maxWidth.isFinite ? c.maxWidth : 320.0;
+          final h = (w * 9 / 16) < 200 ? 200.0 : w * 9 / 16;
+          return YoutubePlayer(controller: _controller, aspectRatio: w / h);
+        },
       ),
     );
   }

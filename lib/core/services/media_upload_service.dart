@@ -16,14 +16,13 @@ class MediaUploadService {
   final String bucket;
 
   static const Map<String, int> maxBytes = {
-    'profile-avatars': 5 * 1024 * 1024,
+    'profile-avatars': 8 * 1024 * 1024,
     'avatar-frames': 8 * 1024 * 1024,
     'name-animations': 8 * 1024 * 1024,
     'chat-sounds': 5 * 1024 * 1024,
     'profile-music': 5 * 1024 * 1024,
     'media': 10 * 1024 * 1024,
     'chat-media-plus': 25 * 1024 * 1024,
-    'chat-voice': 10 * 1024 * 1024,
     'chat-badges': 8 * 1024 * 1024,
     'chat-welcome-images': 8 * 1024 * 1024,
     'profile-patterns': 15 * 1024 * 1024,
@@ -47,12 +46,11 @@ class MediaUploadService {
     },
     'chat-media-plus': {
       'png', 'jpg', 'jpeg', 'webp', 'gif', 'mp4', 'webm', 'mov',
-      'mp3', 'm4a', 'wav', 'ogg', 'aac', 'pdf', 'zip', 'doc', 'docx', 'txt'
+      'mp3', 'm4a', 'wav', 'ogg', 'aac', 'pdf', 'zip'
     },
-    'chat-voice': {'m4a', 'mp3', 'wav', 'ogg', 'aac', 'webm'},
     'media': {
       'png', 'jpg', 'jpeg', 'webp', 'gif', 'mp4', 'webm', 'mov',
-      'mp3', 'm4a', 'wav', 'ogg', 'aac', 'zip', 'pdf', 'doc', 'docx', 'txt'
+      'mp3', 'm4a', 'wav', 'ogg', 'aac', 'zip', 'pdf'
     },
   };
 
@@ -76,10 +74,17 @@ class MediaUploadService {
     required String fileName,
     required String folder,
     required String uid,
+    String? contentType,
   }) async {
     final ext = _extension(fileName);
     _validate(bytes: bytes, fileName: fileName, ext: ext, uid: uid);
-    final safeFolder = _cleanPart(folder);
+    // المجلد قد يكون متداخلًا (chat/attachments) وسياسات التخزين تتحقق من كل
+    // جزء منه حرفيًا — تنظيف النص كاملًا كان يحوّل "/" إلى "_" فيُرفض الرفع.
+    final safeFolder = folder
+        .split('/')
+        .where((part) => part.isNotEmpty)
+        .map(_cleanPart)
+        .join('/');
     final safeUid = _cleanPart(uid);
     final safeName = _cleanFileName(fileName, ext);
     final path = bucket == 'profile-avatars'
@@ -89,7 +94,7 @@ class MediaUploadService {
       bytes: bytes,
       fileName: fileName,
       path: path,
-      contentType: _contentTypeFor(ext),
+      contentType: contentType ?? _contentTypeFor(ext),
     );
   }
 
@@ -250,9 +255,6 @@ class MediaUploadService {
         'ogg' => 'audio/ogg',
         'm4a' => 'audio/mp4',
         'aac' => 'audio/aac',
-        'doc' => 'application/msword',
-        'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'txt' => 'text/plain',
         'zip' => 'application/zip',
         'pdf' => 'application/pdf',
         _ => 'application/octet-stream',

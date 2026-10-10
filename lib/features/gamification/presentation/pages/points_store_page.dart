@@ -1,4 +1,5 @@
 import '../../../../core/data/supabase_document_compat.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -406,7 +407,7 @@ class _ProductCardState extends State<_ProductCard> {
 
     if (user == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         const SnackBar(
           content: Text('جلسة المستخدم غير موجودة.'),
         ),
@@ -463,12 +464,12 @@ class _ProductCardState extends State<_ProductCard> {
 
       result.fold(
         (failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context).showSnackBarSfx(
             SnackBar(content: Text(failure.message)),
           );
         },
         (_) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context).showSnackBarSfx(
             const SnackBar(
               content: Text('تم شراء العنصر ✓'),
             ),
@@ -478,7 +479,7 @@ class _ProductCardState extends State<_ProductCard> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(
           content: Text('لم يكتمل الشراء: $e'),
         ),
@@ -513,7 +514,7 @@ class _ProductCardState extends State<_ProductCard> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         const SnackBar(
           content: Text('تم تأكيد العملية من الخادم.'),
         ),
@@ -521,7 +522,7 @@ class _ProductCardState extends State<_ProductCard> {
     } on SupabaseFunctionException catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(
           content: Text(
             e.message ?? 'لم تكتمل عملية العضوية.',
@@ -568,12 +569,12 @@ class _ProductCardState extends State<_ProductCard> {
         'tierId': widget.product.membershipTier,
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         const SnackBar(content: Text('تم إهداء العضوية مجانًا من DRAGON.')),
       );
     } on SupabaseFunctionException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text(e.message ?? 'تعذر الإهداء.')),
       );
     }

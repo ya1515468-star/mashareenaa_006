@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -34,10 +35,10 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
     setState(() => _submitting = false);
     if (error != null) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error)));
+          .showSnackBarSfx(SnackBar(content: Text(error)));
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBarSfx(
       const SnackBar(content: Text('تم استلام طلب حذف الحساب')),
     );
     Navigator.of(context).popUntil((route) => route.isFirst);

@@ -1,4 +1,5 @@
 import 'package:file_picker/file_picker.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -84,13 +85,13 @@ class _VipChatRuntimeCenterPageState
     try {
       await _saveSetting('value', _smartMuteSeconds);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(
         content: Text('تم حفظ مدة الكتم الذكي وربطها بخدمة أصوات الشات ✓'),
       ));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('تعذر الحفظ: $e')));
+            .showSnackBarSfx(SnackBar(content: Text('تعذر الحفظ: $e')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -101,7 +102,7 @@ class _VipChatRuntimeCenterPageState
     final label = _tipLabelController.text.trim();
     final amount = int.tryParse(_tipAmountController.text.trim());
     if (label.isEmpty || amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(
         content: Text('أدخل عنوانًا ومقدار دعم صالحًا.'),
       ));
       return;
@@ -111,14 +112,14 @@ class _VipChatRuntimeCenterPageState
       await _saveSetting('value', label);
       await _saveSetting('default_amount', amount);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(
           content: Text('تم حفظ إعدادات زر دعم المنشئ ✓'),
         ));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('تعذر الحفظ: $e')));
+            .showSnackBarSfx(SnackBar(content: Text('تعذر الحفظ: $e')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -180,7 +181,7 @@ class _VipChatRuntimeCenterPageState
               final bytes = picked?.files.single.bytes;
               if (!mounted || bytes == null) return;
               final ok = bytes.length <= 25 * 1024 * 1024;
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(
                 content: Text(ok
                     ? 'فحص محلي: الملف ضمن حد 25MB.'
                     : 'فحص محلي: الملف يتجاوز حد 25MB.'),

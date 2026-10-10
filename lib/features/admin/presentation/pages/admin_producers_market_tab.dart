@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -170,7 +171,7 @@ class _ReelAdminCardState extends State<_ReelAdminCard> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
         );
       }
@@ -405,7 +406,7 @@ class _QuotaPanel extends ConsumerWidget {
   }
 }
 
-class _QuotaEditCard extends StatefulWidget {
+class _QuotaEditCard extends ConsumerStatefulWidget {
   final String tierKey;
   final String nameAr;
   final String emoji;
@@ -427,10 +428,10 @@ class _QuotaEditCard extends StatefulWidget {
   });
 
   @override
-  State<_QuotaEditCard> createState() => _QuotaEditCardState();
+  ConsumerState<_QuotaEditCard> createState() => _QuotaEditCardState();
 }
 
-class _QuotaEditCardState extends State<_QuotaEditCard> {
+class _QuotaEditCardState extends ConsumerState<_QuotaEditCard> {
   late final TextEditingController _ctrl;
   late final TextEditingController _pointsCtrl;
   late final TextEditingController _gemsCtrl;
@@ -476,8 +477,11 @@ class _QuotaEditCardState extends State<_QuotaEditCard> {
         'p_allow_download': true,
         'p_is_enabled': true,
       });
+      // الجدول FutureProvider لا يتحدّث تلقائيًا كما تفعل تدفّقات الريلز؛
+      // نُبطله بعد الكتابة لتعرض البطاقات القيم الجديدة فورًا.
+      ref.invalidate(_reelQuotaProvider);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           const SnackBar(
             content: Text('تم تحديث الحصة'),
             backgroundColor: Colors.green,
@@ -486,7 +490,7 @@ class _QuotaEditCardState extends State<_QuotaEditCard> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
         );
       }
@@ -667,7 +671,7 @@ class _ListingAdminCardState extends State<_ListingAdminCard> {
           params: {'p_ad_id': widget.listing['id'], 'p_status': 'published'});
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
         );
       }
@@ -706,7 +710,7 @@ class _ListingAdminCardState extends State<_ListingAdminCard> {
           params: {'p_ad_id': widget.listing['id'], 'p_status': 'blocked'});
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
           SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
         );
       }

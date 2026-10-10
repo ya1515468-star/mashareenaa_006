@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -126,7 +127,7 @@ class _AdminGiftDialogState extends State<_AdminGiftDialog> {
       await widget.onConfirmGift(userId, const Uuid().v4());
       if (!mounted) return;
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم إهداء «${widget.itemLabel}» بنجاح ✓'), backgroundColor: Colors.green.shade700));
+      ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تم إهداء «${widget.itemLabel}» بنجاح ✓'), backgroundColor: Colors.green.shade700));
     } catch (e) {
       setState(() => _error = _friendlyLookupError(e));
     } finally {

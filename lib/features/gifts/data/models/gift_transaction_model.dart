@@ -18,7 +18,7 @@ class GiftTransactionModel extends GiftTransactionEntity {
       fromUid: map['fromUid'] as String? ?? '',
       toUid: map['toUid'] as String? ?? '',
       pricePoints: map['pricePoints'] as int? ?? 0,
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: parseFlexibleTimestamp(map['createdAt']),
     );
   }
 }

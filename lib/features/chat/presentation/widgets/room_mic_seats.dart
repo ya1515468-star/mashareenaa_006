@@ -1,10 +1,11 @@
-import '../../../../core/services/realtime_resilience.dart';
 import 'dart:async';
+import '../../../../core/services/snack_sfx.dart';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/dynamic_avatar_frame.dart';
+import '../../../../core/services/resilient_realtime_channel.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -25,7 +26,7 @@ class RoomMicSeats extends StatefulWidget {
 class _RoomMicSeatsState extends State<RoomMicSeats> {
   final _db = Supabase.instance.client;
   Map<String, dynamic>? _state;
-  RealtimeChannel? _channel;
+  ResilientRealtimeChannel? _channelRes;
   final _voice = _RoomVoice();
   bool _busy = false;
   bool _isOwner = false;
@@ -48,32 +49,31 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
       if (mounted) setState(() => _isOwner = v == true);
     }).catchError((_) {});
     _load();
-    _channel = _db.channel('room_mic:${widget.roomId}')
-      ..onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'room_mic_seats',
-          filter: PostgresChangeFilter(
-              type: PostgresChangeFilterType.eq, column: 'room_id', value: widget.roomId),
-          callback: (_) => _load())
-      ..onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'room_mic_settings',
-          filter: PostgresChangeFilter(
-              type: PostgresChangeFilterType.eq, column: 'room_id', value: widget.roomId),
-          callback: (_) => _load())
-      ..subscribe((_, error) {
-        if (error != null) {
-          RealtimeResilience.instance.recoverAfterChannelFailure();
-        }
-      });
+    // كانت .subscribe() بلا أي معالجة لحالتها — انقطاع التوكن أو الشبكة
+    // لحظيًا يُسقط تحديثات الكراسي الحيّة إلى الأبد بلا أي تعافٍ تلقائي.
+    _channelRes = ResilientRealtimeChannel(
+      client: _db,
+      build: (client) => client.channel('room_mic:${widget.roomId}')
+        ..onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'room_mic_seats',
+            filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq, column: 'room_id', value: widget.roomId),
+            callback: (_) => _load())
+        ..onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: 'room_mic_settings',
+            filter: PostgresChangeFilter(
+                type: PostgresChangeFilterType.eq, column: 'room_id', value: widget.roomId),
+            callback: (_) => _load()),
+    );
   }
 
   @override
   void dispose() {
-    final ch = _channel;
-    if (ch != null) unawaited(_db.removeChannel(ch));
+    unawaited(_channelRes?.dispose());
     unawaited(_voice.leave());
     _voice.speaking.dispose();
     super.dispose();
@@ -107,13 +107,10 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
       }
       if (shouldSpeak != _voice.publisher) {
         await _voice.refreshRole(widget.roomId);
-      }
-      // سجّل معرّف Agora الحالي على الخادم حتى لو بدأ المستخدم بالفعل
-      // كمتحدّث عند أول تحميل الشاشة؛ من دون ذلك يبقى agora_uid فارغًا
-      // ولا يستطيع مؤشر "يتحدث الآن" مطابقة متحدثي Agora بالكرسي.
-      if (_voice.publisher && _voice.uid != null && mine != null) {
-        unawaited(_db.rpc('set_my_mic_agora_uid',
-            params: {'p_room': widget.roomId, 'p_agora_uid': _voice.uid}));
+        if (_voice.publisher && _voice.uid != null) {
+          unawaited(_db.rpc('set_my_mic_agora_uid',
+              params: {'p_room': widget.roomId, 'p_agora_uid': _voice.uid}));
+        }
       }
       if (mine != null) {
         await _voice.setMuted(mine['self_muted'] == true || mine['muted'] == true);
@@ -124,7 +121,7 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
   }
 
   void _toast(String t) =>
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(t)));
+      ScaffoldMessenger.maybeOf(context)?.showSnackBarSfx(SnackBar(content: Text(t)));
 
   String _err(Object e) {
     final t = e.toString();
@@ -378,14 +375,13 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
   }
 
   Widget _seat(Map<String, dynamic> s, Set<int> speaking) {
-    final control = _state?['can_control'] == true;
     final occupant = s['user_id']?.toString();
     final locked = s['locked'] == true;
     final muted = s['muted'] == true || s['self_muted'] == true;
     final agoraUid = (s['agora_uid'] as num?)?.toInt();
     final isMe = occupant != null && occupant == _me;
     final talking = occupant != null && !muted &&
-        (agoraUid != null && speaking.contains(agoraUid));
+        ((isMe && speaking.contains(0)) || (agoraUid != null && speaking.contains(agoraUid)));
     final avatar = s['avatar']?.toString() ?? '';
 
     return GestureDetector(
@@ -441,39 +437,6 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
                   child: Icon(Icons.mic_off, size: 11, color: Colors.white),
                 ),
               ),
-            if (isMe)
-              Positioned(
-                top: -4,
-                right: -4,
-                child: _SeatQuickButton(
-                  icon: s['muted'] == true
-                      ? Icons.volume_off_rounded
-                      : (s['self_muted'] == true ? Icons.mic_off_rounded : Icons.mic_rounded),
-                  color: s['muted'] == true
-                      ? const Color(0xFFE11D48)
-                      : (s['self_muted'] == true ? const Color(0xFFE11D48) : const Color(0xFF16A34A)),
-                  onTap: _busy || s['muted'] == true
-                      ? null
-                      : () => _rpc('set_my_mic_muted', {
-                            'p_room': widget.roomId,
-                            'p_muted': s['self_muted'] != true,
-                          }),
-                ),
-              )
-            else if (control && occupant != null)
-              Positioned(
-                top: -4,
-                right: -4,
-                child: _SeatQuickButton(
-                  icon: muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-                  color: muted ? const Color(0xFFE11D48) : const Color(0xFF7C3AED),
-                  onTap: _busy ? null : () => _rpc('room_mic_admin', {
-                    'p_room': widget.roomId,
-                    'p_action': muted ? 'unmute' : 'mute',
-                    'p_seat': (s['index'] as num).toInt(),
-                  }),
-                ),
-              ),
           ]),
           const SizedBox(height: 3),
           Text(
@@ -526,29 +489,13 @@ class _RoomVoice {
         } catch (_) {}
       },
       onAudioVolumeIndication: (_, speakers, __, ___) {
-        final localUid = uid;
-        if (localUid == null) return;
-        final active = <int>{};
-        for (final s in speakers) {
-          final volume = s.volume ?? 0;
-          final vad = s.vad ?? 0;
-          if (volume <= 12 && vad != 1) continue;
-          // Agora reports the local speaker as uid=0 in this callback.
-          if (s.uid == 0) {
-            active.add(localUid);
-          } else if (s.uid != null) {
-            active.add(s.uid!);
-          }
-        }
-        if (speaking.value.length != active.length || !speaking.value.containsAll(active)) {
-          speaking.value = active;
-        }
+        speaking.value = {
+          for (final s in speakers)
+            if ((s.volume ?? 0) > 12 && s.uid != null) s.uid!,
+        };
       },
     ));
     await engine.enableAudio();
-    try {
-      await engine.setDefaultAudioRouteToSpeakerphone(true);
-    } catch (_) {}
     try {
       await engine.enableAudioVolumeIndication(interval: 400, smooth: 3, reportVad: true);
     } catch (_) {}
@@ -566,9 +513,6 @@ class _RoomVoice {
       ),
     );
     joined = true;
-    try {
-      await engine.setEnableSpeakerphone(true);
-    } catch (_) {}
   }
 
   /// يطلب رمزًا جديدًا يعكس الدور الحالي على الخادم، ثم يحدّث الدور محليًا.
@@ -583,10 +527,6 @@ class _RoomVoice {
           publisher ? ClientRoleType.clientRoleBroadcaster : ClientRoleType.clientRoleAudience,
       publishMicrophoneTrack: publisher,
     ));
-    try {
-      await engine.enableLocalAudio(publisher);
-      await engine.setEnableSpeakerphone(true);
-    } catch (_) {}
   }
 
   Future<void> setMuted(bool muted) async {
@@ -606,23 +546,4 @@ class _RoomVoice {
       await engine.release();
     } catch (_) {}
   }
-}
-
-
-class _SeatQuickButton extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final VoidCallback? onTap;
-  const _SeatQuickButton({required this.icon, required this.color, required this.onTap});
-  @override
-  Widget build(BuildContext context) => Material(
-        color: color,
-        shape: const CircleBorder(),
-        elevation: 3,
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: SizedBox(width: 22, height: 22, child: Icon(icon, color: Colors.white, size: 12)),
-        ),
-      );
 }

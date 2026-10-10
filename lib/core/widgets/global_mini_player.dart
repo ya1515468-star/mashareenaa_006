@@ -1,613 +1,173 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../providers/mini_player_provider.dart';
 
-/// مشغل YouTube عائم واحد مشترك بين الغرفة والخاص.
-/// عند التصغير يبقى WebView حيًا ومرئيًا داخل mini player، حتى لا ينقطع الصوت أثناء
-/// التنقل. وعند التكبير يعود الفيديو بالحجم الكامل.
+/// شريط عائم ثابت فوق التطبيق كله (يُركَّب في MaterialApp.builder في
+/// main.dart، لا داخل أي شاشة)، فيبقى حيًّا عبر كل تنقّل — بين الغرف،
+/// الخاص، وأقسام المنصة الأخرى — حتى يُغلَق يدويًا. هذا يحقّق "يستمر
+/// بالتشغيل عند الانتقال" مع إبقاء مشغّل الفيديو المضمَّن داخل فقاعة
+/// الرسالة نفسه محليًّا (يتوقف تلقائيًا بمغادرة تلك الشاشة بحكم دورة
+/// حياة الودجت العادية؛ هذان مشغّلان منفصلان تمامًا لا يتداخلان).
+///
+/// حالتان بصريتان لمتحكّم واحد لا يُعاد بناؤه بين الحالتين (هذا ما يُبقي
+/// الصوت متواصلًا بلا أي قطع عند التبديل):
+/// - نافذة عائمة (الوضع الافتراضي عند بدء أي مقطع): بطاقة صغيرة فيها
+///   الفيديو ظاهرًا فعليًا + زرّا "تصغير" و"إغلاق".
+/// - مُصغَّرة: شريط أيقونة فقط (نفس تصميم الإصدار السابق) بعد الضغط على
+///   "تصغير"؛ الفيديو يستمر بالتشغيل في الخلفية دون أي تغيير في المتحكّم،
+///   والضغط على الشريط أو زر الاستعادة يعيدها نافذة عائمة من جديد.
+/// "إغلاق" (✕) في كلتا الحالتين ينهي التشغيل كليًا ويُزيل الشريط.
+// ملاحظة: هذا الودجت يُركَّب في MaterialApp.builder فوق Navigator، أي بلا
+// أي Overlay سلف — لذلك لا يجوز استعمال tooltip في IconButton هنا (يرمي
+// "No Overlay widget found" فينهار التخطيط كله ويظهر الصندوق الأحمر).
 class GlobalMiniPlayer extends ConsumerStatefulWidget {
   const GlobalMiniPlayer({super.key});
-
   @override
   ConsumerState<GlobalMiniPlayer> createState() => _GlobalMiniPlayerState();
 }
 
 class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
   YoutubePlayerController? _controller;
-  StreamSubscription<YoutubePlayerValue>? _subscription;
   String? _currentId;
-  String? _autoPlayConsumedId;
-  bool _compact = true;
-  bool _blocked = false;
-  bool _loading = false;
-  bool _muted = false;
-  int? _errorCode;
-
-  // 152 is not a current official IFrame API error code. Do not turn a
-  // transient/legacy 152 report into a permanent blocked state.
-  static const _blockedCodes = <int>{2, 5, 100, 101, 150, 153};
-
-  void _disposeController() {
-    unawaited(_subscription?.cancel());
-    _subscription = null;
-    final old = _controller;
-    _controller = null;
-    if (old != null) unawaited(old.close());
-  }
-
-  void _attachController(YoutubePlayerController controller) {
-    _subscription = controller.listen((value) {
-      if (!mounted || !identical(_controller, controller)) return;
-      final code = value.error.code;
-      final blocked = _blockedCodes.contains(code);
-      if (blocked != _blocked || code != _errorCode) {
-        setState(() {
-          _blocked = blocked;
-          _errorCode = blocked ? code : null;
-          if (blocked) _loading = false;
-        });
-      }
-    });
-  }
-
-  Future<void> _loadIntoController(
-    YoutubePlayerController controller,
-    String videoId, {
-    required bool autoPlay,
-  }) async {
-    try {
-      if (autoPlay) {
-        await controller.loadVideoById(videoId: videoId);
-      } else {
-        await controller.cueVideoById(videoId: videoId);
-      }
-      // Explicitly restore audio after every load.
-      await controller.unMute();
-      await controller.setVolume(100);
-      _muted = false;
-
-      if (!mounted || !identical(_controller, controller)) return;
-      setState(() {
-        _loading = false;
-        _blocked = false;
-        _errorCode = null;
-      });
-    } catch (_) {
-      if (!mounted || !identical(_controller, controller)) return;
-      setState(() {
-        _loading = false;
-        _blocked = true;
-        _errorCode ??= 153;
-      });
-    }
-  }
-
-  Future<void> _playCurrent(YoutubePlayerController controller) async {
-    try {
-      await controller.unMute();
-      await controller.setVolume(100);
-      _muted = false;
-      await controller.playVideo();
-      if (mounted && identical(_controller, controller)) {
-        setState(() {
-          _blocked = false;
-          _errorCode = null;
-        });
-      }
-    } catch (_) {
-      if (!mounted || !identical(_controller, controller)) return;
-      setState(() => _blocked = true);
-    }
-  }
 
   void _syncController(MiniPlayerTrack? track) {
     if (track == null) {
-      if (_controller != null) _disposeController();
+      _controller?.close();
+      _controller = null;
       _currentId = null;
-      _autoPlayConsumedId = null;
-      _blocked = false;
-      _loading = false;
-      _errorCode = null;
-      _muted = false;
       return;
     }
-
-    if (_currentId == track.videoId && _controller != null) {
-      if (track.autoPlay && _autoPlayConsumedId != track.videoId) {
-        _autoPlayConsumedId = track.videoId;
-        final controller = _controller!;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || !identical(_controller, controller)) return;
-          unawaited(_playCurrent(controller));
-        });
-      }
-      return;
-    }
-
+    if (_currentId == track.videoId) return;
     _currentId = track.videoId;
-    _autoPlayConsumedId = track.autoPlay ? track.videoId : null;
-    _compact = true;
-    _blocked = false;
-    _loading = true;
-    _errorCode = null;
-    _muted = false;
-
-    _disposeController();
-
-    final created = YoutubePlayerController(
-      key: track.videoId,
-      params: const YoutubePlayerParams(
-        showControls: true,
-        showFullscreenButton: true,
-        mute: false,
-        strictRelatedVideos: false,
-        interfaceLanguage: 'ar',
-        privacyEnhancedMode: true,
-        origin: 'https://com.mashareena.mashareena',
-      ),
-    );
-    _controller = created;
-    _attachController(created);
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !identical(_controller, created)) return;
-      unawaited(
-        _loadIntoController(
-          created,
-          track.videoId,
-          autoPlay: track.autoPlay,
+    // مقطع جديد يبدأ دائمًا كنافذة عائمة كاملة، بصرف النظر عن حالة التصغير
+    // التي رُبما تُركت عليها نافذة المقطع السابق. لا setState هنا: هذا
+    // يُستدعى من build قبل استعمال _minimized في هذا التمريرة نفسها.
+    if (_controller == null) {
+      // نفس الإعداد الافتراضي الذي ثبت استقراره لمشغّل الفقاعة — بلا أي
+      // origin مخصّص ولا إعادة تحميل، بعد ثلاث محاولات فاشلة هناك أثبتت
+      // أن التدخل اليدوي في هذا المسار يكسر التشغيل أكثر مما يصلحه.
+      _controller = YoutubePlayerController.fromVideoId(
+        videoId: track.videoId,
+        autoPlay: true,
+        params: const YoutubePlayerParams(
+          showControls: false,
+          mute: false,
+          strictRelatedVideos: false,
         ),
       );
-    });
+    } else {
+      _controller!.loadVideoById(videoId: track.videoId);
+    }
   }
 
   @override
   void dispose() {
-    _disposeController();
+    _controller?.close();
     super.dispose();
   }
 
-  Future<void> _openInYoutube(String videoId) async {
-    final uri = Uri.parse('https://www.youtube.com/watch?v=$videoId');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
-  Future<void> _toggleMute(YoutubePlayerController controller) async {
-    try {
-      if (_muted) {
-        await controller.unMute();
-        await controller.setVolume(100);
-      } else {
-        await controller.mute();
-      }
-      if (mounted) setState(() => _muted = !_muted);
-    } catch (_) {}
-  }
-
-  void _close() {
-    ref.read(miniPlayerProvider.notifier).state = null;
-  }
-
-  Future<void> _playPause(YoutubePlayerController controller) async {
-    try {
-      final value = controller.value;
-      if (value.playerState == PlayerState.playing) {
-        await controller.pauseVideo();
-      } else {
-        await _playCurrent(controller);
-      }
-    } catch (_) {}
-  }
-
-  Widget _playPauseButton(
-    YoutubePlayerController controller, {
-    double size = 40,
-    Color background = const Color(0xFF111827),
-  }) {
-    return YoutubeValueBuilder(
-      controller: controller,
-      builder: (_, value) {
-        final playing = value.playerState == PlayerState.playing;
-        return Material(
-          color: background,
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: _loading
-                ? null
-                : () => unawaited(
-                      (playing
-                              ? controller.pauseVideo()
-                              : _playCurrent(controller))
-                          .catchError((_) {}),
-                    ),
-            child: SizedBox(
-              width: size,
-              height: size,
-              child: Icon(
-                playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                color: Colors.white,
-                size: size * .55,
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _compactView(
-    MiniPlayerTrack track,
-    YoutubePlayerController controller,
-  ) {
-    return Container(
-      height: 76,
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1A1230), Color(0xFF302060)],
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: const Color(0xFF8D6BFF).withValues(alpha: .65),
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black54,
-            blurRadius: 16,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Row(
-        textDirection: TextDirection.ltr,
-        children: [
-          // Keep the real YouTube platform view mounted and visible at a
-          // useful mini size. Hiding it at 1x1 can pause the WebView on
-          // Android, which breaks continuous playback during navigation.
-          ClipRRect(
-            borderRadius: BorderRadius.circular(11),
-            child: SizedBox(
-              width: 92,
-              height: 52,
-              child: YoutubePlayer(
-                controller: controller,
-                aspectRatio: 16 / 9,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Directionality(
-              textDirection: TextDirection.rtl,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    track.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Icon(
-                        _muted
-                            ? Icons.volume_off_rounded
-                            : Icons.volume_up_rounded,
-                        color: _muted
-                            ? const Color(0xFFFCA5A5)
-                            : const Color(0xFF4ADE80),
-                        size: 14,
-                      ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          _muted ? 'مكتوم' : 'يعمل أثناء التنقل',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white60,
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints.tightFor(width: 38, height: 38),
-            tooltip: _muted ? 'إلغاء الكتم' : 'كتم',
-            onPressed: _loading
-                ? null
-                : () => unawaited(_toggleMute(controller)),
-            icon: Icon(
-              _muted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
-              color: _muted
-                  ? const Color(0xFFFCA5A5)
-                  : const Color(0xFF4ADE80),
-              size: 20,
-            ),
-          ),
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints.tightFor(width: 38, height: 38),
-            tooltip: 'إيقاف مؤقت / تشغيل',
-            onPressed: _loading ? null : () => unawaited(_playPause(controller)),
-            icon: YoutubeValueBuilder(
-              controller: controller,
-              builder: (_, value) => Icon(
-                value.playerState == PlayerState.playing
-                    ? Icons.pause_rounded
-                    : Icons.play_arrow_rounded,
-                color: Colors.white,
-                size: 23,
-              ),
-            ),
-          ),
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints.tightFor(width: 38, height: 38),
-            tooltip: 'تكبير',
-            onPressed: () => setState(() => _compact = false),
-            icon: const Icon(
-              Icons.open_in_full_rounded,
-              color: Color(0xFFD9CCFF),
-              size: 20,
-            ),
-          ),
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints.tightFor(width: 38, height: 38),
-            tooltip: 'إغلاق',
-            onPressed: _close,
-            icon: const Icon(
-              Icons.close_rounded,
-              color: Color(0xFFFCA5A5),
-              size: 21,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _expandedView(
-    MiniPlayerTrack track,
-    YoutubePlayerController controller,
-  ) {
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 470),
-      padding: const EdgeInsets.fromLTRB(8, 5, 8, 6),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF17101F), Color(0xFF21163A)],
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: const Color(0xFF7C3AED).withValues(alpha: .65),
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black54,
-            blurRadius: 15,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            textDirection: TextDirection.rtl,
-            children: [
-              const Icon(
-                Icons.play_circle_fill_rounded,
-                color: Color(0xFFFFD600),
-                size: 24,
-              ),
-              const SizedBox(width: 7),
-              Expanded(
-                child: Text(
-                  track.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                tooltip: 'تصغير',
-                onPressed: () => setState(() => _compact = true),
-                icon: const Icon(
-                  Icons.remove_rounded,
-                  color: Color(0xFFD9CCFF),
-                  size: 22,
-                ),
-              ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                tooltip: 'إغلاق',
-                onPressed: _close,
-                icon: const Icon(
-                  Icons.close_rounded,
-                  color: Color(0xFFFCA5A5),
-                  size: 22,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          if (_blocked)
-            _fallback(track)
-          else
-            SizedBox(
-              width: double.infinity,
-              height: 220,
-              child: YoutubePlayer(
-                controller: controller,
-                aspectRatio: 16 / 9,
-              ),
-            ),
-          YoutubeValueBuilder(
-            controller: controller,
-            builder: (_, value) {
-              final playing = value.playerState == PlayerState.playing;
-              return Row(
-                textDirection: TextDirection.rtl,
-                children: [
-                  IconButton(
-                    tooltip: playing ? 'إيقاف مؤقت' : 'تشغيل',
-                    onPressed: _loading
-                        ? null
-                        : () => unawaited(
-                              (playing
-                                      ? controller.pauseVideo()
-                                      : _playCurrent(controller))
-                                  .catchError((_) {}),
-                            ),
-                    icon: Icon(
-                      playing
-                          ? Icons.pause_circle_filled_rounded
-                          : Icons.play_circle_fill_rounded,
-                      color: const Color(0xFF67E8F9),
-                      size: 31,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: _muted ? 'إلغاء الكتم' : 'كتم',
-                    onPressed: _loading
-                        ? null
-                        : () => unawaited(_toggleMute(controller)),
-                    icon: Icon(
-                      _muted
-                          ? Icons.volume_off_rounded
-                          : Icons.volume_up_rounded,
-                      color: _muted
-                          ? const Color(0xFFFCA5A5)
-                          : const Color(0xFF4ADE80),
-                      size: 23,
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton.icon(
-                    onPressed: () => unawaited(_openInYoutube(track.videoId)),
-                    icon: const Icon(Icons.open_in_new_rounded, size: 17),
-                    label: const Text('فتح في يوتيوب'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFFC4B5FD),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _fallback(MiniPlayerTrack track) {
-    final ownerBlocked =
-        _errorCode == 101 || _errorCode == 150 || _errorCode == 153;
-    return Container(
-      constraints: const BoxConstraints(minHeight: 180),
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF221238), Color(0xFF111827)],
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.ondemand_video_rounded,
-            color: Color(0xFFA78BFA),
-            size: 40,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            ownerBlocked
-                ? 'هذا الفيديو يمنع التضمين داخل المشغل.'
-                : 'تعذّر تشغيل فيديو يوتيوب داخل المشغل.',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          if (_errorCode != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                'رمز YouTube: $_errorCode',
-                style: const TextStyle(color: Colors.white54, fontSize: 11),
-              ),
-            ),
-          const SizedBox(height: 11),
-          FilledButton.icon(
-            onPressed: () => unawaited(_openInYoutube(track.videoId)),
-            icon: const Icon(Icons.open_in_new_rounded, size: 17),
-            label: const Text('فتح في يوتيوب'),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF8B5CF6),
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  void _close() => ref.read(miniPlayerProvider.notifier).state = null;
 
   @override
   Widget build(BuildContext context) {
     final track = ref.watch(miniPlayerProvider);
+    final minimized = ref.watch(miniPlayerMinimizedProvider);
+    // مقطع جديد يبدأ دائمًا كنافذة عائمة كاملة.
+    ref.listen<MiniPlayerTrack?>(miniPlayerProvider, (prev, next) {
+      if (next != null && next.videoId != prev?.videoId) {
+        ref.read(miniPlayerMinimizedProvider.notifier).state = false;
+      }
+    });
     _syncController(track);
-
     final controller = _controller;
-    if (track == null || controller == null) {
-      return const SizedBox.shrink();
-    }
+    if (track == null || controller == null) return const SizedBox.shrink();
 
+    return _buildPlayer(controller, track, minimized);
+  }
+
+  // مفتاح ثابت للمشغّل: تبديل التصغير/التكبير يغيّر خصائص الإطار فقط (حجم،
+  // شفافية، إخفاء الرأس) ولا يهدم شجرة الودجت — هدمها كان يُتلف iframe
+  // يوتيوب فيتوقف الفيديو. نفس العناصر بنفس الترتيب في الحالتين دائمًا.
+  final GlobalKey _playerKey = GlobalKey();
+
+  Widget _buildPlayer(
+      YoutubePlayerController controller, MiniPlayerTrack track, bool minimized) {
+    const width = 188.0;
+    const videoHeight = width * 9 / 16;
     return Positioned(
-      left: 8,
-      right: 8,
-      bottom: 72,
-      child: Material(
-        color: Colors.transparent,
-        child: AnimatedSize(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          alignment: Alignment.topCenter,
-          child: _compact
-              ? _compactView(track, controller)
-              : _expandedView(track, controller),
+      left: minimized ? 0 : 14,
+      top: minimized ? 0 : 130,
+      width: minimized ? 200 : width,
+      child: IgnorePointer(
+        ignoring: minimized,
+        // في التصغير: شبه شفاف (لا Offstage) كي يبقى المشغّل مرسومًا فعليًا
+        // ويستمر الصوت، وتظهر أيقونته في شريط الكتابة عبر MiniPlayerChip.
+        child: Opacity(
+          opacity: minimized ? 0.01 : 1,
+          child: Material(
+            color: Colors.transparent,
+            child: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF17101F),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: minimized
+                      ? null
+                      : const [BoxShadow(color: Colors.black54, blurRadius: 14)],
+                  border: Border.all(
+                      color: minimized ? Colors.transparent : Colors.white12),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Offstage(
+                    offstage: minimized,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 4, 2, 4),
+                      child: Row(children: [
+                        Expanded(
+                          child: Text(
+                            track.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.remove_rounded,
+                              color: Colors.white54, size: 18),
+                          onPressed: () => ref
+                              .read(miniPlayerMinimizedProvider.notifier)
+                              .state = true,
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.close_rounded,
+                              color: Colors.white54, size: 18),
+                          onPressed: _close,
+                        ),
+                      ]),
+                    ),
+                  ),
+                  SizedBox(
+                    width: minimized ? 200 : width,
+                    height: minimized ? 200 : videoHeight,
+                    child: YoutubePlayer(
+                      key: _playerKey,
+                      controller: controller,
+                      aspectRatio: minimized ? 1 : 16 / 9,
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          ),
         ),
       ),
     );

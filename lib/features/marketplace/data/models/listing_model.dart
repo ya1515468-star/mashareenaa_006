@@ -30,7 +30,7 @@ class ListingModel extends ListingEntity {
       category: map['category'] as String? ?? 'other',
       imageUrls: List<String>.from(map['imageUrls'] as List? ?? []),
       status: ListingStatusX.fromWire(map['status'] as String?),
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: parseFlexibleTimestamp(map['createdAt']),
     );
   }
 

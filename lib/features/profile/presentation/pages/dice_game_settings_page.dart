@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../widgets/account_setting_tiles.dart';
 
@@ -50,7 +51,7 @@ class _DiceGameSettingsPageState extends State<DiceGameSettingsPage> {
       'theme': _theme,
     });
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBarSfx(
         const SnackBar(content: Text('تم حفظ إعدادات لعبة النرد ✓')));
   }
 

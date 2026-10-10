@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/widgets/cross_platform_image.dart';
@@ -40,7 +41,7 @@ Future<void> showReportDialog({
           );
 
   if (!context.mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
+  ScaffoldMessenger.of(context).showSnackBarSfx(
     SnackBar(
         content:
             Text(success ? 'تم إرسال البلاغ، شكرًا لك' : 'تعذّر إرسال البلاغ')),
@@ -87,7 +88,7 @@ class _ReportDialogBodyState extends State<_ReportDialogBody> {
       } catch (e) {
         if (mounted) {
           setState(() => _uploading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context).showSnackBarSfx(
             SnackBar(content: Text('فشل رفع صورة التوثيق: $e')),
           );
         }

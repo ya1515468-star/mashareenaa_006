@@ -432,7 +432,10 @@ class MessageBubble extends ConsumerWidget {
                         child: EmbeddedMediaPlayer(
                             url: message.text.trim().startsWith('http')
                                 ? message.text.trim()
-                                : 'https://${message.text.trim()}')),
+                                : 'https://${message.text.trim()}',
+                            // يوتيوب يُشغَّل حصرًا عبر المشغّل العائم العام
+                            // لا تضمينًا داخل الفقاعة — تيك توك يبقى كما هو.
+                            routeYoutubeToFloatingPlayer: true)),
                   if (!deletedForEveryone &&
                       !message.type.isMedia &&
                       message.text.isNotEmpty &&

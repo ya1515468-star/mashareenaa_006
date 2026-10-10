@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -63,10 +64,10 @@ class _AdminReportsTabState extends ConsumerState<AdminReportsTab> {
       await Supabase.instance.client.rpc('moderator_resolve_report',
           params: {'p_report_id': id, 'p_new_status': newStatus});
       ref.invalidate(_adminReportsProvider);
-      messenger?.showSnackBar(SnackBar(
+      messenger?.showSnackBarSfx(SnackBar(
           content: Text(newStatus == 'resolved' ? 'عولج البلاغ' : 'تُجوهل البلاغ')));
     } catch (e) {
-      messenger?.showSnackBar(SnackBar(content: Text('تعذّر التحديث: $e')));
+      messenger?.showSnackBarSfx(SnackBar(content: Text('تعذّر التحديث: $e')));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -109,10 +110,10 @@ class _AdminReportsTabState extends ConsumerState<AdminReportsTab> {
           'p_evidence_url': r['evidence_url'],
           'p_source_report_id': r['id'],
         });
-        messenger?.showSnackBar(const SnackBar(content: Text('نُشر التحذير')));
+        messenger?.showSnackBarSfx(const SnackBar(content: Text('نُشر التحذير')));
       }
     } catch (e) {
-      messenger?.showSnackBar(SnackBar(content: Text('تعذّر النشر: $e')));
+      messenger?.showSnackBarSfx(SnackBar(content: Text('تعذّر النشر: $e')));
     } finally {
       title.dispose();
       details.dispose();

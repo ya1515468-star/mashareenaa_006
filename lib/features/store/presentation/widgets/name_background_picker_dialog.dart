@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
+import 'package:uuid/uuid.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -164,6 +166,64 @@ class _NameBackgroundPickerDialogState extends ConsumerState<_NameBackgroundPick
     );
   }
 
+  /// الخلفيات المخصصة مدفوعة: بدل رسالة «اشترِها من قسم…» نعرض السعر
+  /// ونتيح الشراء مباشرة ثم يُكمل الحفظ تلقائيًا.
+  Future<bool> _offerPurchase() async {
+    final itemKey = switch (_mode) {
+      'dual' => _kDualItemKey,
+      'transparent_empty' => _kEmptyItemKey,
+      _ => _kSolidItemKey,
+    };
+    try {
+      final row = await Supabase.instance.client
+          .from('profile_cosmetic_catalog')
+          .select('name_ar,price_points,price_gems')
+          .eq('item_key', itemKey)
+          .maybeSingle();
+      if (row == null || !mounted) return false;
+      final pp = (row['price_points'] as num?)?.toInt() ?? 0;
+      final pg = (row['price_gems'] as num?)?.toInt() ?? 0;
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: Text('${row['name_ar'] ?? 'خلفية مدفوعة'}',
+              style: const TextStyle(fontSize: 15)),
+          content: Text(
+              'هذه الخلفية غير مملوكة بعد. السعر: $pp نقطة أو $pg جوهرة. هل تريد شراءها الآن؟'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(c), child: const Text('لاحقًا')),
+            if (pg > 0)
+              TextButton(
+                  onPressed: () => Navigator.pop(c, 'gems'),
+                  child: Text('شراء بـ $pg جوهرة')),
+            if (pp > 0)
+              FilledButton(
+                  onPressed: () => Navigator.pop(c, 'points'),
+                  child: Text('شراء بـ $pp نقطة')),
+          ],
+        ),
+      );
+      if (choice == null) return false;
+      await Supabase.instance.client.rpc('purchase_profile_cosmetic', params: {
+        'p_item_key': itemKey,
+        'p_currency': choice,
+        'p_request_id': const Uuid().v4(),
+      });
+      return true;
+    } catch (e) {
+      final m = e.toString();
+      if (mounted) {
+        setState(() => _error = m.contains('INSUFFICIENT_POINTS')
+            ? 'رصيد النقاط غير كافٍ.'
+            : m.contains('INSUFFICIENT_GEMS')
+                ? 'رصيد الجواهر غير كافٍ.'
+                : 'تعذّر الشراء.');
+      }
+      return false;
+    }
+  }
+
   Future<void> _save() async {
     setState(() {
       _busy = true;
@@ -183,12 +243,20 @@ class _NameBackgroundPickerDialogState extends ConsumerState<_NameBackgroundPick
       ref.invalidate(currentProfileProvider);
       if (!mounted) return;
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: const Text('تم حفظ خلفية إطار الاسم ✓'), backgroundColor: Colors.green.shade700),
       );
     } catch (e) {
       final s = e.toString();
       debugPrint('NAME_BACKGROUND_SAVE_ERROR: $s');
+      if (s.contains('ITEM_NOT_OWNED') && mounted) {
+        final bought = await _offerPurchase();
+        if (bought) {
+          await _save();
+          return;
+        }
+      }
+      if (!mounted) return;
       setState(() {
         _error = s.contains('ITEM_NOT_OWNED')
             ? 'هذه الخلفية غير مملوكة بعد — اشترِها من قسم «خلفية إطار الاسم» أولًا.'

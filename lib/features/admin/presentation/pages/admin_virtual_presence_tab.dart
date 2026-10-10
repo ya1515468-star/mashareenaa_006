@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AdminVirtualPresenceTab extends StatefulWidget {
@@ -33,7 +34,7 @@ class _AdminVirtualPresenceTabState extends State<AdminVirtualPresenceTab> {
       if (mounted) setState(() {});
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBarSfx(
             SnackBar(content: Text('تعذر تحديث الحضور الافتراضي: $e')));
       }
     } finally {
@@ -52,7 +53,7 @@ class _AdminVirtualPresenceTabState extends State<AdminVirtualPresenceTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('تعذر تغيير الحالة: $e')));
+            .showSnackBarSfx(SnackBar(content: Text('تعذر تغيير الحالة: $e')));
       }
     }
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/error_view.dart';
@@ -123,14 +124,14 @@ class NotificationsPage extends ConsumerWidget {
       try {
         await ref.read(notificationControllerProvider.notifier).deleteAll(uid);
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context).showSnackBarSfx(
             const SnackBar(content: Text('تم حذف كل الإشعارات ✓')),
           );
         }
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('تعذّر حذف الإشعارات: $e')));
+              .showSnackBarSfx(SnackBar(content: Text('تعذّر حذف الإشعارات: $e')));
         }
       }
     }
@@ -157,13 +158,13 @@ class NotificationsPage extends ConsumerWidget {
                           .read(notificationControllerProvider.notifier)
                           .markAllRead(uid);
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        ScaffoldMessenger.of(context).showSnackBarSfx(
                           const SnackBar(content: Text('تم تعليم الكل كمقروء ✓')),
                         );
                       }
                     } catch (e) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        ScaffoldMessenger.of(context).showSnackBarSfx(
                             SnackBar(content: Text('تعذّر تحديث الإشعارات: $e')));
                       }
                     }
@@ -209,7 +210,7 @@ class NotificationsPage extends ConsumerWidget {
                   // (حتى بعد ظهور تأثير السحب البصري) كان يمر دون أي أثر
                   // ظاهر للمستخدم إطلاقًا.
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    ScaffoldMessenger.of(context).showSnackBarSfx(
                         SnackBar(content: Text('تعذّر حذف الإشعار: $e')));
                   }
                 }),
@@ -242,7 +243,7 @@ class NotificationsPage extends ConsumerWidget {
                         .delete(n.id)
                         .catchError((e) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        ScaffoldMessenger.of(context).showSnackBarSfx(
                             SnackBar(content: Text('تعذّر حذف الإشعار: $e')));
                       }
                     }),
@@ -252,7 +253,7 @@ class NotificationsPage extends ConsumerWidget {
                       .markRead(n.id)
                       .catchError((e) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(
                           content: Text('تعذّر تحديث الإشعار: $e')));
                     }
                   }),

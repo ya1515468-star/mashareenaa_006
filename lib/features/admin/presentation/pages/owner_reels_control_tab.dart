@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -279,10 +280,10 @@ class _ReelAdminCard extends StatelessWidget {
       await _db.rpc('owner_update_reel',
           params: {'p_reel_id': reel['id'].toString(), 'p_patch': patch});
       onChanged();
-      messenger?.showSnackBar(const SnackBar(
+      messenger?.showSnackBarSfx(const SnackBar(
           content: Text('نُفّذ'), backgroundColor: Color(0xFF16A34A)));
     } catch (e) {
-      messenger?.showSnackBar(SnackBar(
+      messenger?.showSnackBarSfx(SnackBar(
           content: Text('فشل: $e'),
           backgroundColor: const Color(0xFFDC2626)));
     }
@@ -360,11 +361,11 @@ class _ReelAdminCard extends StatelessWidget {
         'p_reason': c.text.trim(),
       });
       onChanged();
-      messenger?.showSnackBar(const SnackBar(
+      messenger?.showSnackBarSfx(const SnackBar(
           content: Text('حُذف الفيديو'),
           backgroundColor: Color(0xFF16A34A)));
     } catch (e) {
-      messenger?.showSnackBar(SnackBar(
+      messenger?.showSnackBarSfx(SnackBar(
           content: Text('فشل الحذف: $e'),
           backgroundColor: const Color(0xFFDC2626)));
     }

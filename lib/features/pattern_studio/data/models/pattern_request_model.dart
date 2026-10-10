@@ -27,7 +27,7 @@ class PatternRequestModel extends PatternRequestEntity {
       resultImageUrl: map['resultImageUrl'] as String?,
       resultVideoUrl: map['resultVideoUrl'] as String?,
       reviewerNote: map['reviewerNote'] as String?,
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      createdAt: parseFlexibleTimestamp(map['createdAt']),
     );
   }
 
