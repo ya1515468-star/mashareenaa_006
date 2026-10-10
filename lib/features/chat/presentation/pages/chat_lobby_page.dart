@@ -1206,7 +1206,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       case 'image': return '📷 صورة';
       case 'video': return '🎬 فيديو';
       case 'audio': return '🎙️ رسالة صوتية';
-      case 'gif': return '✨ سمايل متحرك';
+      case 'gif': return '';
       case 'file': return '📎 ملف';
       case 'gift': return '🎁 هدية';
     }
@@ -1403,24 +1403,6 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                   unawaited(_deleteRoomMessage(row));
                 },
               ),
-            ListTile(
-                leading:
-                    const Icon(Icons.view_in_ar_outlined, color: Colors.white),
-                title:
-                    const Text('رد 3D', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _setReplyTo(row, mode: 'reply_3d');
-                }),
-            ListTile(
-                leading:
-                    const Icon(Icons.view_in_ar_outlined, color: Colors.white),
-                title: const Text('اقتباس 3D',
-                    style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _setReplyTo(row, mode: 'quote_3d');
-                }),
             ListTile(
               leading: const Icon(Icons.alternate_email, color: Colors.white),
               title: const Text('منشن', style: TextStyle(color: Colors.white)),
@@ -3855,7 +3837,7 @@ class _ChatIdentityHeader extends StatelessWidget {
       roomId: roomId,
       fallbackName: fallbackName,
       fallbackFontSize: 11,
-
+      showTitle: true,
       showBadges: true,
       showAchievements: false,
       sizeMultiplier: sizeMultiplier,
@@ -3980,28 +3962,20 @@ class _GlobalEventOverlayState extends State<_GlobalEventOverlay> {
           final imageWidth = math.min(170.0, math.max(90.0, cardWidth * 0.46));
 
           Widget welcomeImage() {
-            final image = imageUrl != null && imageUrl.startsWith('asset://')
+            if (imageUrl == null || imageUrl.isEmpty) return const SizedBox.shrink();
+            final image = imageUrl.startsWith('asset://')
                 ? Image.asset(
                     imageUrl.substring('asset://'.length),
                     fit: BoxFit.contain,
                     filterQuality: FilterQuality.high,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                   )
-                : (imageUrl != null && imageUrl.isNotEmpty)
-                    ? Image.network(
-                        imageUrl,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
-                        errorBuilder: (_, __, ___) => Image.asset(
-                          'assets/chat/welcome/default_welcome.gif',
-                          fit: BoxFit.contain,
-                          filterQuality: FilterQuality.high,
-                        ),
-                      )
-                    : Image.asset(
-                        'assets/chat/welcome/default_welcome.gif',
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
-                      );
+                : Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  );
             return SizedBox(
               width: imageWidth,
               child: AspectRatio(aspectRatio: 480 / 854, child: image),

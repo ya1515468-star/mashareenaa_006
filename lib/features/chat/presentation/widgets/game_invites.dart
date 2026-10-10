@@ -30,7 +30,7 @@ String _emoji(String t) {
     case 'dice':
       return '🎲';
     default:
-      return '🧵';
+      return '♠♥♦♣';
   }
 }
 

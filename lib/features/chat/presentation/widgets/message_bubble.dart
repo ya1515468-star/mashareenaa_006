@@ -141,22 +141,6 @@ class MessageBubble extends ConsumerWidget {
               },
             ),
             _ActionTile(
-              icon: Icons.view_in_ar_outlined,
-              label: 'رد 3D',
-              onTap: () {
-                Navigator.pop(sheetContext);
-                onReplyMode?.call('reply_3d');
-              },
-            ),
-            _ActionTile(
-              icon: Icons.view_in_ar_outlined,
-              label: 'اقتباس 3D',
-              onTap: () {
-                Navigator.pop(sheetContext);
-                onReplyMode?.call('quote_3d');
-              },
-            ),
-            _ActionTile(
               icon: Icons.forward_rounded,
               label: 'إعادة توجيه',
               onTap: () {

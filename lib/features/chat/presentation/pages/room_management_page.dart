@@ -1008,15 +1008,18 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: image == null
-                              ? Image.asset('assets/chat/welcome/default_welcome.gif', fit: BoxFit.cover)
+                              ? const Center(child: Icon(Icons.image_not_supported_outlined, color: Colors.white38, size: 40))
                               : Image.network(
                                   image,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Image.asset(
-                                    'assets/chat/welcome/default_welcome.gif',
-                                    fit: BoxFit.cover,
-                                  ),
+                                  errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image_outlined, color: Colors.white38, size: 40)),
                                 ),
+                        ),
+                      if (!loading && image != null)
+                        TextButton.icon(
+                          onPressed: uploading ? null : () => setSheetState(() { imageUrl = null; }),
+                          icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                          label: const Text('حذف الصورة', style: TextStyle(color: Color(0xFFEF4444))),
                         ),
                       const SizedBox(height: 10),
                       OutlinedButton.icon(
@@ -1108,7 +1111,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
                                   await _sb.rpc('update_chat_welcome_settings', params: {
                                     'p_room_id': widget.roomId,
                                     'p_message_template': messageText.trim(),
-                                    'p_image_url': imageUrl ?? 'asset://assets/chat/welcome/default_welcome.gif',
+                                    'p_image_url': imageUrl,
                                     'p_is_enabled': enabled,
                                   });
                                   if (sheetContext.mounted) {

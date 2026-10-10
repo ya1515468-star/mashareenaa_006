@@ -625,6 +625,7 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
                       uid: widget.otherUid,
                       fallbackName: widget.otherName,
                       fallbackFontSize: 14,
+                      showTitle: true,
                       showBadges: true,
                       showAchievements: true,
                     ),

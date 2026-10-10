@@ -26,12 +26,12 @@ class ChatThemeDefinition {
   static const List<ChatThemeDefinition> all = [
     ChatThemeDefinition(
       id: 'royal_dark',
-      name: 'ملكي داكن',
+      name: 'ذهبي ملكي',
       backgroundKey: 'aurora',
-      gradient: [Color(0xFF0D0617), Color(0xFF24103A), Color(0xFF0B0815)],
-      bubbleMine: Color(0xFF6F26A0),
-      bubbleOther: Color(0xFF32203D),
-      accent: Color(0xFFC86BFF),
+      gradient: [Color(0xFF120D03), Color(0xFF3A2A08), Color(0xFF0E0A02)],
+      bubbleMine: Color(0xFF9A7418),
+      bubbleOther: Color(0xFF2E2410),
+      accent: Color(0xFFFFC83D),
       icon: Icons.auto_awesome_rounded,
     ),
     ChatThemeDefinition(

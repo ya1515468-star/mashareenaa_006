@@ -253,7 +253,7 @@ Future<void> showGameHub(BuildContext context,
           const SizedBox(height: 8),
           ListTile(
             dense: true,
-            leading: const Text('🧵', style: TextStyle(fontSize: 26)),
+            leading: const Text('♠♥♦♣', style: TextStyle(fontSize: 15, letterSpacing: 0)),
             title: const Text('تركس سوري',
                 style: TextStyle(color: Colors.white)),
             subtitle: const Text('فردي أو شراكة ضد الكمبيوتر — برهان نقاط حقيقي',

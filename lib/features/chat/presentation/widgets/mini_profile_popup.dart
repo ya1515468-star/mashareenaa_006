@@ -585,8 +585,8 @@ class MiniProfilePopup extends ConsumerWidget {
                 leading: Text(
                     t == 'connect4'
                         ? '🔴'
-                        : (t == 'rps' ? '✊' : (t == 'coin' ? '🪙' : '🧵')),
-                    style: const TextStyle(fontSize: 24)),
+                        : (t == 'rps' ? '✊' : (t == 'coin' ? '🪙' : '♠♥♦♣')),
+                    style: TextStyle(fontSize: t.startsWith('trix_') ? 14 : 24)),
                 title: Text(t.startsWith('trix_') ? gameTitle(t) : '${gameTitle(t)} (3D)'),
                 subtitle: const Text('رهان نقاط: ربح / خسارة / مضاعفة'),
                 onTap: () async {
