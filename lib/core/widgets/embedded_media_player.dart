@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import '../services/youtube_origin.dart';
 import '../theme/app_theme.dart';
 import '../providers/mini_player_provider.dart';
 import '../services/youtube_guard.dart';
@@ -332,6 +333,7 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
     videoId: widget.videoId,
     autoPlay: true,
     params: const YoutubePlayerParams(
+          origin: kYoutubeEmbedOrigin,
       showControls: true,
       showFullscreenButton: true,
       // Browsers commonly block autoplay with sound; start muted so the link starts immediately,

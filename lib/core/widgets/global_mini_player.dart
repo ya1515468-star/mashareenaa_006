@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import '../services/youtube_origin.dart';
 
 import '../providers/mini_player_provider.dart';
 import '../services/youtube_guard.dart';
@@ -73,6 +74,7 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
         videoId: playId,
         autoPlay: true,
         params: const YoutubePlayerParams(
+          origin: kYoutubeEmbedOrigin,
           showControls: false,
           mute: false,
           strictRelatedVideos: false,
