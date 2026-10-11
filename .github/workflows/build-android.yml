@@ -48,10 +48,21 @@ jobs:
         run: flutter pub get
 
       - name: Flutter analyze
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        run: |
+          set -o pipefail
+          if ! flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.txt; then
+            # أخطاء المحلّل كتعليقات (Annotations) تُقرأ عبر واجهة GitHub حتى حين تُحجب السجلات.
+            grep -E "error •" analyze.txt | head -50 | sed 's/^/::error::/'
+            exit 1
+          fi
 
       - name: Flutter tests
-        run: flutter test
+        run: |
+          set -o pipefail
+          if ! flutter test 2>&1 | tee test.txt; then
+            grep -E "Error|error:|Expected|Actual|FAILED" test.txt | head -40 | sed 's/^/::error::/'
+            exit 1
+          fi
 
       - name: Verify release signing secrets
         env:
