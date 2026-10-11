@@ -189,3 +189,16 @@
   `public`، ولا دالة owner/admin تنقصها صلاحية EXECUTE للمستخدم المصادَق
   (عدا دالتين داخليتين لا يستدعيهما التطبيق). كتابات المالك كلها عبر RPC
   (٥ كتابات مباشرة فقط، كلها لغير المالك).
+
+## مشغّل يوتيوب — الصورة (2026-10-11)
+- **السبب المُثبت:** `YoutubePlayer` يرسم الـWebView داخل `OverlayPortal`، والمشغّل العائم كان مركّبًا في `MaterialApp.builder` بلا `Overlay` سلف → خطأ الجهاز المتكرر `No Overlay widget found` (`_OverlayPortalState._getLocation`). الصوت يعمل والـWebView المرئي لا يُركَّب.
+- **التنفيذ:** `lib/main.dart` — `GlobalMiniPlayer` و`AiAssistantFab` داخل `Overlay` خاص.
+- **origin:** يبقى `https://com.mashareena.mashareena` (شرط يوتيوب الرسمي: نطاق baseUrl = معرّف التطبيق). لا يُغيَّر.
+- **تشخيص حيّ:** `core/services/youtube_diagnostics.dart` يكتب في `client_error_logs` رسائل `YT_STATE` و`YT_ERROR`.
+
+## خطوط الرسائل الخادمية (2026-10-11)
+- المفاتيح في `server_fonts` (cairo, rakkas…) تُنزَّل وتُسجَّل عبر `ServerFonts.ensure` باسم عائلة `srv_<key>`.
+- **الغرف:** `_ChatMessageRow` → `_content(fontFamily: …)` → `_MentionRichText.fontFamily` (كانت بلا خط إطلاقًا).
+- **الخاص:** `get_message_font_key(uuid)` خادميًا (سياسة profiles تمنع قراءة صف الغير) → `serverMessageFontKeyProvider`.
+- كل فقاعة تستمع إلى `ServerFonts.revision` لتُعاد بناءً بعد التنزيل.
+- **تشخيص حيّ:** `FONT_LOADED / FONT_HTTP_FAIL / FONT_NO_ROW / FONT_EXCEPTION` في `client_error_logs`.

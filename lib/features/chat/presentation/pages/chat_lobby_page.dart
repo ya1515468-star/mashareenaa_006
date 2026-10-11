@@ -73,6 +73,8 @@ import '../../../store/presentation/profile_cosmetic_store_page.dart';
 import 'room_management_page.dart';
 import 'chat_rooms_page.dart';
 import '../../../../core/widgets/animated_gold.dart';
+import '../../../../core/services/server_font_for_user.dart';
+import '../../../../core/services/server_fonts.dart';
 import 'chat_feature_settings_page.dart';
 import 'chat_notification_settings_page.dart';
 import 'directory_list_page.dart';
@@ -3318,7 +3320,7 @@ class _ChatMessageRow extends ConsumerWidget {
   }
 
   Widget _content(double smileySize, Color textColor,
-      {bool bold = false, bool italic = false, double scale = 1.0}) {
+      {bool bold = false, bool italic = false, double scale = 1.0, String? fontFamily}) {
     final fw = bold ? FontWeight.w800 : FontWeight.w500;
     final fs = italic ? FontStyle.italic : FontStyle.normal;
     final sz = (14.0 * scale).clamp(11.0, 22.0);
@@ -3514,6 +3516,7 @@ class _ChatMessageRow extends ConsumerWidget {
     return _MentionRichText(
       text: body.isEmpty ? 'رسالة فارغة' : body,
       baseColor: textColor,
+      fontFamily: fontFamily,
       fontWeight: fw,
       fontStyle: fs,
       fontSize: sz.toDouble(),
@@ -3789,10 +3792,23 @@ class _ChatMessageRow extends ConsumerWidget {
                                   width: double.infinity,
                                   child: Align(
                                     alignment: Alignment.centerRight,
-                                    child: _content(smileySize, messageTextColor,
-                                        bold: msgBold,
-                                        italic: msgItalic,
-                                        scale: msgScale),
+                                    // فقاعة الغرفة كانت ترسم النص بلا أي fontFamily
+                                    // إطلاقًا — منطق خطوط الخادم كان في
+                                    // ServerChatInlineMessage التي لا تستعملها
+                                    // الغرف أصلًا (الخاص وحده). الخط هنا من مفتاح
+                                    // المرسِل الخادمي، ويُعاد البناء حين يجهز.
+                                    child: ValueListenableBuilder<int>(
+                                      valueListenable: ServerFonts.revision,
+                                      builder: (_, __, ___) => _content(
+                                          smileySize, messageTextColor,
+                                          bold: msgBold,
+                                          italic: msgItalic,
+                                          scale: msgScale,
+                                          fontFamily: loadedServerFontFamily(ref
+                                              .watch(serverMessageFontKeyProvider(
+                                                  row['user_id']?.toString() ?? ''))
+                                              .valueOrNull)),
+                                    ),
                                   ),
                                 ),
                                 if (timeText.isNotEmpty) ...[
@@ -4259,11 +4275,14 @@ class _MentionRichText extends StatelessWidget {
   final FontWeight fontWeight;
   final FontStyle fontStyle;
   final double fontSize;
+  // خط الرسائل الخادمي للمرسِل (cairo, rakkas…). null = الافتراضي.
+  final String? fontFamily;
 
   const _MentionRichText({
     this.fontWeight = FontWeight.w600,
     this.fontStyle = FontStyle.normal,
     this.fontSize = 15,
+    this.fontFamily,
     required this.text,
     required this.baseColor,
     this.mentionNames = const <String>{},
@@ -4353,6 +4372,7 @@ class _MentionRichText extends StatelessWidget {
           fontWeight: fontWeight,
           fontStyle: fontStyle,
           height: 1.4,
+          fontFamily: fontFamily,
         ),
       );
     }
@@ -4383,6 +4403,7 @@ class _MentionRichText extends StatelessWidget {
                     fontWeight: fontWeight,
                     fontStyle: fontStyle,
                     height: 1.4,
+          fontFamily: fontFamily,
                   ),
                 ),
         ),
@@ -4405,6 +4426,7 @@ class _MentionRichText extends StatelessWidget {
           fontWeight: fontWeight,
           fontStyle: fontStyle,
           height: 1.4,
+          fontFamily: fontFamily,
         ),
         children: spans,
       ),

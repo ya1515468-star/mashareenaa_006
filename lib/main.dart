@@ -106,8 +106,19 @@ class MashareenaApp extends ConsumerWidget {
                   removeBottom: true,
                   child: Stack(children: [
                     child ?? const SizedBox.shrink(),
-                    const GlobalMiniPlayer(),
-                    const AiAssistantFab(),
+                    // البند 3 (السبب الحقيقي لغياب صورة يوتيوب): YoutubePlayer
+                    // على الهاتف يرسم الـWebView داخل OverlayPortal، وهذا
+                    // الموضع فوق الـNavigator بلا أي Overlay سلف — فكان يرمي
+                    // "No Overlay widget found" (_OverlayPortalState
+                    // ._getLocation)، وهو الخطأ المسجّل من الجهاز عشرات
+                    // المرات. المتحكّم يعمل فيُسمع الصوت، لكن الـWebView
+                    // المرئي لا يُركَّب أبدًا. Overlay خاص هنا يمنحهما سلفًا.
+                    // الإدخالات غير معتمة، فالمساحات الفارغة لا تحجب اللمس
+                    // عن التطبيق تحتها.
+                    Overlay(initialEntries: [
+                      OverlayEntry(builder: (_) => const GlobalMiniPlayer()),
+                      OverlayEntry(builder: (_) => const AiAssistantFab()),
+                    ]),
                   ]),
                 ),
               );

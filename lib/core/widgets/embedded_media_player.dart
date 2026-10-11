@@ -15,6 +15,7 @@ import '../services/youtube_origin.dart';
 import '../theme/app_theme.dart';
 import '../providers/mini_player_provider.dart';
 import '../services/youtube_guard.dart';
+import '../services/youtube_diagnostics.dart';
 import 'tiktok_web_player_stub.dart'
     if (dart.library.html) 'tiktok_web_player_web.dart';
 
@@ -351,10 +352,13 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
   // unmounted". العلم يمنع أي عمل إضافي بعد التفكيك بلا الحاجة لتغيير
   // الحزمة نفسها.
   bool _disposed = false;
+  StreamSubscription<YoutubePlayerValue>? _diag;
 
   @override
   void initState() {
     super.initState();
+    _diag = attachYoutubeDiagnostics(_controller,
+        videoId: widget.videoId, where: 'inline_player');
     // فحص خادمي: إن كان الفيديو ممنوع التضمين نبدّله ببديل قابل للتضمين.
     final asked = widget.videoId;
     YoutubeGuard.resolve(asked, '').then((r) {
@@ -377,6 +381,7 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
   @override
   void dispose() {
     _disposed = true;
+    _diag?.cancel();
     _controller.close();
     super.dispose();
   }

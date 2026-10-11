@@ -8,6 +8,7 @@ import '../services/youtube_origin.dart';
 
 import '../providers/mini_player_provider.dart';
 import '../services/youtube_guard.dart';
+import '../services/youtube_diagnostics.dart';
 
 /// شريط عائم ثابت فوق التطبيق كله (يُركَّب في MaterialApp.builder في
 /// main.dart، لا داخل أي شاشة)، فيبقى حيًّا عبر كل تنقّل — بين الغرف،
@@ -36,6 +37,8 @@ class GlobalMiniPlayer extends ConsumerStatefulWidget {
 class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
   YoutubePlayerController? _controller;
   String? _currentId;
+  // تشخيص من الجهاز: يُبلِّغ الخادم بحالة المشغّل ورمز خطأ يوتيوب.
+  StreamSubscription<YoutubePlayerValue>? _diag;
   // فحص خادمي (youtube-check) قبل التشغيل: إن كان الفيديو ممنوع التضمين
   // يُستبدل بنسخة قابلة للتضمين بنفس العنوان بدل خطأ 152.
   final Map<String, YoutubeResolution> _resolved = {};
@@ -43,6 +46,8 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
 
   void _syncController(MiniPlayerTrack? track) {
     if (track == null) {
+      _diag?.cancel();
+      _diag = null;
       _controller?.close();
       _controller = null;
       _currentId = null;
@@ -85,10 +90,14 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
     } else {
       _controller!.loadVideoById(videoId: playId);
     }
+    _diag?.cancel();
+    _diag = attachYoutubeDiagnostics(_controller!,
+        videoId: playId, where: 'mini_player');
   }
 
   @override
   void dispose() {
+    _diag?.cancel();
     _controller?.close();
     super.dispose();
   }
