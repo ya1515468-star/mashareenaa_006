@@ -113,7 +113,7 @@ class _AiAssistantFabState extends State<AiAssistantFab> {
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Color(0xFF7D32A6), Color(0xFFFFD700)],
+                    colors: [Color(0xFF8A5A00), Color(0xFFFFD45C), Color(0xFFFFF3A3)],
                   ),
                   boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 10)],
                 ),

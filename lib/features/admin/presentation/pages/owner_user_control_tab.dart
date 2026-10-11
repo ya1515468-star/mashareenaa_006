@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/widgets/animated_gold.dart';
 import '../../../../core/services/snack_sfx.dart';
 
 import 'package:flutter/material.dart';
@@ -34,7 +35,7 @@ const _kRestrictions = <_RestrictionKind>[
   _RestrictionKind('no_gift', 'منع الهدايا', 'لا يرسل ولا يستقبل هدايا',
       Icons.card_giftcard_rounded, Color(0xFFEC4899)),
   _RestrictionKind('no_room', 'منع الغرف', 'لا يدخل أي غرفة دردشة',
-      Icons.meeting_room_rounded, Color(0xFF8B5CF6)),
+      Icons.meeting_room_rounded, kGoldSolid),
   _RestrictionKind('shadow', 'حظر خفي', 'رسائله تظهر له وحده',
       Icons.visibility_off_rounded, Color(0xFF64748B)),
 ];

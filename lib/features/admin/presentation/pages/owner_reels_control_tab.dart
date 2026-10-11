@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/animated_gold.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -191,7 +192,7 @@ class _ReelAdminCard extends StatelessWidget {
                                 ? const Color(0xFF34D399)
                                 : const Color(0xFFF59E0B)),
                     if (reel['is_pinned'] == true)
-                      _pill('📌 مثبّت', const Color(0xFF8B5CF6)),
+                      _pill('📌 مثبّت', kGoldSolid),
                     if (reel['is_featured'] == true)
                       _pill('⭐ مميّز', const Color(0xFFFFD700)),
                     _pill('👁 ${reel['views_count'] ?? 0}', Colors.white30),

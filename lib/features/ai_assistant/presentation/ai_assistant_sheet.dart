@@ -19,7 +19,9 @@ import 'ai_assistant_admin_sheet.dart';
 const _bg = Color(0xFF17101F);
 const _card = Color(0xFF241733);
 const _gold = Color(0xFFFFD700);
-const _purple = Color(0xFF7D32A6);
+// البند 15: كان بنفسجيًا (7D32A6). صار ذهبًا داكنًا يتباين مع النص
+// الأبيض ويوافق عائلة الذهب في بقية التطبيق.
+const _purple = Color(0xFF6B4A0F);
 
 class _Msg {
   final bool user;

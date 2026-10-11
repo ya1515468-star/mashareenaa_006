@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/widgets/animated_gold.dart';
 import '../../domain/chat_visual_size_service.dart';
 
 class ChatFeatureSettingsPage extends StatefulWidget {
@@ -96,7 +97,7 @@ class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
               style: FilledButton.styleFrom(
                 padding: EdgeInsets.zero,
                 backgroundColor:
-                    value == level ? const Color(0xFF8E44AD) : const Color(0xFF2A1935),
+                    value == level ? kGoldSolid : const Color(0xFF2A1935),
               ),
               child: Text('$level'),
             ),

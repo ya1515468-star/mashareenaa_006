@@ -28,7 +28,15 @@ class _VipChatRuntimeCenterPageState
   bool _busy = false;
   late final Future<Map<String, dynamic>> _runtimeFuture;
 
-  String get _title => switch (widget.featureKey) {
+  /// البند 19: الاسم العربي يُقرأ من كتالوج الخادم
+  /// (profile_service_catalog.name_ar) لا من قائمة ثابتة في الكود. القائمة
+  /// الثابتة كانت تغطي 6 خدمات فقط من 39 في الكتالوج، فكل خدمة أخرى تسقط
+  /// على اسم عام. الاسم العربي موجود خادميًا للـ39 كلها (تحققت بالاستعلام:
+  /// صفر صف بلا name_ar وصفر صف يبدأ بحرف لاتيني)، فالخادم هو المصدر.
+  String? _serverNameAr;
+
+  /// يُستعمل ريثما يصل اسم الخادم، أو إن تعذّرت القراءة.
+  String get _fallbackTitle => switch (widget.featureKey) {
         'chat_link_preview_plus' => 'معاينة الروابط Plus',
         'chat_media_plus' => 'وسائط Plus',
         'chat_favorites_plus' => 'مفضلة الشات Plus',
@@ -37,6 +45,27 @@ class _VipChatRuntimeCenterPageState
         'creator_tip_button' => 'دعم المنشئ',
         _ => 'خدمة VIP',
       };
+
+  String get _title => _serverNameAr?.trim().isNotEmpty == true
+      ? _serverNameAr!.trim()
+      : _fallbackTitle;
+
+  /// لا يُعرض المفتاح الإنجليزي للعضو في أي حال: إن تعذّرت القراءة يبقى
+  /// الاسم العربي الاحتياطي.
+  Future<void> _loadServerNameAr() async {
+    try {
+      final row = await Supabase.instance.client
+          .from('profile_service_catalog')
+          .select('name_ar')
+          .eq('feature_key', widget.featureKey)
+          .maybeSingle();
+      final ar = row?['name_ar']?.toString();
+      if (!mounted || ar == null || ar.trim().isEmpty) return;
+      setState(() => _serverNameAr = ar);
+    } catch (_) {
+      // الاسم الاحتياطي العربي يكفي؛ لا مفتاح إنجليزي يظهر إطلاقًا.
+    }
+  }
 
   IconData get _icon => switch (widget.featureKey) {
         'chat_link_preview_plus' => Icons.link,
@@ -52,6 +81,7 @@ class _VipChatRuntimeCenterPageState
   void initState() {
     super.initState();
     _runtimeFuture = _runtime();
+    _loadServerNameAr();
   }
 
   @override

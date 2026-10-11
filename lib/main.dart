@@ -75,26 +75,30 @@ class MashareenaApp extends ConsumerWidget {
           child: UploadProgressOverlay(
             // Stack فوق التطبيق كله (لا داخل أي شاشة بعينها) حتى يبقى
             // المشغّل المصغّر العائم حيًّا عبر كل تنقّل بين الشاشات.
-            child: Stack(children: [
-              // targetSdk 35 يفرض الرسم خلف أزرار النظام (رجوع/الرئيسية/القائمة):
-              // نحجز لها مساحة سفلية ثابتة ونزيلها من MediaQuery لمنع التكرار.
-              Builder(builder: (ctx) {
-                final mq = MediaQuery.of(ctx);
-                final pad = (mq.viewPadding.bottom - mq.viewInsets.bottom)
-                    .clamp(0.0, 200.0)
-                    .toDouble();
-                return Padding(
-                  padding: EdgeInsets.only(bottom: pad),
-                  child: MediaQuery.removePadding(
-                    context: ctx,
-                    removeBottom: true,
-                    child: child ?? const SizedBox.shrink(),
-                  ),
-                );
-              }),
-              const GlobalMiniPlayer(),
-              const AiAssistantFab(),
-            ]),
+            // البند 12: targetSdk 35 يفرض الرسم خلف أزرار النظام (رجوع/
+            // الرئيسية/القائمة). كانت الحشوة السفلية تُطبَّق على محتوى
+            // التطبيق وحده، بينما المشغّل العائم وزر المساعد شقيقان له في
+            // الـStack خارج تلك الحشوة — فيُرسمان تحت أزرار الهاتف ويتعذّر
+            // الضغط عليهما. الحشوة الآن تلفّ الـStack كله فتنطبق على
+            // الثلاثة معًا.
+            child: Builder(builder: (ctx) {
+              final mq = MediaQuery.of(ctx);
+              final pad = (mq.viewPadding.bottom - mq.viewInsets.bottom)
+                  .clamp(0.0, 200.0)
+                  .toDouble();
+              return Padding(
+                padding: EdgeInsets.only(bottom: pad),
+                child: MediaQuery.removePadding(
+                  context: ctx,
+                  removeBottom: true,
+                  child: Stack(children: [
+                    child ?? const SizedBox.shrink(),
+                    const GlobalMiniPlayer(),
+                    const AiAssistantFab(),
+                  ]),
+                ),
+              );
+            }),
           ),
         );
       },

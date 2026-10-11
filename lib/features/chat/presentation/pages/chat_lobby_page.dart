@@ -72,6 +72,7 @@ import 'chat_thread_page.dart';
 import '../../../store/presentation/profile_cosmetic_store_page.dart';
 import 'room_management_page.dart';
 import 'chat_rooms_page.dart';
+import '../../../../core/widgets/animated_gold.dart';
 import 'chat_feature_settings_page.dart';
 import 'chat_notification_settings_page.dart';
 import 'directory_list_page.dart';
@@ -2974,7 +2975,11 @@ class _TopBar extends ConsumerWidget {
                             Color(0xFFFFD45C),
                             Color(0xFF8A5A00)
                           ]
-                        : const [Color(0xFF6E3B8F), Color(0xFF30153F)],
+                        // البند 15: كان بنفسجيًا. صار برونزًا داكنًا لا ذهبًا
+                        // لامعًا، كي يزول البنفسجي دون أن تضيع التفرقة بين
+                        // الفئة العادية والأسطورية (الذهب اللامع للأسطورية
+                        // وحدها).
+                        : const [Color(0xFF6B5320), Color(0xFF3A2A0E)],
                   ),
                   border: Border.all(
                     color: legendary
@@ -3392,7 +3397,7 @@ class _ChatMessageRow extends ConsumerWidget {
               await safeLaunch(u);
             },
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(icon, color: const Color(0xFF7D32A6), size: 30),
+              AnimatedGoldIcon(icon, size: 30),
               const SizedBox(width: 8),
               Flexible(
                   child: Text(body.isEmpty ? 'مرفق' : body,
