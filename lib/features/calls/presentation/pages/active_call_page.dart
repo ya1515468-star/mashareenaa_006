@@ -5,6 +5,7 @@ import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../../../../core/monitoring/error_monitor.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../profile/presentation/providers/profile_provider.dart';
 import '../../../profile/presentation/widgets/profile_avatar.dart';
@@ -162,6 +163,10 @@ class _ActiveCallPageState extends ConsumerState<ActiveCallPage> {
           await engine.renewToken(fresh.token);
         },
         onError: (code, msg) {
+          // كانت أخطاء المكالمات لا تصل لسجل الأخطاء إطلاقًا، فلم يبقَ أثر
+          // للفشل إلا في سجل الدالة الخادمية. الآن تُسجَّل مع نوع المكالمة.
+          unawaited(ErrorMonitor.report('CALL_AGORA_ERROR $code: $msg',
+              screen: 'active_call', source: 'agora_on_error_${widget.type.wire}'));
           if (mounted) setState(() => _error = 'Agora $code: $msg');
         },
       ));
@@ -228,7 +233,11 @@ class _ActiveCallPageState extends ConsumerState<ActiveCallPage> {
               autoSubscribeVideo: widget.type == CallType.video,
               publishMicrophoneTrack: true,
               publishCameraTrack: widget.type == CallType.video));
-    } catch (e) {
+    } catch (e, st) {
+      unawaited(ErrorMonitor.report('CALL_SETUP_FAILED: $e',
+          stack: st,
+          screen: 'active_call',
+          source: 'bootstrap_${widget.isCaller ? 'caller' : 'callee'}_${widget.type.wire}'));
       await _endBilling();
       try {
         await ref

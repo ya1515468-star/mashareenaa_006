@@ -71,19 +71,34 @@ Deno.serve(async (req) => {
     if (user.id !== callerUid && user.id !== calleeUid) return json({ error: 'FORBIDDEN' }, 403);
     if (!['ringing', 'accepted'].includes(status)) return json({ error: 'CALL_NOT_JOINABLE' }, 409);
 
-    // Token issuance is itself a paid-feature boundary. Re-check the entitlement
-    // here so a stale/forged call document cannot be used to obtain Agora access.
-    const { data: serviceRows, error: serviceError } = await supabase
-      .from('user_profile_services')
-      .select('feature_key,enabled')
-      .eq('user_id', user.id)
-      .eq('feature_key', 'voice_video_calls')
-      .eq('enabled', true)
-      .limit(1);
-    if (serviceError) return json({ error: 'SERVICE_CHECK_FAILED' }, 500);
-    if (!serviceRows?.length) {
-      const { data: ownerRows, error: ownerError } = await supabase.rpc('is_my_platform_owner');
-      if (ownerError || ownerRows !== true) return json({ error: 'FEATURE_REQUIRED_VOICE_VIDEO' }, 403);
+    // Token issuance is a paid-feature boundary — but the feature belongs to the
+    // CALLER (who starts and pays for the call), not to whoever answers.
+    //
+    // Proven cause of the 403s (edge logs 2026-10-11 21:01–21:03): this check
+    // used to read only a directly-purchased row in user_profile_services for
+    // the CURRENT user. So (1) a receiver without the paid feature could never
+    // answer, and (2) a caller entitled through a membership — exactly what
+    // start_call accepts via has_profile_service_for_user — was refused when
+    // fetching the token. Both sides now use the same server function as
+    // start_call, applied to the call's caller.
+    const { data: callerEntitled, error: entitlementError } = await supabase.rpc(
+      'has_profile_service_for_user',
+      { p_user_id: callerUid, p_feature_key: 'voice_video_calls' },
+    );
+    if (entitlementError) {
+      console.error('agora-token entitlement check failed', entitlementError);
+      return json({ error: 'SERVICE_CHECK_FAILED' }, 500);
+    }
+    if (callerEntitled !== true) {
+      let callerIsOwner = false;
+      if (user.id === callerUid) {
+        const { data: ownerRows } = await supabase.rpc('is_my_platform_owner');
+        callerIsOwner = ownerRows === true;
+      }
+      if (!callerIsOwner) {
+        console.warn('agora-token refused: caller lacks voice_video_calls', { callerUid, requester: user.id });
+        return json({ error: 'FEATURE_REQUIRED_VOICE_VIDEO' }, 403);
+      }
     }
 
     const since = new Date(Date.now() - 5 * 60 * 1000).toISOString();
@@ -99,7 +114,12 @@ Deno.serve(async (req) => {
     const appCertificate = Deno.env.get('AGORA_APP_CERTIFICATE');
     if (!appId || !appCertificate) return json({ error: 'AGORA_SERVER_NOT_CONFIGURED' }, 500);
 
-    const expiresIn = 300;
+    // agora-token@2.x takes token/privilege expiry as SECONDS FROM NOW (not an
+    // absolute timestamp) plus a 7th privilegeExpire argument. The old call
+    // passed an absolute timestamp (~57 years) and omitted privilegeExpire
+    // (defaults to 0 = never), so tokens effectively never expired. Now both
+    // are a real hour; the app renews via onTokenPrivilegeWillExpire.
+    const expiresIn = 3600;
     const expireAt = Math.floor(Date.now() / 1000) + expiresIn;
     const token = RtcTokenBuilder.buildTokenWithUid(
       appId,
@@ -107,7 +127,8 @@ Deno.serve(async (req) => {
       channel,
       expectedUid,
       RtcRole.PUBLISHER,
-      expireAt,
+      expiresIn,
+      expiresIn,
     );
 
     const { error: auditError } = await supabase.from('agora_token_issues').insert({ user_id: user.id });
