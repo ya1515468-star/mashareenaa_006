@@ -14,7 +14,6 @@ class ChatFeatureSettingsPage extends StatefulWidget {
 class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
   final db = Supabase.instance.client;
   final targetUid = TextEditingController();
-  bool loading = true;
   bool saving = false;
   bool sizeLoading = true;
   bool isOwner = false;
@@ -34,7 +33,6 @@ class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
   @override
   void initState() {
     super.initState();
-    _load();
     _loadVisualSize();
   }
 
@@ -42,23 +40,6 @@ class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
   void dispose() {
     targetUid.dispose();
     super.dispose();
-  }
-
-  Future<void> _load() async {
-    try {
-      final r = await db
-          .from('chat_feature_settings')
-          .select()
-          .eq('id', true)
-          .single();
-      if (mounted) {
-        setState(() {
-          loading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => loading = false);
-    }
   }
 
   Future<void> _loadVisualSize() async {
@@ -226,11 +207,8 @@ class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
     return Scaffold(
-      appBar: AppBar(title: const Text('إعدادات Chat / D3 — التحكم البصري')),
+      appBar: AppBar(title: const Text('إعدادات الشات — التحكم البصري')),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         const Text('حجم الإطار والسمايل المتحرك', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
         const SizedBox(height: 6),

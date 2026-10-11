@@ -352,10 +352,9 @@ class MessageBubble extends ConsumerWidget {
                               .toSet()
                           : const <String>{},
                     ),
-                  // البند 11: حُذف الرد ثلاثي الأبعاد والاقتباس ثلاثي الأبعاد.
-                  // الرسائل القديمة التي تحمل reply_mode = reply_3d/quote_3d
-                  // تُعرَض الآن ببطاقة الرد العادية نفسها، فلا يبقى أي مسار
-                  // ثلاثي الأبعاد في العرض ولا تُفقَد معاينة رسالة قديمة.
+                  // البند 11: الرد والاقتباس ثلاثي الأبعاد محذوفان بالكامل
+                  // (الودجت، قسم الإعدادات، وكل قراءة لوضعه). كل رد يُعرَض
+                  // ببطاقة واحدة موحَّدة.
                   if (message.replyToId != null && !deletedForEveryone)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6),

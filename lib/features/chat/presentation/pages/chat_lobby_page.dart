@@ -2178,7 +2178,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
               _PendingBar(
                 icon: Icons.reply,
                 label:
-                    '${_replyMode == 'quote' || _replyMode == 'quote_3d' ? 'اقتباس من' : 'رد على'} ${_replyingTo!['display_name'] ?? 'عضو'}: '
+                    '${_replyMode == 'quote' ? 'اقتباس من' : 'رد على'} ${_replyingTo!['display_name'] ?? 'عضو'}: '
                     '${(_replyingTo!['body'] ?? '📎 مرفق').toString()}',
                 onCancel: _cancelReply,
               ),
@@ -3246,8 +3246,7 @@ class _ChatMessageRow extends ConsumerWidget {
     final content = parts.length > 1 ? parts[1] : (parts.isNotEmpty ? parts[0] : '');
     final thumbUrl = parts.length > 2 ? parts[2] : '';
     final isQuote = row['metadata'] is Map &&
-        ((row['metadata'] as Map)['reply_mode'] == 'quote' ||
-            (row['metadata'] as Map)['reply_mode'] == 'quote_3d');
+        (row['metadata'] as Map)['reply_mode'] == 'quote';
     return InkWell(
       borderRadius: BorderRadius.circular(8),
       onTap: () => onJumpToMessage?.call(replyToId),
