@@ -1642,7 +1642,6 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
           children: [
             const Text('قالب الاسم', textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
             const SizedBox(height: 4),
-            const Text('50 قالب فيديو مستقلة للاسم. القالب هو الحاوية الأساسية؛ خلفية الاسم وتأثير اسم المستخدم، عند امتلاكهما، يُعرضان داخل القالب. وبدون القالب يبقيان يعملان منفصلين كما كانا.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60, fontSize: 11, height: 1.35)),
             const SizedBox(height: 12),
             if (templates.length != 50)
               Text('تحذير الخادم: تم تحميل ${templates.length}/50 قالبًا', textAlign: TextAlign.center, style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.w800)),
@@ -2292,7 +2291,6 @@ class _AddRemoteFrameDialogState extends State<_AddRemoteFrameDialog> {
           decoration:const InputDecoration(labelText:'مؤثر الإطار'),
         ),
         const SizedBox(height:8),
-        const Text('الحجم والأبعاد تُفحص تلقائيًا. GIF يحتفظ بحركته، والصور الثابتة تحصل على المؤثر المختار عند العرض. المؤثر يعمل داخل المتجر وفي البروفايل والشات.', style: TextStyle(fontSize: 12, color: Colors.white60)),
         const SizedBox(height:8),
         Row(children:[Expanded(child:TextField(controller:points,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'نقاط'))),const SizedBox(width:8),Expanded(child:TextField(controller:gems,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'جواهر')))]),
         const SizedBox(height:8),

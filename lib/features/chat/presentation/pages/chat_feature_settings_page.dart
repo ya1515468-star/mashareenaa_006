@@ -13,11 +13,7 @@ class ChatFeatureSettingsPage extends StatefulWidget {
 
 class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
   final db = Supabase.instance.client;
-  final reply = TextEditingController();
-  final quote = TextEditingController();
   final targetUid = TextEditingController();
-  bool enabled = true;
-  String timezone = 'UTC';
   bool loading = true;
   bool saving = false;
   bool sizeLoading = true;
@@ -44,8 +40,6 @@ class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
 
   @override
   void dispose() {
-    reply.dispose();
-    quote.dispose();
     targetUid.dispose();
     super.dispose();
   }
@@ -59,10 +53,6 @@ class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
           .single();
       if (mounted) {
         setState(() {
-          enabled = r['enabled'] == true;
-          reply.text = '';
-          quote.text = '';
-          timezone = r['timezone_reset']?.toString() ?? 'UTC';
           loading = false;
         });
       }
@@ -108,32 +98,6 @@ class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
     }
   }
 
-  Future<void> _save() async {
-    final a = int.tryParse(reply.text.trim());
-    final b = int.tryParse(quote.text.trim());
-    if (a == null || b == null || a < 0 || b < 0) return;
-    setState(() => saving = true);
-    try {
-      await db.rpc('dragon_update_chat_feature_settings', params: {
-        'p_enabled': enabled,
-        'p_limit_d3_reply_daily': a,
-        'p_limit_d3_quote_daily': b,
-        'p_timezone_reset': timezone,
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBarSfx(
-            const SnackBar(content: Text('تم حفظ إعدادات الرد 3D خادميًا ✓')));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBarSfx(SnackBar(content: Text('تعذر الحفظ: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => saving = false);
-    }
-  }
-
   Widget _levelButtons({
     required int value,
     required ValueChanged<int> onChanged,
@@ -162,7 +126,7 @@ class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
 
   Widget _visualCard({
     required String title,
-    required String subtitle,
+    String? subtitle,
     required int value,
     required ValueChanged<int> onChanged,
   }) {
@@ -174,8 +138,12 @@ class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
-            const SizedBox(height: 4),
-            Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+            // البند 24: العنوان الفرعي التوضيحي صار اختياريًا؛ البطاقة تُرسم
+            // بلا فراغ متروك حين لا يوجد نص.
+            if (subtitle != null && subtitle.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+            ],
             const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerRight,
@@ -270,10 +238,10 @@ class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
         const SizedBox(height: 12),
         if (sizeLoading) const Center(child: CircularProgressIndicator()),
         if (!sizeLoading && isOwner) ...[
-          _visualCard(title: 'حجم الإطار العام', subtitle: 'يطبّق على جميع الأعضاء ما لم يوجد استثناء شخصي.', value: globalFrameLevel, onChanged: (v) => setState(() => globalFrameLevel = v)),
-          _visualCard(title: 'حجم السمايل المتحرك العام', subtitle: 'حجم GIF/السمايل داخل رسائل الغرفة.', value: globalSmileyLevel, onChanged: (v) => setState(() => globalSmileyLevel = v)),
-          _visualCard(title: 'حجم الصورة الشخصية العام', subtitle: 'حجم صورة العضو داخل رسائل الغرفة.', value: globalAvatarLevel, onChanged: (v) => setState(() => globalAvatarLevel = v)),
-          _visualCard(title: 'حجم شارة الحيوان العام', subtitle: 'حجم الحيوان المتحرك فوق قالب الاسم.', value: globalAnimalLevel, onChanged: (v) => setState(() => globalAnimalLevel = v)),
+          _visualCard(title: 'حجم الإطار العام', value: globalFrameLevel, onChanged: (v) => setState(() => globalFrameLevel = v)),
+          _visualCard(title: 'حجم السمايل المتحرك العام', value: globalSmileyLevel, onChanged: (v) => setState(() => globalSmileyLevel = v)),
+          _visualCard(title: 'حجم الصورة الشخصية العام', value: globalAvatarLevel, onChanged: (v) => setState(() => globalAvatarLevel = v)),
+          _visualCard(title: 'حجم شارة الحيوان العام', value: globalAnimalLevel, onChanged: (v) => setState(() => globalAnimalLevel = v)),
           FilledButton.icon(onPressed: saving ? null : _saveGlobal, icon: const Icon(Icons.public), label: const Text('تطبيق الحجم العام على الجميع')),
           const SizedBox(height: 18),
           const Divider(),
@@ -283,15 +251,14 @@ class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
           const SizedBox(height: 10),
           TextField(controller: targetUid, decoration: const InputDecoration(labelText: 'UUID العضو')),
           const SizedBox(height: 10),
-          _visualCard(title: 'إطار العضو المحدد', subtitle: 'استثناء شخصي لهذا العضو.', value: targetFrameLevel, onChanged: (v) => setState(() => targetFrameLevel = v)),
-          _visualCard(title: 'سمايل العضو المحدد', subtitle: 'استثناء شخصي لهذا العضو.', value: targetSmileyLevel, onChanged: (v) => setState(() => targetSmileyLevel = v)),
-          _visualCard(title: 'صورة العضو المحدد', subtitle: 'حجم الصورة الشخصية لهذا العضو وحده.', value: targetAvatarLevel, onChanged: (v) => setState(() => targetAvatarLevel = v)),
-          _visualCard(title: 'حيوان العضو المحدد', subtitle: 'حجم شارة الحيوان لهذا العضو وحده.', value: targetAnimalLevel, onChanged: (v) => setState(() => targetAnimalLevel = v)),
+          _visualCard(title: 'إطار العضو المحدد', value: targetFrameLevel, onChanged: (v) => setState(() => targetFrameLevel = v)),
+          _visualCard(title: 'سمايل العضو المحدد', value: targetSmileyLevel, onChanged: (v) => setState(() => targetSmileyLevel = v)),
+          _visualCard(title: 'صورة العضو المحدد', value: targetAvatarLevel, onChanged: (v) => setState(() => targetAvatarLevel = v)),
+          _visualCard(title: 'حيوان العضو المحدد', value: targetAnimalLevel, onChanged: (v) => setState(() => targetAnimalLevel = v)),
           FilledButton.icon(onPressed: saving ? null : _saveTarget, icon: const Icon(Icons.person), label: const Text('تطبيق للعضو المحدد')),
           const SizedBox(height: 18),
           const Text('منح الصلاحية العليا', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
           const SizedBox(height: 6),
-          const Text('العضو الممنوح يستطيع التحكم بحجمه لنفسه فقط.', style: TextStyle(color: Colors.white54)),
           const SizedBox(height: 10),
           Row(children: [
             Expanded(child: FilledButton.icon(onPressed: saving ? null : () => _grant(true), icon: const Icon(Icons.admin_panel_settings), label: const Text('منح'))),
@@ -304,31 +271,15 @@ class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
         ],
         if (!sizeLoading && !isOwner && canManageSelf) ...[
           const SizedBox(height: 4),
-          _visualCard(title: 'حجم إطارك', subtitle: 'صلاحية عليا: التعديل هنا يخص حسابك فقط.', value: selfFrameLevel, onChanged: (v) => setState(() => selfFrameLevel = v)),
-          _visualCard(title: 'حجم سمايلك المتحرك', subtitle: 'صلاحية عليا: التعديل هنا يخص حسابك فقط.', value: selfSmileyLevel, onChanged: (v) => setState(() => selfSmileyLevel = v)),
+          _visualCard(title: 'حجم إطارك', value: selfFrameLevel, onChanged: (v) => setState(() => selfFrameLevel = v)),
+          _visualCard(title: 'حجم سمايلك المتحرك', value: selfSmileyLevel, onChanged: (v) => setState(() => selfSmileyLevel = v)),
           FilledButton.icon(onPressed: saving ? null : _saveMine, icon: const Icon(Icons.save), label: const Text('حفظ حجمي')),
         ],
         if (!sizeLoading && !isOwner && !canManageSelf)
           const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('لا توجد لديك صلاحية للتحكم بحجم الإطار أو السمايل.', style: TextStyle(color: Colors.white70)))),
-        const Divider(height: 36),
-        const Text('إعدادات الرد والاقتباس 3D', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-        SwitchListTile(value: enabled, onChanged: saving ? null : (v) => setState(() => enabled = v), title: const Text('تفعيل الرد والاقتباس 3D')),
-        TextField(controller: reply, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'حد Reply 3D اليومي')),
-        const SizedBox(height: 12),
-        TextField(controller: quote, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'حد Quote 3D اليومي')),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String>(
-          initialValue: timezone,
-          items: const [
-            DropdownMenuItem(value: 'UTC', child: Text('UTC')),
-            DropdownMenuItem(value: 'Asia/Damascus', child: Text('Asia/Damascus')),
-            DropdownMenuItem(value: 'America/Chicago', child: Text('America/Chicago')),
-          ],
-          onChanged: saving ? null : (v) => setState(() => timezone = v ?? timezone),
-          decoration: const InputDecoration(labelText: 'منطقة إعادة ضبط اليوم'),
-        ),
-        const SizedBox(height: 24),
-        FilledButton(onPressed: saving ? null : _save, child: Text(saving ? 'جارٍ الحفظ...' : 'حفظ خادمي')),
+        // البند 11: أُزيل قسم «إعدادات الرد والاقتباس 3D» بكامله (المفتاح،
+        // حدّا Reply/Quote اليوميان، ومنطقة إعادة الضبط) لأن الميزة نفسها
+        // محذوفة من الشات، فلم يبقَ لإعداداتها معنى.
       ]),
     );
   }

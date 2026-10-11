@@ -569,9 +569,7 @@ class MiniProfilePopup extends ConsumerWidget {
       context: context,
       builder: (sheetContext) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const ListTile(
-              title: Text('اختر اللعبة'),
-              subtitle: Text('سيصل للعضو طلب للقبول أو الرفض')),
+          const ListTile(title: Text('اختر اللعبة')),
           ListTile(
               leading: const Icon(Icons.casino_outlined),
               title: const Text('لعبة النرد'),
@@ -603,9 +601,7 @@ class MiniProfilePopup extends ConsumerWidget {
       context: context,
       builder: (sheetContext) => SafeArea(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const ListTile(
-              title: Text('تحويل إلى العضو'),
-              subtitle: Text('التحويل يتم خادميًا مع التحقق من الرصيد')),
+          const ListTile(title: Text('تحويل إلى العضو')),
           ListTile(
               leading: const Icon(Icons.stars_rounded),
               title: const Text('تحويل نقاط'),

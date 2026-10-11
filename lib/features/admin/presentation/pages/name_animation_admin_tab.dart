@@ -227,7 +227,6 @@ class _NameAnimationAdminTabState extends ConsumerState<NameAnimationAdminTab> {
     return ListView(padding: const EdgeInsets.all(14), children: [
       const Text('إدارة حيوانات الاسم المتحركة', textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
       const SizedBox(height: 6),
-      const Text('GIF فقط — رفع آمن، تخزين خادمي، شراء وتفعيل، وظهور مستقل فوق قالب الاسم.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70)),
       const SizedBox(height: 14),
       Align(alignment: Alignment.centerLeft, child: OutlinedButton.icon(onPressed: _runDiagnostics, icon: const Icon(Icons.health_and_safety_outlined), label: const Text('فحص وتشخيص ذاتي'))),
       const SizedBox(height: 10),

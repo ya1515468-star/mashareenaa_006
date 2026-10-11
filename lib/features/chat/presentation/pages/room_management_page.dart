@@ -1691,7 +1691,6 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
             const Divider(color: Colors.white24, height: 30),
             const Text('أصوات وتنبيهات الغرفة', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
             const SizedBox(height: 6),
-            const Text('يمكن لمالك المنصة أو مدير الغرفة اختيار صوت مستقل لكل نوع.', style: TextStyle(color: Colors.white54)),
             _roomSoundTile('publicMessage', 'رسائل العام'),
             _roomSoundTile('privateMessage', 'رسائل الخاص'),
             _roomSoundTile('mention', 'المنشن'),

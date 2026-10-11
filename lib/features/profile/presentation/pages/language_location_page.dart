@@ -102,7 +102,6 @@ class _LanguageLocationPageState extends State<LanguageLocationPage> {
                   field: 'locationSharingEnabled',
                   icon: Icons.location_on_outlined,
                   title: 'مشاركة موقعي الجغرافي',
-                  subtitle: 'لعرضك ضمن "المتصلون بالقرب مني" فقط',
                 ),
               ],
             ),

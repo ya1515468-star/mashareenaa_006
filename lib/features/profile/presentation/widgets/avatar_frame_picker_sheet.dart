@@ -48,7 +48,6 @@ class AvatarFramePickerSheet extends ConsumerWidget {
                 const SizedBox(height: 10),
                 const Text('إطارات من الخادم',style:TextStyle(fontSize:18,fontWeight:FontWeight.w900)),
                 const SizedBox(height: 8),
-                const Padding(padding:EdgeInsets.symmetric(horizontal:18),child:Text('الإطار يُعرض فوق الصورة من الملف المخزن في Supabase، سواء كان ثابتًا أو متحركًا.',style:TextStyle(color:Colors.white60,fontSize:11),textAlign:TextAlign.center)),
                 const SizedBox(height: 10),
                 Expanded(child: GridView.builder(
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 22),

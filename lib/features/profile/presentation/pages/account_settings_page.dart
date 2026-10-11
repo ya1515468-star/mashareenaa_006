@@ -339,7 +339,6 @@ class AccountSettingsContent extends ConsumerWidget {
         field: 'messageSoundEnabled',
         icon: Icons.volume_up_outlined,
         title: 'صوت الرسائل',
-        subtitle: 'تنبيه صوتي عند وصول رسالة جديدة',
         defaultValue: true,
       ),
       AccountSwitchSettingTile(
