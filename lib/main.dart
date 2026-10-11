@@ -14,6 +14,7 @@ import 'core/config/supabase_config.dart';
 import 'core/monitoring/error_monitor.dart';
 import 'core/widgets/upload_progress_overlay.dart';
 import 'core/widgets/global_mini_player.dart';
+import 'core/widgets/sewing_machine_splash.dart';
 import 'core/services/server_realtime_sync.dart';
 
 Future<void> main() async {
@@ -97,7 +98,9 @@ class MashareenaApp extends ConsumerWidget {
           ),
         );
       },
-      home: const PresenceLifecycleObserver(child: AppRouter()),
+      home: const StartupSplashGate(
+        child: PresenceLifecycleObserver(child: AppRouter()),
+      ),
     );
   }
 }

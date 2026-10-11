@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/premium/effects.dart';
 import '../widgets/premium/login_visual_variants.dart';
+import '../../../../core/widgets/sewing_machine_splash.dart';
 import '../widgets/premium/premium_auth_scaffold.dart';
 import '../widgets/premium/premium_button.dart';
 import '../widgets/premium/premium_text_field.dart';
@@ -115,10 +116,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     // هذا التبديل يُرى كوميض حقيقي: يظهر الزر ثم يختفي أو العكس. عرض حالة
     // تحميل نظيفة بدل الافتراض التفاؤلي يمنع هذا التناقض المرئي كليًا.
     if (!variantAsync.hasValue) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF0A0C1C),
-        body: Center(child: BrandAnimatedLogo(size: 110)),
-      );
+      return const Scaffold(body: SewingMachineSplash());
     }
     final variant = variantAsync.value!;
     final style = loginVariantStyles[variant]!;

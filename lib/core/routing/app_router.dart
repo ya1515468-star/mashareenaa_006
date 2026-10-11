@@ -5,7 +5,7 @@ import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/auth/presentation/widgets/pin_lock_gate.dart';
 import '../../features/home/presentation/pages/home_shell.dart';
 import '../widgets/loading_indicator.dart';
-import '../../features/auth/presentation/widgets/brand_animated_logo.dart';
+import '../widgets/sewing_machine_splash.dart';
 import '../../features/notifications/presentation/widgets/login_announcement_gate.dart';
 
 /// نقطة القرار المركزية: تعرض شاشة الدخول أو [HomeShell] (الشاشة
@@ -21,10 +21,7 @@ class AppRouter extends ConsumerWidget {
     final authState = ref.watch(authControllerProvider);
 
     return authState.when(
-      loading: () => const Scaffold(
-        backgroundColor: Color(0xFF0A0C1C),
-        body: Center(child: BrandAnimatedLogo(size: 110)),
-      ),
+      loading: () => const Scaffold(body: SewingMachineSplash()),
       error: (_, __) => const LoginPage(),
       data: (user) => user == null
           ? const LoginPage()

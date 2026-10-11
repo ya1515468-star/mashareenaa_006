@@ -7,6 +7,7 @@ import '../../../calls/domain/entities/call_entity.dart';
 import '../../../calls/presentation/pages/active_call_page.dart';
 import '../../../calls/presentation/providers/call_provider.dart';
 import '../../../calls/presentation/widgets/incoming_call_card.dart';
+import '../../../../core/widgets/sewing_machine_splash.dart';
 import 'home_dashboard_page.dart';
 import '../../../chat/presentation/pages/chat_lobby_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -41,6 +42,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   String? _roomError;
   bool _roomLoading = false;
   String? _handledCallId;
+  DateTime? _roomFailSince;
   ProviderSubscription<AsyncValue<CallEntity?>>? _incomingCallSubscription;
   StreamSubscription<AuthState>? _authSubscription;
   Timer? _roomRetryTimer;
@@ -194,6 +196,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           setState(() {
             _currentRoomId = roomId;
             _roomError = null;
+            _roomFailSince = null;
             _roomLoading = false;
           });
           return;
@@ -231,12 +234,18 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       setState(() {
         _currentRoomId = (liveId != null && liveId.isNotEmpty) ? liveId : null;
         _roomError = errorMessage;
+        if (_currentRoomId != null) {
+          _roomFailSince = null;
+        } else {
+          _roomFailSince ??= DateTime.now();
+        }
         _roomLoading = false;
       });
     } catch (_) {
       if (mounted) {
         setState(() {
           _roomError = errorMessage;
+          _roomFailSince ??= DateTime.now();
           _roomLoading = false;
         });
       }
@@ -246,6 +255,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   Widget _chatEntryPage() {
     final roomId = _currentRoomId;
     if (roomId != null && roomId.isNotEmpty) return ChatLobbyPage(roomId: roomId);
+    // أول ثوانٍ بعد الدخول: المحاولات الصامتة تعمل في الخلفية، فتُعرض ماكينة
+    // الخياطة بدل رسالة «تعذّر فتح الشات». لا يظهر الخطأ إلا بعد فشل مستمر.
+    final failedFor = _roomFailSince == null
+        ? Duration.zero
+        : DateTime.now().difference(_roomFailSince!);
+    if (_roomError == null || failedFor < const Duration(seconds: 25)) {
+      return const SewingMachineSplash();
+    }
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
