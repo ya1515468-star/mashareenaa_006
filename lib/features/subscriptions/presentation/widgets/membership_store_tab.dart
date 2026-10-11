@@ -250,7 +250,6 @@ class MembershipStoreTab extends ConsumerWidget {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             ListTile(
               title: Text('شراء ${tier.name} لمدة ${tier.durationDays} يوم'),
-              subtitle: const Text('اختر وسيلة الدفع — يُخصم المبلغ من رصيدك فورًا'),
             ),
             if (points > 0)
               ListTile(

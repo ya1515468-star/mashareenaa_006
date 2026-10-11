@@ -256,8 +256,6 @@ Future<void> showGameHub(BuildContext context,
             leading: const Text('♠♥♦♣', style: TextStyle(fontSize: 15, letterSpacing: 0)),
             title: const Text('تركس سوري',
                 style: TextStyle(color: Colors.white)),
-            subtitle: const Text('فردي أو شراكة ضد الكمبيوتر — برهان نقاط حقيقي',
-                style: TextStyle(color: Colors.white54, fontSize: 12)),
             onTap: () {
               Navigator.pop(sheetContext);
               showTrixLauncher(context);
@@ -268,8 +266,6 @@ Future<void> showGameHub(BuildContext context,
             leading: const Text('📨', style: TextStyle(fontSize: 26)),
             title: const Text('دعوة لاعب / دعواتي',
                 style: TextStyle(color: Colors.white)),
-            subtitle: const Text('ادعُ أي عضو لأي لعبة برهان حقيقي، وأدر دعواتك',
-                style: TextStyle(color: Colors.white54, fontSize: 12)),
             onTap: () {
               Navigator.pop(sheetContext);
               showGameInvites(context, roomId: roomId, onIncoming: onIncoming);
@@ -283,8 +279,6 @@ Future<void> showGameHub(BuildContext context,
                   style: const TextStyle(fontSize: 26)),
               title: Text(gameTitle(t),
                   style: const TextStyle(color: Colors.white)),
-              subtitle: const Text('ضد الكمبيوتر',
-                  style: TextStyle(color: Colors.white54, fontSize: 12)),
               onTap: () {
                 Navigator.pop(sheetContext);
                 openPractice(context, t);

@@ -13,7 +13,7 @@ enum LoginVisualVariant {
   static LoginVisualVariant fromServer(String? key) => switch (key) {
         'royal' => LoginVisualVariant.royal,
         'modern' => LoginVisualVariant.modern,
-        _ => LoginVisualVariant.atelier,
+        _ => LoginVisualVariant.royal,
       };
 }
 
@@ -173,6 +173,6 @@ final loginVisualVariantProvider =
         await Supabase.instance.client.rpc('get_login_visual_variant');
     return LoginVisualVariant.fromServer(result?.toString());
   } catch (_) {
-    return LoginVisualVariant.atelier;
+    return LoginVisualVariant.royal;
   }
 });

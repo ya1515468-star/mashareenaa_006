@@ -92,9 +92,6 @@ class AccountSecurityPage extends ConsumerWidget {
                 color: AppColors.error),
             title: const Text('حذف عضوية',
                 style: TextStyle(color: AppColors.error)),
-            subtitle: const Text(
-                'حذف الحساب نهائيًا — إجراء لا يمكن التراجع عنه',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
             trailing:
                 const Icon(Icons.chevron_left, color: AppColors.textMuted),
             onTap: () => Navigator.of(context).push(

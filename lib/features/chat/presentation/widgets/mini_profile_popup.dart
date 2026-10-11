@@ -190,7 +190,7 @@ class MiniProfilePopup extends ConsumerWidget {
       backgroundColor: AppColors.surfaceElevated,
       builder: (sheetContext) => SafeArea(
         child: ListView(shrinkWrap: true, children: [
-          ListTile(title: Text(title), subtitle: const Text('اختر المدة')),
+          ListTile(title: Text(title),),
           ..._durations.map((d) => ListTile(
                 leading: const Icon(Icons.timer_outlined),
                 title: Text(d.key),
@@ -575,7 +575,6 @@ class MiniProfilePopup extends ConsumerWidget {
           ListTile(
               leading: const Icon(Icons.casino_outlined),
               title: const Text('لعبة النرد'),
-              subtitle: const Text('تحدٍّ بنقاط أو ودّي'),
               onTap: () {
                 Navigator.pop(sheetContext);
                 _sendDiceChallenge(context);
@@ -588,7 +587,6 @@ class MiniProfilePopup extends ConsumerWidget {
                         : (t == 'rps' ? '✊' : (t == 'coin' ? '🪙' : '♠♥♦♣')),
                     style: TextStyle(fontSize: t.startsWith('trix_') ? 14 : 24)),
                 title: Text(t.startsWith('trix_') ? gameTitle(t) : '${gameTitle(t)} (3D)'),
-                subtitle: const Text('رهان نقاط: ربح / خسارة / مضاعفة'),
                 onTap: () async {
                   Navigator.pop(sheetContext);
                   final sent = await sendGameChallengeFlow(context,

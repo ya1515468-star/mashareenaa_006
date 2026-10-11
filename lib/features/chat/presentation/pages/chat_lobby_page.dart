@@ -775,8 +775,6 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                     color: Color(0xFFDFA8FF)),
                 title: const Text('ألعاب ثلاثية الأبعاد',
                     style: TextStyle(color: Colors.white)),
-                subtitle: const Text('أربعة في صف • حجر ورقة مقص • العملة',
-                    style: TextStyle(color: Colors.white54, fontSize: 12)),
                 onTap: () {
                   Navigator.pop(sheetContext);
                   showGameHub(context,
@@ -2584,10 +2582,6 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                             style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w800)),
-                        subtitle: const Text(
-                            'يمكن للأعضاء الوصول إليها من دليل الغرف.',
-                            style:
-                                TextStyle(color: Colors.white54, fontSize: 11)),
                         contentPadding: EdgeInsets.zero,
                       ),
                     ],
@@ -2860,10 +2854,6 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                             color: Colors.orangeAccent),
                         title: const Text('تحذيرات الأمان المنشورة',
                             style: TextStyle(color: Colors.white)),
-                        subtitle: const Text(
-                            'بلاغات تم اعتمادها ونشرها من الإدارة',
-                            style:
-                                TextStyle(color: Colors.white54, fontSize: 11)),
                         onTap: () {
                           Navigator.pop(dialogContext);
                           Navigator.of(context).push(MaterialPageRoute(

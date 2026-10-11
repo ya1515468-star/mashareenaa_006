@@ -116,8 +116,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     // تحميل نظيفة بدل الافتراض التفاؤلي يمنع هذا التناقض المرئي كليًا.
     if (!variantAsync.hasValue) {
       return const Scaffold(
-        backgroundColor: Color(0xFF0A0A0C),
-        body: Center(child: CircularProgressIndicator()),
+        backgroundColor: Color(0xFF0A0C1C),
+        body: Center(child: BrandAnimatedLogo(size: 110)),
       );
     }
     final variant = variantAsync.value!;

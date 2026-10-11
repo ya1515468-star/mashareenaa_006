@@ -362,10 +362,6 @@ class AccountSettingsContent extends ConsumerWidget {
         leading: const Icon(Icons.admin_panel_settings_outlined,
             color: AppColors.gold),
         title: const Text('أمان الحساب'),
-        subtitle: const Text(
-          'البريد، كلمة المرور، ربط Google، حذف العضوية',
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-        ),
         trailing: const Icon(Icons.chevron_left, color: AppColors.textMuted),
         onTap: () => Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => AccountSecurityPage(profile: liveProfile))),
