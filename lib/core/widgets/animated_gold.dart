@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+// Ticker وTickerCallback معرّفان في scheduler لا في material.
+import 'package:flutter/scheduler.dart';
 
 /// البند 15: اللون البنفسجي في الشات استُبدل بذهبي **متحرك** لا ذهبي ثابت.
 ///
@@ -24,7 +26,7 @@ class _GoldTicker extends ChangeNotifier {
     _controller = AnimationController(
       vsync: _vsync,
       duration: const Duration(milliseconds: 2600),
-    )..repeat();
+    );
     _controller.addListener(notifyListeners);
   }
 
@@ -34,6 +36,21 @@ class _GoldTicker extends ChangeNotifier {
 
   late final AnimationController _controller;
   double get value => _controller.value;
+
+  // لا تدور الحركة إلا وعلى الشاشة عنصر ذهبي فعلًا. بلا هذا يبقى
+  // المتحكّم يطلب إطارًا كل 16ms ما دام التطبيق يعمل — هدر معالج وبطارية
+  // بلا أي عنصر يُرسم.
+  @override
+  void addListener(VoidCallback listener) {
+    super.addListener(listener);
+    if (!_controller.isAnimating) _controller.repeat();
+  }
+
+  @override
+  void removeListener(VoidCallback listener) {
+    super.removeListener(listener);
+    if (!hasListeners && _controller.isAnimating) _controller.stop();
+  }
 }
 
 class _AlwaysTickerProvider implements TickerProvider {
