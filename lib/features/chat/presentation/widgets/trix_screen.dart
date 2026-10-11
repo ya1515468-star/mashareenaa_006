@@ -619,7 +619,7 @@ class _TrixScreenState extends State<TrixScreen> with TickerProviderStateMixin {
     final rel = (seat - me + 4) % 4;
     final who = _who(seat);
     _later(delayMs, () => playServerSound('trix_double'));
-    final al = Alignment.lerp(_kSeat[rel], Alignment.zero, 0.42)!;
+    final al = Alignment.lerp(_kSeat[rel], Alignment.center, 0.42)!;
     _addFx((done) => _Anim(
           delay: Duration(milliseconds: delayMs),
           duration: const Duration(milliseconds: 1600),
@@ -909,7 +909,7 @@ class _TrixScreenState extends State<TrixScreen> with TickerProviderStateMixin {
       playServerSound('slap');
       _doShake(6);
     });
-    final al = Alignment.lerp(Alignment.zero, _kSeat[rel], 0.55)!;
+    final al = Alignment.lerp(Alignment.center, _kSeat[rel], 0.55)!;
     _addFx((done) => _Anim(
           delay: Duration(milliseconds: delayMs),
           duration: const Duration(milliseconds: 1250),
@@ -966,7 +966,7 @@ class _TrixScreenState extends State<TrixScreen> with TickerProviderStateMixin {
   }
 
   void _floatText(int rel, String text, Color color, int delayMs) {
-    final from = Alignment.lerp(Alignment.zero, _kSeat[rel], 0.6)!;
+    final from = Alignment.lerp(Alignment.center, _kSeat[rel], 0.6)!;
     _addFx((done) => _Anim(
           delay: Duration(milliseconds: delayMs),
           duration: const Duration(milliseconds: 1300),
@@ -999,7 +999,7 @@ class _TrixScreenState extends State<TrixScreen> with TickerProviderStateMixin {
     const medals = ['🥇', '🥈', '🥉', '🏅'];
     const pts = [200, 150, 100, 50];
     playServerSound('trix_finish');
-    final al = Alignment.lerp(Alignment.zero, _kSeat[rel], 0.6)!;
+    final al = Alignment.lerp(Alignment.center, _kSeat[rel], 0.6)!;
     _addFx((done) => _Anim(
           duration: const Duration(milliseconds: 1700),
           onDone: done,
@@ -1752,7 +1752,7 @@ class _TrixScreenState extends State<TrixScreen> with TickerProviderStateMixin {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
                 margin: const EdgeInsets.symmetric(horizontal: 4),
-                transform: Matrix4.translationValues(0, _dblSel.contains(c) ? -8 : 0, 0),
+                transform: Matrix4.translationValues(0.0, _dblSel.contains(c) ? -8.0 : 0.0, 0.0),
                 child: PlayingCard(
                     card: c, width: 44, height: 62, glow: _dblSel.contains(c), glowColor: const Color(0xFFFF6D00)),
               ),

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/services/server_sounds.dart';
+import 'animated_dice_roller.dart' show Dice3D;
 import 'game_invites.dart';
 import 'trix_game.dart';
 
@@ -246,7 +247,7 @@ Future<void> showGameHub(BuildContext context,
                   fontWeight: FontWeight.w800)),
           const SizedBox(height: 4),
           const Text(
-              'ضد الكمبيوتر هنا (تدريب بلا نقاط). للعب ضد لاعب حقيقي برهان نقاط: اضغط صورته ← طلب لعبة.',
+              'ضد الكمبيوتر هنا: اللعب يُحسم في الخادم وللفائز جائزة نقاط. ضد لاعب حقيقي (رهان + جائزة نقاط وجواهر): اضغط صورته ← طلب لعبة.',
               textAlign: TextAlign.center,
               textDirection: TextDirection.rtl,
               style: TextStyle(color: Colors.white54, fontSize: 12)),
@@ -271,11 +272,11 @@ Future<void> showGameHub(BuildContext context,
               showGameInvites(context, roomId: roomId, onIncoming: onIncoming);
             },
           ),
-          for (final t in const ['connect4', 'rps', 'coin'])
+          for (final t in const ['connect4', 'rps', 'coin', 'dice'])
             ListTile(
               dense: true,
               leading: Text(
-                  t == 'connect4' ? '🔴' : (t == 'rps' ? '✊' : '🪙'),
+                  t == 'connect4' ? '🔴' : (t == 'rps' ? '✊' : (t == 'coin' ? '🪙' : '🎲')),
                   style: const TextStyle(fontSize: 26)),
               title: Text(gameTitle(t),
                   style: const TextStyle(color: Colors.white)),
@@ -293,11 +294,13 @@ Future<void> showGameHub(BuildContext context,
 Future<void> openPractice(BuildContext context, String type) {
   Widget body;
   if (type == 'connect4') {
-    body = const _Connect4Practice();
+    body = const _Connect4Bot();
   } else if (type == 'rps') {
-    body = const _RpsPractice();
+    body = const _RpsBot();
+  } else if (type == 'dice') {
+    body = const _DiceBot();
   } else {
-    body = const _CoinPractice();
+    body = const _CoinBot();
   }
   return showDialog<void>(
     context: context,
@@ -380,106 +383,6 @@ List<int>? _c4Drop(List<int> b, int col, int p) {
     }
   }
   return null;
-}
-
-/// يعيد خلايا الرباعي الفائز (أول خلية تحدد اللاعب) أو null.
-List<int>? _c4WinCells(List<int> b) {
-  const dirs = [
-    [0, 1],
-    [1, 0],
-    [1, 1],
-    [1, -1]
-  ];
-  for (var r = 0; r < _rows; r++) {
-    for (var c = 0; c < _cols; c++) {
-      final p = b[r * _cols + c];
-      if (p == 0) continue;
-      for (final d in dirs) {
-        final cells = <int>[r * _cols + c];
-        for (var k = 1; k < 4; k++) {
-          final nr = r + d[0] * k;
-          final nc = c + d[1] * k;
-          if (nr < 0 || nr >= _rows || nc < 0 || nc >= _cols) break;
-          if (b[nr * _cols + nc] != p) break;
-          cells.add(nr * _cols + nc);
-        }
-        if (cells.length == 4) return cells;
-      }
-    }
-  }
-  return null;
-}
-
-int _c4Eval(List<int> b, int p) {
-  final o = 3 - p;
-  var s = 0;
-  for (var r = 0; r < _rows; r++) {
-    final v = b[r * _cols + 3];
-    if (v == p) s += 3;
-    if (v == o) s -= 3;
-  }
-  const dirs = [
-    [0, 1],
-    [1, 0],
-    [1, 1],
-    [1, -1]
-  ];
-  for (var r = 0; r < _rows; r++) {
-    for (var c = 0; c < _cols; c++) {
-      for (final d in dirs) {
-        final er = r + d[0] * 3;
-        final ec = c + d[1] * 3;
-        if (er < 0 || er >= _rows || ec < 0 || ec >= _cols) continue;
-        var mine = 0, theirs = 0, empty = 0;
-        for (var k = 0; k < 4; k++) {
-          final v = b[(r + d[0] * k) * _cols + c + d[1] * k];
-          if (v == p) {
-            mine++;
-          } else if (v == o) {
-            theirs++;
-          } else {
-            empty++;
-          }
-        }
-        if (mine == 3 && empty == 1) s += 6;
-        if (mine == 2 && empty == 2) s += 2;
-        if (theirs == 3 && empty == 1) s -= 5;
-      }
-    }
-  }
-  return s;
-}
-
-int _c4Negamax(List<int> b, int depth, int alpha, int beta, int p) {
-  final w = _c4WinCells(b);
-  if (w != null) return b[w.first] == p ? 100000 + depth : -(100000 + depth);
-  if (!b.contains(0)) return 0;
-  if (depth == 0) return _c4Eval(b, p);
-  var best = -1000000000;
-  for (final col in const [3, 2, 4, 1, 5, 0, 6]) {
-    final nb = _c4Drop(b, col, p);
-    if (nb == null) continue;
-    final v = -_c4Negamax(nb, depth - 1, -beta, -alpha, 3 - p);
-    if (v > best) best = v;
-    if (v > alpha) alpha = v;
-    if (alpha >= beta) break;
-  }
-  return best;
-}
-
-int _c4ComputerMove(List<int> b, int p) {
-  var bestCol = 3;
-  var bestVal = -1000000000;
-  for (final col in const [3, 2, 4, 1, 5, 0, 6]) {
-    final nb = _c4Drop(b, col, p);
-    if (nb == null) continue;
-    final v = -_c4Negamax(nb, 4, -1000000000, 1000000000, 3 - p);
-    if (v > bestVal) {
-      bestVal = v;
-      bestCol = col;
-    }
-  }
-  return bestCol;
 }
 
 class Connect4BoardView extends StatelessWidget {
@@ -642,98 +545,268 @@ class Connect4BoardView extends StatelessWidget {
   }
 }
 
-class _Connect4Practice extends StatefulWidget {
-  const _Connect4Practice();
+// ───────────────────────── ضد الكمبيوتر (من الخادم) ─────────────────────────
+
+Map<String, dynamic>? _asRow(Object? raw) => raw is Map ? Map<String, dynamic>.from(raw) : null;
+Map<String, dynamic> _stateOf(Map<String, dynamic>? r) =>
+    r?['state'] is Map ? Map<String, dynamic>.from(r!['state'] as Map) : <String, dynamic>{};
+Map<String, dynamic>? _prizeOf(Map<String, dynamic>? r) =>
+    r?['prize'] is Map ? Map<String, dynamic>.from(r!['prize'] as Map) : null;
+
+/// شارة النتيجة: النص + جائزة الخادم الفعلية (نقاط/جواهر) + احتفال عند الفوز.
+class GameResultBurst extends StatefulWidget {
+  final String result; // win | lose | draw
+  final String text;
+  final Map<String, dynamic>? prize;
+  final bool sound;
+  const GameResultBurst(
+      {super.key, required this.result, required this.text, this.prize, this.sound = true});
+
   @override
-  State<_Connect4Practice> createState() => _Connect4PracticeState();
+  State<GameResultBurst> createState() => _GameResultBurstState();
 }
 
-class _Connect4PracticeState extends State<_Connect4Practice> {
-  List<int> board = List<int>.filled(_rows * _cols, 0);
-  int? last;
-  bool playerTurn = true;
-  String status = 'دورك — أنت الأحمر';
-  List<int> win = const [];
-  bool over = false;
+class _GameResultBurstState extends State<GameResultBurst> with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))..forward();
+  final List<List<double>> _bits = [];
 
-  void _afterMove(List<int> nb, int idx, int p) {
-    final w = _c4WinCells(nb);
-    setState(() {
-      board = nb;
-      last = idx;
-      if (w != null) {
-        win = w;
-        over = true;
-        status = p == 1 ? '🎉 فزت!' : '😅 فاز الكمبيوتر';
-        Future.delayed(const Duration(milliseconds: 700),
-            () => playServerSound(p == 1 ? 'game_win' : 'game_lose'));
-      } else if (!nb.contains(0)) {
-        over = true;
-        status = 'تعادل';
-        Future.delayed(const Duration(milliseconds: 700),
-            () => playServerSound('game_draw'));
-      }
-    });
-  }
-
-  int _landingIndex(List<int> before, List<int> after) {
-    for (var i = 0; i < before.length; i++) {
-      if (before[i] != after[i]) return i;
+  @override
+  void initState() {
+    super.initState();
+    final r = math.Random();
+    for (var i = 0; i < 22; i++) {
+      _bits.add([r.nextDouble() * math.pi * 2, 40 + r.nextDouble() * 110, (r.nextDouble() - 0.5) * 8, i.toDouble()]);
     }
-    return 0;
-  }
-
-  void _tap(int col) {
-    if (!playerTurn || over) return;
-    final nb = _c4Drop(board, col, 1);
-    if (nb == null) return;
-    final idx = _landingIndex(board, nb);
-    playerTurn = false;
-    _afterMove(nb, idx, 1);
-    if (over) return;
-    setState(() => status = 'الكمبيوتر يفكر…');
-    Future.delayed(const Duration(milliseconds: 700), () {
-      if (!mounted) return;
-      final col2 = _c4ComputerMove(board, 2);
-      final nb2 = _c4Drop(board, col2, 2);
-      if (nb2 == null) return;
-      final idx2 = _landingIndex(board, nb2);
-      _afterMove(nb2, idx2, 2);
-      if (!over) {
-        setState(() {
-          playerTurn = true;
-          status = 'دورك — أنت الأحمر';
-        });
-      }
-    });
-  }
-
-  void _reset() => setState(() {
-        board = List<int>.filled(_rows * _cols, 0);
-        last = null;
-        win = const [];
-        over = false;
-        playerTurn = true;
-        status = 'دورك — أنت الأحمر';
+    if (widget.sound) {
+      Future.delayed(const Duration(milliseconds: 250), () {
+        playServerSound(widget.result == 'win' ? 'game_win' : (widget.result == 'lose' ? 'game_lose' : 'game_draw'));
       });
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final win = widget.result == 'win';
+    final pts = (widget.prize?['points'] as num?)?.toInt() ?? 0;
+    final gems = (widget.prize?['gems'] as num?)?.toInt() ?? 0;
+    final color = win ? const Color(0xFFFFD54F) : (widget.result == 'lose' ? const Color(0xFFFF8A80) : Colors.white);
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        final t = _c.value;
+        final pop = Curves.elasticOut.transform((t / 0.55).clamp(0.0, 1.0));
+        return SizedBox(
+          width: double.infinity,
+          child: Stack(alignment: Alignment.center, clipBehavior: Clip.none, children: [
+            if (win)
+              for (final b in _bits)
+                Transform.translate(
+                  offset: Offset(math.cos(b[0]) * b[1] * Curves.easeOut.transform(t),
+                      math.sin(b[0]) * b[1] * Curves.easeOut.transform(t) + 60 * t * t),
+                  child: Opacity(
+                    opacity: (1 - t).clamp(0.0, 1.0),
+                    child: Transform.rotate(
+                      angle: b[2] * t,
+                      child: Text(const ['🎉', '✨', '🏆', '💎', '⭐'][b[3].toInt() % 5],
+                          style: const TextStyle(fontSize: 20)),
+                    ),
+                  ),
+                ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Transform.scale(
+                  scale: 0.3 + 0.7 * pop,
+                  child: Text(widget.text,
+                      textAlign: TextAlign.center,
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(
+                        color: color,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 19,
+                        shadows: [Shadow(color: color.withAlpha(150), blurRadius: 12)],
+                      )),
+                ),
+                const SizedBox(height: 6),
+                if (pts > 0 || gems > 0)
+                  Opacity(
+                    opacity: ((t - 0.25) / 0.2).clamp(0.0, 1.0),
+                    child: Transform(
+                      alignment: Alignment.center,
+                      transform: Matrix4.identity()
+                        ..setEntry(3, 2, 0.002)
+                        ..rotateX((1 - Curves.easeOutBack.transform(((t - 0.25) / 0.35).clamp(0.0, 1.0))) * math.pi / 2),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [Color(0xFFFFD54F), Color(0xFFFF8F00)]),
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: const [BoxShadow(color: Color(0x88FFB300), blurRadius: 14)],
+                        ),
+                        child: Text(
+                          '🎁 جائزة الخادم: ${pts > 0 ? '+$pts نقطة' : ''}${gems > 0 ? '  +$gems 💎' : ''}',
+                          textDirection: TextDirection.rtl,
+                          style: const TextStyle(color: Color(0xFF3E2700), fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ),
+                  )
+                else if (win)
+                  const Text('لم تُمنح جائزة (الحد اليومي أو شروط الأهلية).',
+                      textDirection: TextDirection.rtl, style: TextStyle(color: Colors.white54, fontSize: 11)),
+              ]),
+            ),
+          ]),
+        );
+      },
+    );
+  }
+}
+
+/// أربعة في صف ضد الكمبيوتر: حركتك وحركة الكمبيوتر والفوز والجائزة من الخادم.
+class _Connect4Bot extends StatefulWidget {
+  const _Connect4Bot();
+  @override
+  State<_Connect4Bot> createState() => _Connect4BotState();
+}
+
+class _Connect4BotState extends State<_Connect4Bot> {
+  Map<String, dynamic>? _row;
+  List<int> _board = List<int>.filled(_rows * _cols, 0);
+  int? _last;
+  List<int> _win = const [];
+  bool _busy = false;
+  String? _err;
+  int _round = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  List<int> _boardOf(Map<String, dynamic>? r) {
+    final b = ((_stateOf(r)['board'] as List?) ?? const []).map((e) => (e as num).toInt()).toList();
+    return b.length == _rows * _cols ? b : List<int>.filled(_rows * _cols, 0);
+  }
+
+  Future<void> _start() async {
+    setState(() {
+      _busy = true;
+      _err = null;
+    });
+    try {
+      final r = _asRow(await _db.rpc('game_bot_start', params: {'p_game': 'connect4'}));
+      if (!mounted || r == null) return;
+      playServerSound('game_start');
+      setState(() {
+        _row = r;
+        _board = _boardOf(r);
+        _last = null;
+        _win = const [];
+        _round++;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _err = gameErrorText(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _tap(int col) async {
+    final r = _row;
+    if (r == null || _busy || r['status'] != 'active') return;
+    final nb = _c4Drop(_board, col, 1);
+    if (nb == null) return;
+    var idx = 0;
+    for (var i = 0; i < nb.length; i++) {
+      if (nb[i] != _board[i]) {
+        idx = i;
+        break;
+      }
+    }
+    setState(() {
+      _busy = true;
+      _board = nb;
+      _last = idx;
+    });
+    try {
+      final res = _asRow(await _db.rpc('game_bot_c4', params: {'p_match': r['id'], 'p_col': col}));
+      if (!mounted || res == null) return;
+      final st = _stateOf(res);
+      final botLast = (st['bot_last'] as num?)?.toInt();
+      final win = ((st['win_cells'] as List?) ?? const []).map((e) => (e as num).toInt()).toList();
+      if (botLast != null) {
+        await Future<void>.delayed(const Duration(milliseconds: 650));
+        if (!mounted) return;
+      }
+      setState(() {
+        _row = res;
+        _board = _boardOf(res);
+        _last = botLast ?? idx;
+        _win = win;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _board = _boardOf(r));
+        ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(gameErrorText(e))));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = _row;
+    final finished = r?['status'] == 'finished';
+    final result = r?['result']?.toString() ?? 'draw';
+    String line;
+    if (_err != null) {
+      line = _err!;
+    } else if (r == null) {
+      line = 'جارٍ تجهيز اللوحة من الخادم…';
+    } else if (finished) {
+      line = result == 'win' ? 'فزت!' : (result == 'lose' ? 'فاز الكمبيوتر' : 'تعادل');
+    } else {
+      line = _busy ? '🤖 الكمبيوتر يفكّر…' : 'دورك — أنت الأحمر 🔴';
+    }
     return Column(children: [
-      Text(status,
-          style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+      Text(line,
+          textDirection: TextDirection.rtl,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
       Connect4BoardView(
-          board: board,
-          winCells: win,
-          lastIdx: last,
-          enabled: playerTurn && !over,
+          board: _board,
+          winCells: _win,
+          lastIdx: _last,
+          enabled: r != null && !finished && !_busy,
           onColumn: _tap),
-      if (over)
+      if (finished)
+        GameResultBurst(
+          key: ValueKey('c4res$_round'),
+          result: result,
+          prize: _prizeOf(r),
+          text: result == 'win' ? '🎉 فزت على الكمبيوتر!' : (result == 'lose' ? '😅 فاز الكمبيوتر' : '🤝 تعادل'),
+        ),
+      if (finished || _err != null)
         FilledButton.icon(
-            onPressed: _reset,
+            onPressed: _busy ? null : _start,
             icon: const Icon(Icons.refresh_rounded),
             label: const Text('جولة جديدة')),
+      const Padding(
+        padding: EdgeInsets.only(top: 6),
+        child: Text('🎁 الفوز على الكمبيوتر: جائزة نقاط من الخادم (حسب الأهلية والحد اليومي).',
+            textAlign: TextAlign.center,
+            textDirection: TextDirection.rtl,
+            style: TextStyle(color: Colors.white38, fontSize: 11)),
+      ),
     ]);
   }
 }
@@ -796,7 +869,7 @@ class _RpsArenaState extends State<RpsArena>
     return TweenAnimationBuilder<double>(
       key: ValueKey('hand-$keyId-$pick'),
       tween: Tween(begin: 1.0, end: 0.0),
-      duration: const Duration(milliseconds: 650),
+      duration: const Duration(milliseconds: 950),
       curve: Curves.easeOutBack,
       onEnd: () {
         if (sound && pick != null) playServerSound('rps_reveal');
@@ -804,7 +877,11 @@ class _RpsArenaState extends State<RpsArena>
       builder: (_, t, __) {
         final angle = t * math.pi;
         final showFace = angle < math.pi / 2 && pick != null;
-        return Transform(
+        // «حجر… ورقة… مقص!»: قفزات ثلاث متزامنة قبل كشف اليد ثلاثي الأبعاد.
+        final hop = pick == null ? 0.0 : -(math.sin((1 - t).clamp(0.0, 1.0) * math.pi * 3).abs()) * 16 * t;
+        return Transform.translate(
+          offset: Offset(0, hop),
+          child: Transform(
           alignment: Alignment.center,
           transform: Matrix4.identity()
             ..setEntry(3, 2, 0.002)
@@ -828,6 +905,7 @@ class _RpsArenaState extends State<RpsArena>
             child: Text(showFace ? _rpsEmoji[pick] ?? '❔' : '❔',
                 style: const TextStyle(fontSize: 44)),
           ),
+        ),
         );
       },
     );
@@ -921,11 +999,18 @@ class _RpsArenaState extends State<RpsArena>
         _hand(widget.oppLast, 'op${widget.round}', sound: true),
       ]),
       const SizedBox(height: 12),
-      Text(widget.banner,
-          textAlign: TextAlign.center,
-          textDirection: TextDirection.rtl,
-          style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+      TweenAnimationBuilder<double>(
+        key: ValueKey('banner-${widget.round}-${widget.banner}'),
+        tween: Tween(begin: 0.0, end: 1.0),
+        duration: const Duration(milliseconds: 700),
+        curve: Curves.elasticOut,
+        builder: (_, t, child) => Transform.scale(scale: 0.6 + 0.4 * t, child: child),
+        child: Text(widget.banner,
+            textAlign: TextAlign.center,
+            textDirection: TextDirection.rtl,
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+      ),
       const SizedBox(height: 14),
       Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
         _pickButton('rock', 0),
@@ -933,86 +1018,6 @@ class _RpsArenaState extends State<RpsArena>
         _pickButton('scissors', 2),
       ]),
       const SizedBox(height: 10),
-    ]);
-  }
-}
-
-int _rpsResult(String a, String b) {
-  if (a == b) return 0;
-  if ((a == 'rock' && b == 'scissors') ||
-      (a == 'paper' && b == 'rock') ||
-      (a == 'scissors' && b == 'paper')) {
-    return 1;
-  }
-  return 2;
-}
-
-class _RpsPractice extends StatefulWidget {
-  const _RpsPractice();
-  @override
-  State<_RpsPractice> createState() => _RpsPracticeState();
-}
-
-class _RpsPracticeState extends State<_RpsPractice> {
-  int me = 0, cpu = 0, round = 1;
-  String? myLast, cpuLast;
-  String banner = 'اختر: حجر أم ورقة أم مقص؟ (الأول إلى فوزين)';
-  bool over = false;
-  final _rnd = math.Random();
-
-  void _pick(String c) {
-    if (over) return;
-    final o = const ['rock', 'paper', 'scissors'][_rnd.nextInt(3)];
-    final r = _rpsResult(c, o);
-    setState(() {
-      myLast = c;
-      cpuLast = o;
-      if (r == 1) me++;
-      if (r == 2) cpu++;
-      if (me >= 2 || cpu >= 2) {
-        over = true;
-        banner = me >= 2 ? '🎉 فزت بالمباراة!' : '😅 فاز الكمبيوتر بالمباراة';
-        Future.delayed(const Duration(milliseconds: 800),
-            () => playServerSound(me >= 2 ? 'game_win' : 'game_lose'));
-      } else {
-        banner = r == 0
-            ? 'تعادل — أعد الجولة'
-            : (r == 1 ? 'ربحت هذه الجولة ✓' : 'خسرت هذه الجولة');
-        round++;
-      }
-    });
-  }
-
-  void _reset() => setState(() {
-        me = 0;
-        cpu = 0;
-        round = 1;
-        myLast = null;
-        cpuLast = null;
-        over = false;
-        banner = 'اختر: حجر أم ورقة أم مقص؟ (الأول إلى فوزين)';
-      });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(children: [
-      RpsArena(
-        myName: 'أنت',
-        oppName: 'الكمبيوتر',
-        myScore: me,
-        oppScore: cpu,
-        round: round,
-        myLast: myLast,
-        oppLast: cpuLast,
-        banner: banner,
-        canPick: !over,
-        onPick: _pick,
-      ),
-      if (over)
-        FilledButton.icon(
-            onPressed: _reset,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('مباراة جديدة')),
     ]);
   }
 }
@@ -1153,64 +1158,277 @@ class _CoinFlipperState extends State<_CoinFlipper>
   }
 }
 
-class _CoinPractice extends StatefulWidget {
-  const _CoinPractice();
+/// حجر ورقة مقص ضد الكمبيوتر: اختيار الكمبيوتر بعشوائية الخادم بعد اختيارك.
+class _RpsBot extends StatefulWidget {
+  const _RpsBot();
   @override
-  State<_CoinPractice> createState() => _CoinPracticeState();
+  State<_RpsBot> createState() => _RpsBotState();
 }
 
-class _CoinPracticeState extends State<_CoinPractice> {
-  String? mine;
-  String? result;
-  bool done = false;
-  int run = 0;
+class _RpsBotState extends State<_RpsBot> {
+  Map<String, dynamic>? _row;
+  bool _busy = false;
+  String? _err;
+  int _game = 0;
 
-  void _flip(String pick) {
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  Future<void> _start() async {
     setState(() {
-      mine = pick;
-      result = math.Random().nextBool() ? 'heads' : 'tails';
-      done = false;
-      run++;
+      _busy = true;
+      _err = null;
     });
+    try {
+      final r = _asRow(await _db.rpc('game_bot_start', params: {'p_game': 'rps'}));
+      if (mounted && r != null) {
+        setState(() {
+          _row = r;
+          _game++;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _err = gameErrorText(e));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _pick(String c) async {
+    final r = _row;
+    if (r == null || _busy || r['status'] != 'active') return;
+    setState(() => _busy = true);
+    try {
+      final res = _asRow(await _db.rpc('game_bot_rps', params: {'p_match': r['id'], 'p_choice': c}));
+      if (mounted && res != null) setState(() => _row = res);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(gameErrorText(e))));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final r = _row;
+    final st = _stateOf(r);
+    final sc = ((st['scores'] as List?) ?? const [0, 0]).map((e) => (e as num).toInt()).toList();
+    final last = st['last'] is Map ? Map<String, dynamic>.from(st['last'] as Map) : null;
+    final finished = r?['status'] == 'finished';
+    final result = r?['result']?.toString() ?? 'draw';
+    String banner;
+    if (_err != null) {
+      banner = _err!;
+    } else if (r == null) {
+      banner = 'جارٍ التجهيز…';
+    } else if (finished) {
+      banner = result == 'win' ? 'فزت بالمباراة!' : 'فاز الكمبيوتر بالمباراة';
+    } else if (last != null) {
+      final res = (last['res'] as num?)?.toInt() ?? 0;
+      banner = res == 0 ? 'تعادل — أعد الجولة' : (res == 1 ? 'ربحت الجولة ✓' : 'خسرت الجولة ✗');
+    } else {
+      banner = 'اختر: حجر أم ورقة أم مقص؟ (الأول إلى فوزين)';
+    }
     return Column(children: [
-      if (result == null)
+      RpsArena(
+        myName: 'أنت',
+        oppName: 'الكمبيوتر 🤖',
+        myScore: sc.isNotEmpty ? sc[0] : 0,
+        oppScore: sc.length > 1 ? sc[1] : 0,
+        round: (st['round'] as num?)?.toInt() ?? 1,
+        myLast: last?['me']?.toString(),
+        oppLast: last?['bot']?.toString(),
+        banner: banner,
+        canPick: r != null && !finished && !_busy,
+        onPick: _pick,
+      ),
+      if (finished)
+        GameResultBurst(
+          key: ValueKey('rpsres$_game'),
+          result: result,
+          prize: _prizeOf(r),
+          text: result == 'win' ? '🎉 فزت بالمباراة!' : '😅 فاز الكمبيوتر',
+        ),
+      if (finished || _err != null)
+        FilledButton.icon(
+            onPressed: _busy ? null : _start,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('مباراة جديدة')),
+    ]);
+  }
+}
+
+/// العملة ضد الكمبيوتر: الوجه الخارج يُحسم في الخادم قبل الرمي.
+class _CoinBot extends StatefulWidget {
+  const _CoinBot();
+  @override
+  State<_CoinBot> createState() => _CoinBotState();
+}
+
+class _CoinBotState extends State<_CoinBot> {
+  Map<String, dynamic>? _row;
+  bool _busy = false;
+  bool _done = false;
+  int _run = 0;
+
+  Future<void> _flip(String pick) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final r = _asRow(await _db.rpc('game_bot_start', params: {'p_game': 'coin', 'p_pick': pick}));
+      if (mounted && r != null) {
+        setState(() {
+          _row = r;
+          _done = false;
+          _run++;
+        });
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(gameErrorText(e))));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = _row;
+    final st = _stateOf(r);
+    final side = st['side']?.toString() ?? 'heads';
+    final result = r?['result']?.toString() ?? 'lose';
+    final flipping = r != null && !_done;
+    final sideName = side == 'heads' ? 'صورة' : 'كتابة';
+    return Column(children: [
+      if (r == null)
         const SizedBox(
             height: 220,
-            child: Center(
-                child: Text('اختر وجه العملة ثم ستُرمى',
-                    style: TextStyle(color: Colors.white70))))
+            child: Center(child: Text('اختر وجه العملة ثم ستُرمى', style: TextStyle(color: Colors.white70))))
       else
         _CoinFlipper(
-            key: ValueKey(run),
-            resultSide: result!,
+            key: ValueKey(_run),
+            resultSide: side,
             onDone: () {
-              setState(() => done = true);
-              Future.delayed(const Duration(milliseconds: 500),
-                  () => playServerSound(result == mine ? 'game_win' : 'game_lose'));
+              if (mounted) setState(() => _done = true);
             }),
-      if (done)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Text(
-              result == mine ? '🎉 كسبت! خرجت ${result == 'heads' ? 'صورة' : 'كتابة'}' : '😅 خسرت — خرجت ${result == 'heads' ? 'صورة' : 'كتابة'}',
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16)),
+      if (r != null && _done)
+        GameResultBurst(
+          key: ValueKey('coinres$_run'),
+          result: result,
+          prize: _prizeOf(r),
+          text: result == 'win' ? '🎉 كسبت! خرجت $sideName' : '😅 خسرت — خرجت $sideName',
         ),
       Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        FilledButton(
-            onPressed: result != null && !done ? null : () => _flip('heads'),
-            child: const Text('👑 صورة')),
+        FilledButton(onPressed: flipping || _busy ? null : () => _flip('heads'), child: const Text('👑 صورة')),
         const SizedBox(width: 12),
-        FilledButton(
-            onPressed: result != null && !done ? null : () => _flip('tails'),
-            child: const Text('✦ كتابة')),
+        FilledButton(onPressed: flipping || _busy ? null : () => _flip('tails'), child: const Text('✦ كتابة')),
       ]),
+    ]);
+  }
+}
+
+/// النرد ضد الكمبيوتر: نردان لكل طرف من الخادم، الأعلى مجموعًا يفوز.
+class _DiceBot extends StatefulWidget {
+  const _DiceBot();
+  @override
+  State<_DiceBot> createState() => _DiceBotState();
+}
+
+class _DiceBotState extends State<_DiceBot> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400));
+  Map<String, dynamic>? _row;
+  bool _busy = false;
+  bool _done = false;
+  int _run = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _c.addStatusListener((s) {
+      if (s == AnimationStatus.completed && mounted) {
+        playServerSound('dice_land');
+        setState(() => _done = true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  Future<void> _roll() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final r = _asRow(await _db.rpc('game_bot_start', params: {'p_game': 'dice'}));
+      if (mounted && r != null) {
+        setState(() {
+          _row = r;
+          _done = false;
+          _run++;
+        });
+        playServerSound('dice_roll');
+        _c.forward(from: 0);
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(gameErrorText(e))));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Widget _side(String label, List<int> d, int seed) {
+    final sum = d.fold<int>(0, (a, b) => a + b);
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 4),
+      AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => Row(mainAxisSize: MainAxisSize.min, children: [
+          for (var i = 0; i < d.length; i++)
+            Dice3D(value: d[i], progress: _row == null ? 1 : _c.value, size: 58, seed: seed + i),
+        ]),
+      ),
+      AnimatedOpacity(
+        opacity: _done ? 1 : 0,
+        duration: const Duration(milliseconds: 250),
+        child: Text('$sum',
+            style: const TextStyle(color: Color(0xFFFFD700), fontWeight: FontWeight.w900, fontSize: 26)),
+      ),
+    ]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = _row;
+    final st = _stateOf(r);
+    List<int> dice(String k) =>
+        ((st[k] as List?) ?? const [1, 1]).map((e) => (e as num).toInt()).toList();
+    final result = r?['result']?.toString() ?? 'draw';
+    final rolling = r != null && !_done;
+    return Column(children: [
+      Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+        _side('أنت', dice('me'), _run * 4),
+        const Text('VS', style: TextStyle(color: Colors.white38, fontWeight: FontWeight.w900, fontSize: 18)),
+        _side('الكمبيوتر 🤖', dice('bot'), _run * 4 + 2),
+      ]),
+      if (r != null && _done)
+        GameResultBurst(
+          key: ValueKey('diceres$_run'),
+          result: result,
+          prize: _prizeOf(r),
+          text: result == 'win' ? '🎉 مجموعك أعلى — فزت!' : (result == 'lose' ? '😅 الكمبيوتر أعلى' : '🤝 تعادل'),
+        ),
+      const SizedBox(height: 8),
+      FilledButton.icon(
+        onPressed: rolling || _busy ? null : _roll,
+        icon: const Text('🎲', style: TextStyle(fontSize: 18)),
+        label: Text(r == null ? 'ارمِ النرد' : 'ارمِ مجددًا'),
+      ),
     ]);
   }
 }
@@ -1406,6 +1624,21 @@ class _GameMatchDialogState extends State<GameMatchDialog> {
                       fontSize: 16)),
             ),
             const SizedBox(height: 8),
+          ]);
+        }
+        final prize = state['prize'] is Map ? Map<String, dynamic>.from(state['prize'] as Map) : null;
+        if (status == 'finished' && (type != 'coin' || _coinDone)) {
+          final winner = row['winner']?.toString();
+          final res = (winner == null || winner == 'null') ? 'draw' : (winner == _me ? 'win' : 'lose');
+          body = Column(mainAxisSize: MainAxisSize.min, children: [
+            body,
+            GameResultBurst(
+              key: ValueKey('match-res-${row['id']}'),
+              result: res,
+              sound: false,
+              prize: prize != null && prize['uid']?.toString() == _me ? prize : null,
+              text: res == 'win' ? '🏆 فزت!' : (res == 'lose' ? 'حظًا أوفر' : '🤝 تعادل'),
+            ),
           ]);
         }
         return _GameShell(

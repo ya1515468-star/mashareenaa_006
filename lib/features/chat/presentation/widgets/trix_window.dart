@@ -196,8 +196,8 @@ class _TrixFloatingHostState extends State<TrixFloatingHost> {
         return ValueListenableBuilder<Offset>(
           valueListenable: TrixWindow.instance.floatPos,
           builder: (context, pos, _) {
-            final left = pos.dx.clamp(0.0, math.max(0.0, size.width - w));
-            final top = pos.dy.clamp(0.0, math.max(0.0, size.height - h));
+            final double left = pos.dx.clamp(0.0, math.max(0.0, size.width - w)).toDouble();
+            final double top = pos.dy.clamp(0.0, math.max(0.0, size.height - h)).toDouble();
             return Positioned(
               left: left,
               top: top,
@@ -235,8 +235,8 @@ class _TrixFloatingHostState extends State<TrixFloatingHost> {
         return ValueListenableBuilder<Offset>(
           valueListenable: TrixWindow.instance.miniPos,
           builder: (context, pos, _) {
-            final left = pos.dx.clamp(0.0, size.width - 64);
-            final top = pos.dy.clamp(0.0, size.height - 64);
+            final double left = pos.dx.clamp(0.0, math.max(0.0, size.width - 64)).toDouble();
+            final double top = pos.dy.clamp(0.0, math.max(0.0, size.height - 64)).toDouble();
             return Stack(children: [
               // تبقى الشاشة مركّبة (مخفية) فتستمر المزامنة والأصوات.
               Offstage(child: SizedBox(width: 400, height: 760, child: screen)),
