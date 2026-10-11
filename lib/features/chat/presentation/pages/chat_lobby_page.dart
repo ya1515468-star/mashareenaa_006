@@ -223,6 +223,9 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
           : <String>{};
       final replyToUid = row['reply_to_sender_uid']?.toString();
       final kind = row['kind']?.toString();
+      // منشورات بوت المحتوى صامتة: تتكرر كل بضع دقائق، ونغمة لكل منشور
+      // ستزعج الأعضاء.
+      if (metadata['system_event']?.toString() == 'content_bot') continue;
       if (mentioned.contains(currentUid)) {
         unawaited(_sound.play(ChatSoundEvent.mention, roomId: _roomId));
       } else if (replyToUid == currentUid) {
@@ -2053,7 +2056,9 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                               final isGlobalEvent = kind == 'global_event';
                               final isWelcomeBot = kind == 'system' &&
                                   metadata['system_event']?.toString() == 'welcome_bot';
-                              if (!isGlobalEvent && !isWelcomeBot) {
+                              final isContentBot = kind == 'system' &&
+                                  metadata['system_event']?.toString() == 'content_bot';
+                              if (!isGlobalEvent && !isWelcomeBot && !isContentBot) {
                                 messageRow['_message_frame_index'] = messageFrameIndex++;
                               }
                             }
@@ -2085,6 +2090,23 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                                     metadata['system_event']?.toString() == 'welcome_bot';
                                 final rowId = row['id']?.toString() ?? 'row-$i';
                                 final occurrenceKey = '$rowId#$i';
+                                // بوت المحتوى: فقاعة خاصة بلون وخط مميزين
+                                // (لا تمرّ بمسار رسائل الأعضاء ولا هويتهم).
+                                if (row['kind']?.toString() == 'system' &&
+                                    metadata['system_event']?.toString() ==
+                                        'content_bot') {
+                                  return KeyedSubtree(
+                                    key: ValueKey(occurrenceKey),
+                                    child: _ContentBotRow(
+                                      message: row['message']?.toString() ?? '',
+                                      label: metadata['bot_label']?.toString() ??
+                                          'معلومة',
+                                      icon: metadata['bot_icon']?.toString() ?? '💡',
+                                      category:
+                                          metadata['bot_category']?.toString() ?? '',
+                                    ),
+                                  );
+                                }
                                 // إعلان هدية داخل الغرفة: يُعرض كصفّ مميّز
                                 // يُبرز رمز الهدية الحقيقي (صورتها إن وُجدت،
                                 // وإلا الإيموجي الخاص بها من كتالوج الهدايا
@@ -3541,12 +3563,12 @@ class _ChatMessageRow extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       textDirection: TextDirection.rtl,
       children: [
-        Icon(Icons.smart_toy_rounded, size: 15, color: Color(0xFFB25CFF)),
+        Text('👋', style: TextStyle(fontSize: 13)),
         SizedBox(width: 4),
         Text(
           'بوت الترحيب',
           style: TextStyle(
-            color: Color(0xFFB25CFF),
+            color: Color(0xFFE9C46A),
             fontSize: 12,
             fontWeight: FontWeight.w900,
           ),
@@ -3633,17 +3655,26 @@ class _ChatMessageRow extends ConsumerWidget {
     // أفاتار البوت كان 58×58 بينما أفاتار العضو 50×50، فيبدو أضخم
     // من الجميع ويكسر انتظام الصف. صار 42 — أصغر من أفاتار العضو
     // لأنه رسالة نظام لا مشارِكًا.
+    // أفاتار بوت الترحيب (مُغيَّر بطلب المالك): دائرة بتدرّج ذهبي/عنابي
+    // بحافة ذهبية ويد ملوّحة بدل أيقونة الروبوت البنفسجية.
     final baseAvatar = isSystemBot
         ? Container(
             width: 42,
             height: 42,
-            decoration: const BoxDecoration(
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Color(0xFF2A173A),
-              boxShadow: [BoxShadow(color: Color(0x663B1E55), blurRadius: 7)],
+              gradient: const LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: [Color(0xFFE9C46A), Color(0xFF7A1F3D)],
+              ),
+              border: Border.all(color: const Color(0xFFFFE8A3), width: 1.6),
+              boxShadow: const [
+                BoxShadow(color: Color(0x66E9C46A), blurRadius: 8),
+              ],
             ),
-            child: const Icon(Icons.smart_toy_rounded,
-                color: Color(0xFFB25CFF), size: 21),
+            child: const Text('👋', style: TextStyle(fontSize: 20)),
           )
         : _VideoStyleAvatar(
             url: row['avatar_url']?.toString(),
@@ -4175,6 +4206,94 @@ class _GlobalEventOverlayState extends State<_GlobalEventOverlay> {
 /// (public_chat_messages.metadata التي يكتبها send_gift_atomic من كتالوج
 /// الهدايا) — لا قائمة رموز محلية إطلاقًا، فأي هدية يضيفها المالك للكتالوج
 /// تظهر برمزها الصحيح تلقائيًا بلا أي تعديل في التطبيق.
+/// فقاعة بوت المحتوى (معلومات الخياطة/أذكار/أسرار المهنة/الحياة/تجارب/
+/// تجارة). تُنشر من الخادم (pg_cron → private.content_bot_tick) في كل غرفة.
+/// لون مختلف عن كل فقاعات الأعضاء (تدرّج زمردي/كحلي بحافة ذهبية) وخط
+/// MashareenaAmiri المضمَّن في التطبيق، للفت النظر.
+class _ContentBotRow extends StatelessWidget {
+  final String message;
+  final String label;
+  final String icon;
+  final String category;
+  const _ContentBotRow({
+    required this.message,
+    required this.label,
+    required this.icon,
+    required this.category,
+  });
+
+  List<Color> get _colors => switch (category) {
+        'adhkar' => const [Color(0xFF0F4D3A), Color(0xFF0B2B3F)],
+        'trade' => const [Color(0xFF4A2A0C), Color(0xFF1E1A3A)],
+        'life' => const [Color(0xFF1F4A2A), Color(0xFF13283F)],
+        _ => const [Color(0xFF0E3F4F), Color(0xFF2A1640)],
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    const gold = Color(0xFFE9C46A);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 6),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: _colors,
+          ),
+          border: Border.all(color: gold.withValues(alpha: .75), width: 1.3),
+          boxShadow: [
+            BoxShadow(color: gold.withValues(alpha: .18), blurRadius: 12),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              textDirection: TextDirection.rtl,
+              children: [
+                Text(icon, style: const TextStyle(fontSize: 18)),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    textDirection: TextDirection.rtl,
+                    style: const TextStyle(
+                      color: gold,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                const Text(
+                  'بوت مشاريعنا',
+                  style: TextStyle(color: Colors.white54, fontSize: 10.5),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              message,
+              textDirection: TextDirection.rtl,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontFamily: 'MashareenaAmiri',
+                fontSize: 16.5,
+                height: 1.6,
+                color: Color(0xFFFFF6E0),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _GiftAnnouncementRow extends StatelessWidget {
   final String message;
   final String emoji;

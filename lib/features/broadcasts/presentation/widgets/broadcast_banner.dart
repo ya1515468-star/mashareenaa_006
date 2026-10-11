@@ -157,8 +157,9 @@ class _BroadcastBannerWidgetState extends State<_BroadcastBannerWidget>
             ),
             child: Row(
               children: [
+                // كان رمز تنين 🐉 ثابتًا بجانب كل بث — حُذف بطلب المالك.
                 const Text(
-                  '🐉',
+                  '📢',
                   style: TextStyle(fontSize: 22),
                 ),
                 const SizedBox(width: 10),

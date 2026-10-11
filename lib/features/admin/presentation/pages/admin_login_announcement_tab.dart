@@ -257,9 +257,33 @@ class _AdminLoginAnnouncementTabState extends State<AdminLoginAnnouncementTab> {
     }
   }
 
-  Future<void> _archive(String id) async {
+  /// تفعيل/إيقاف بضغطة واحدة (admin_set_login_announcement_status).
+  Future<void> _setStatus(String id, String status) async {
     try {
-      await Supabase.instance.client.rpc('admin_archive_login_announcement', params: {'p_id': id});
+      await Supabase.instance.client.rpc('admin_set_login_announcement_status',
+          params: {'p_id': id, 'p_status': status});
+      if (mounted) setState(() => _future = _load());
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
+    }
+  }
+
+  /// حذف نهائي: يختفي من القائمة ولا يُعرض لأي مستخدم بعده.
+  Future<void> _remove(String id) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('حذف الإعلان'),
+        content: const Text('سيُحذف الإعلان نهائيًا ولن يظهر لأي مستخدم. متابعة؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('حذف')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await Supabase.instance.client.rpc('admin_remove_login_announcement', params: {'p_id': id});
       if (mounted) setState(() => _future = _load());
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
@@ -308,11 +332,23 @@ class _AdminLoginAnnouncementTabState extends State<AdminLoginAnnouncementTab> {
                       trailing: Wrap(
                         spacing: 4,
                         children: [
+                          // تفعيل ⇄ إيقاف بضغطة واحدة.
+                          IconButton(
+                            onPressed: () => _setStatus(row['id'].toString(),
+                                row['status'] == 'active' ? 'paused' : 'active'),
+                            icon: Icon(
+                              row['status'] == 'active'
+                                  ? Icons.pause_circle_outline
+                                  : Icons.play_circle_outline,
+                              color: row['status'] == 'active'
+                                  ? Colors.orangeAccent
+                                  : Colors.greenAccent,
+                            ),
+                          ),
                           IconButton(onPressed: () => _edit(row), icon: const Icon(Icons.edit_outlined)),
                           IconButton(
-                            tooltip: 'أرشفة',
-                            onPressed: () => _archive(row['id'].toString()),
-                            icon: const Icon(Icons.archive_outlined),
+                            onPressed: () => _remove(row['id'].toString()),
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
                           ),
                         ],
                       ),

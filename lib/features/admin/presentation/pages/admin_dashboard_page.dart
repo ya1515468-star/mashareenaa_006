@@ -8,19 +8,16 @@ import 'admin_broadcast_tab.dart';
 import 'admin_feedback_tab.dart';
 import 'admin_reports_tab.dart';
 import 'admin_roles_tab.dart';
-import 'admin_store_tab.dart';
 import 'admin_users_tab.dart';
 import 'owner_user_control_tab.dart';
 import 'owner_reels_control_tab.dart';
 import 'admin_virtual_presence_tab.dart';
 import 'admin_platform_requests_tab.dart';
-import 'profile_cosmetic_admin_tab.dart';
 import 'admin_login_announcement_tab.dart';
 import 'admin_chat_badges_tab.dart';
 import 'admin_user_titles_tab.dart';
-import 'name_animation_admin_tab.dart';
-import 'dragon_control_tab.dart';
 import 'admin_producers_market_tab.dart';
+import 'admin_content_bot_tab.dart';
 
 /// لوحة الإدارة — يجب ألا يصل إليها المستخدم إطلاقًا إلا عبر
 /// [PermissionGate] الذي يغلّف زر الوصول إليها (انظر HomeDashboardPage)؛
@@ -40,10 +37,13 @@ class AdminDashboardPage extends ConsumerWidget {
         ),
       ),
       child: DefaultTabController(
-        length: 19,
+        length: 16,
         child: Scaffold(
           appBar: AppBar(
             title: const Text('لوحة الإدارة'),
+            // أُزيلت تبويبات التسعير (متجر الميزات، DRAGON/Platform Owner،
+            // متجر الشات والأسعار، حيوانات فوق الاسم): التسعير صار موحّدًا
+            // في «لوحة الأسعار» داخل متجر الشات فقط، بطلب المالك.
             bottom: const TabBar(
               isScrollable: true,
               tabs: [
@@ -55,17 +55,14 @@ class AdminDashboardPage extends ConsumerWidget {
                 Tab(text: 'استوديو الباترون'),
                 Tab(text: 'بث DRAGON'),
                 Tab(text: 'اقتراحات الأعضاء'),
-                Tab(text: 'متجر الميزات'),
-                Tab(text: 'DRAGON / Platform Owner'),
                 Tab(text: 'الحضور الافتراضي'),
                 Tab(text: 'طلبات الأفكار والبث'),
-                Tab(text: 'متجر الشات والأسعار'),
                 Tab(text: 'إعلانات تسجيل الدخول'),
                 Tab(text: 'شارة العضو'),
                 Tab(text: 'ألقاب المستخدمين'),
-                Tab(text: 'حيوانات فوق الاسم'),
                 Tab(text: '🎬 سوق المنتجين'),
                 Tab(text: '🎞️ تحكّم الريلز'),
+                Tab(text: '🤖 بوت المحتوى'),
               ],
             ),
           ),
@@ -83,17 +80,14 @@ class AdminDashboardPage extends ConsumerWidget {
               _LazyTab(builder: () => const AdminPatternStudioTab()),
               _LazyTab(builder: () => const AdminBroadcastTab()),
               _LazyTab(builder: () => const AdminFeedbackTab()),
-              _LazyTab(builder: () => const AdminStoreTab()),
-              _LazyTab(builder: () => const DragonControlTab()),
               _LazyTab(builder: () => const AdminVirtualPresenceTab()),
               _LazyTab(builder: () => const AdminPlatformRequestsTab()),
-              _LazyTab(builder: () => const ProfileCosmeticAdminTab()),
               _LazyTab(builder: () => const AdminLoginAnnouncementTab()),
               _LazyTab(builder: () => const AdminChatBadgesTab()),
               _LazyTab(builder: () => const AdminUserTitlesTab()),
-              _LazyTab(builder: () => const NameAnimationAdminTab()),
               _LazyTab(builder: () => const AdminProducersMarketTab()),
               _LazyTab(builder: () => const OwnerReelsControlTab()),
+              _LazyTab(builder: () => const AdminContentBotTab()),
             ],
           ),
         ),

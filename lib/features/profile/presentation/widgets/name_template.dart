@@ -19,17 +19,26 @@ class NameTemplateDefinition {
 }
 
 class NameTemplateRegistry {
-  static const int count = 50;
-  static final List<NameTemplateDefinition> all = List.generate(
-    count,
-    (i) => NameTemplateDefinition(
-      key: 'name_template_${(i + 1).toString().padLeft(2, '0')}',
-      asset: 'assets/name_templates/name_template_${(i + 1).toString().padLeft(2, '0')}.png',
-      referenceIndex: (i % 10) + 1,
-      variantGroup: i < 10 ? 0 : ((i - 10) ~/ 10) + 1,
-      motionStyle: (i * 7) % 10,
-    ),
-  );
+  /// كانت 50 صورة، لكن فحص التشابه البصري (فرق البكسلات < 5/255) أثبت أن
+  /// 41 منها نسخ مكرّرة شبه مطابقة لتسعة تصاميم فقط؛ حُذفت ملفاتها وصفوفها
+  /// نهائيًا بطلب المالك. الباقي هو التصاميم المميّزة الفعلية المفعّلة في
+  /// كتالوج الخادم. الفهرس i يبقى رقم الملف الأصلي (لثبات الحركة والمفاتيح).
+  static const List<int> _distinctIndexes = [1, 3, 4, 5, 6, 7, 8, 9, 12];
+  static int get count => _distinctIndexes.length;
+  static final List<NameTemplateDefinition> all = [
+    for (final n in _distinctIndexes)
+      () {
+        final i = n - 1;
+        final id = n.toString().padLeft(2, '0');
+        return NameTemplateDefinition(
+          key: 'name_template_$id',
+          asset: 'assets/name_templates/name_template_$id.png',
+          referenceIndex: (i % 10) + 1,
+          variantGroup: i < 10 ? 0 : ((i - 10) ~/ 10) + 1,
+          motionStyle: (i * 7) % 10,
+        );
+      }(),
+  ];
 
   static NameTemplateDefinition? get(String? key) {
     final normalized = key?.trim().toLowerCase();

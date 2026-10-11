@@ -41,6 +41,7 @@ import '../../profile/presentation/widgets/avatar_frame_catalog.dart';
 import '../../profile/presentation/widgets/name_template.dart';
 import '../data/services/avatar_frame_upload_service.dart';
 import 'profile_premium_services_tab.dart';
+import 'store_pricing_panel_page.dart';
 
 class _CheckerboardPainter extends CustomPainter {
   @override
@@ -492,6 +493,27 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       appBar: AppBar(
         title: const Text('متجر الشات'),
         actions: [
+          // لوحة الأسعار الموحّدة: المكان الوحيد لتسعير المتجر (أُزيلت
+          // لوحات التسعير من صفحة إدارة المالك).
+          if (owner)
+            IconButton(
+              tooltip: 'لوحة الأسعار',
+              icon: const Icon(Icons.price_change_rounded, color: Colors.amberAccent),
+              onPressed: () async {
+                final changed = await Navigator.of(context).push<bool>(
+                  MaterialPageRoute(builder: (_) => const StorePricingPanelPage()),
+                );
+                if (changed == true) {
+                  ref.invalidate(profileCosmeticCatalogProvider);
+                  ref.invalidate(nameTemplateCatalogProvider);
+                  ref.invalidate(serverAvatarFramesProvider);
+                  ref.invalidate(messageColorCatalogProvider);
+                  ref.invalidate(profilePremiumServicesCatalogProvider);
+                  ref.invalidate(nameAnimationCatalogProvider);
+                  ref.invalidate(storeCatalogProvider);
+                }
+              },
+            ),
           if (owner)
             IconButton(
               tooltip: 'تخصيص الأقسام',

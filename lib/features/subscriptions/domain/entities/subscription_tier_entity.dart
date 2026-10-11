@@ -422,7 +422,7 @@ class SubscriptionCatalog {
     ],
     dailyRewardMultiplier: 8,
     badge: MembershipBadge(
-        emoji: '🐉', labelAr: 'Ultimate', color: Color(0xFF9B59FF)),
+        emoji: '🌟', labelAr: 'Ultimate', color: Color(0xFF9B59FF)),
     features: MembershipFeatures.allEnabled,
   );
 

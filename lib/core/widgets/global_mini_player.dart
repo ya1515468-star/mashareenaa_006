@@ -132,16 +132,19 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
     // 200×200، وكان 188×105 فيعمل الصوت بلا عرض. الحد الأدنى المضبوط الآن.
     const width = 240.0;
     const videoHeight = 200.0;
+    // التصغير: الشفافية (Opacity) لا تؤثر على سطح الـWebView الأصلي في
+    // أندرويد، فكانت النافذة تبقى ظاهرة وتحجب الشاشة. الحل: إزاحة الإطار
+    // كله خارج حدود الشاشة مع إبقائه مركّبًا بنفس الحجم (200×200) ونفس
+    // المفتاح — فلا يُهدم الـiframe ويستمر الصوت، ولا يبقى إلا أيقونة
+    // MiniPlayerChip في شريط الكتابة.
     return Positioned(
-      left: minimized ? 0 : 14,
-      top: minimized ? 0 : 130,
+      left: minimized ? -5000 : 14,
+      top: minimized ? -5000 : 130,
       width: minimized ? 200 : width,
       child: IgnorePointer(
         ignoring: minimized,
-        // في التصغير: شبه شفاف (لا Offstage) كي يبقى المشغّل مرسومًا فعليًا
-        // ويستمر الصوت، وتظهر أيقونته في شريط الكتابة عبر MiniPlayerChip.
         child: Opacity(
-          opacity: minimized ? 0.01 : 1,
+          opacity: 1,
           child: Material(
             color: Colors.transparent,
             child: Directionality(
