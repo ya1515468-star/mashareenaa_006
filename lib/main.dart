@@ -18,6 +18,7 @@ import 'core/widgets/sewing_machine_splash.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'core/services/background_keepalive.dart';
 import 'core/services/server_realtime_sync.dart';
+import 'features/chat/presentation/widgets/trix_game.dart' show TrixFloatingHost;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -118,6 +119,9 @@ class MashareenaApp extends ConsumerWidget {
                     Overlay(initialEntries: [
                       OverlayEntry(builder: (_) => const GlobalMiniPlayer()),
                       OverlayEntry(builder: (_) => const AiAssistantFab()),
+                      // نافذة التركس العائمة (ملء الشاشة/نافذة/أيقونة) ومستمع
+                      // دعوات الطاولات — فوق كل الشاشات فتبقى المباراة حيّة.
+                      OverlayEntry(builder: (_) => const TrixFloatingHost()),
                     ]),
                   ]),
                 ),

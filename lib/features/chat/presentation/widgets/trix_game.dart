@@ -4,9 +4,13 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/navigation/app_navigator.dart';
 import '../../../../core/services/server_sounds.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'game_hub.dart' show gameErrorText;
+
+part 'trix_window.dart';
+part 'trix_screen.dart';
 
 /// تركس سوري — كل شيء يُحسم في الخادم:
 /// الخلط والتوزيع، قانونية كل ورقة، الأكلات، الاحتساب، رهان النقاط والتسوية،
@@ -14,19 +18,39 @@ import 'game_hub.dart' show gameErrorText;
 SupabaseClient get _tdb => Supabase.instance.client;
 
 const Map<String, String> _contractName = {
-  'king': 'الملك ♥',
+  'king': 'الشايب ♥',
   'queens': 'البنات',
   'diamonds': 'الديناري ♦',
   'slaps': 'اللطش',
   'trix': 'التركس',
+  'complex': 'كومبلكس',
 };
 
 const Map<String, String> _contractHint = {
-  'king': 'تجنّب أكل شايب الهارت (−75)',
-  'queens': 'تجنّب أكل البنات (−25 لكل بنت)',
+  'king': 'تجنّب أكل شايب الكبّة (−75، مدبول −150)',
+  'queens': 'تجنّب أكل البنات (−25، المدبولة −50)',
   'diamonds': 'تجنّب أكل الديناري (−10 لكل ورقة)',
   'slaps': 'تجنّب الأكلات (−15 لكل أكلة)',
   'trix': 'تخلّص من أوراقك أولًا (+200/150/100/50)',
+  'complex': 'كل العقوبات معًا: شايب، بنات، ديناري، لطش',
+};
+
+/// هوية كل عقد بصريًا (لون، رمز) — للإعلان والتأثيرات.
+const Map<String, Color> _contractColor = {
+  'king': Color(0xFFE53935),
+  'queens': Color(0xFFD81B60),
+  'diamonds': Color(0xFF29B6F6),
+  'slaps': Color(0xFFFF9800),
+  'trix': Color(0xFF43A047),
+  'complex': Color(0xFF8E24AA),
+};
+const Map<String, String> _contractIcon = {
+  'king': '👑',
+  'queens': '👸',
+  'diamonds': '💎',
+  'slaps': '✋',
+  'trix': '🃏',
+  'complex': '🌀',
 };
 
 const Map<String, String> _suitSym = {'S': '♠', 'H': '♥', 'D': '♦', 'C': '♣'};
@@ -253,7 +277,103 @@ class _BackPainter extends CustomPainter {
       o.pattern != pattern || o.c1 != c1 || o.c2 != c2 || o.c3 != c3;
 }
 
-// ───────────────────────── وجه الورقة ─────────────────────────
+
+// ───────────────────────── تفضيلات الورق (وجه + ظهر) ─────────────────────────
+
+/// وجه الورقة وظهرها المختاران — من الخادم (user_card_face / user_card_back)،
+/// مشتركان بين كل الشاشات فيتغيّر الشكل فورًا في المباراة الجارية.
+class TrixPrefs {
+  TrixPrefs._();
+  static final ValueNotifier<String> face = ValueNotifier<String>('classic');
+  static final ValueNotifier<String> back = ValueNotifier<String>('plaid');
+  static List<Map<String, dynamic>> backs = const [];
+  static List<Map<String, dynamic>> faces = const [
+    {'key': 'classic', 'name': 'كلاسيكي'},
+    {'key': 'jumbo', 'name': 'أرقام كبيرة'},
+    {'key': 'four_color', 'name': 'أربعة ألوان'},
+    {'key': 'royal_gold', 'name': 'ذهبي ملكي'},
+    {'key': 'neon', 'name': 'نيون ليلي'},
+  ];
+  static bool _loaded = false;
+
+  static Future<void> load({bool force = false}) async {
+    if (_loaded && !force) return;
+    try {
+      final raw = await _tdb.rpc('get_card_backs');
+      if (raw is List) {
+        backs = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    } catch (_) {}
+    try {
+      final f = await _tdb.rpc('get_card_faces');
+      if (f is List && f.isNotEmpty) {
+        faces = f.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    } catch (_) {}
+    try {
+      back.value = (await _tdb.rpc('get_my_card_back')).toString();
+    } catch (_) {}
+    try {
+      face.value = (await _tdb.rpc('get_my_card_face')).toString();
+    } catch (_) {}
+    _loaded = true;
+  }
+
+  static Map<String, dynamic>? get backParams {
+    for (final b in backs) {
+      if (b['key'].toString() == back.value && b['params'] is Map) {
+        return Map<String, dynamic>.from(b['params'] as Map);
+      }
+    }
+    return null;
+  }
+
+  static Future<void> setFace(String k) async {
+    face.value = k;
+    try {
+      await _tdb.rpc('set_my_card_face', params: {'p_key': k});
+    } catch (_) {}
+  }
+
+  static Future<void> setBack(String k) async {
+    back.value = k;
+    try {
+      await _tdb.rpc('set_my_card_back', params: {'p_key': k});
+    } catch (_) {}
+  }
+}
+
+// ───────────────────────── وجه الورقة (5 تصاميم) ─────────────────────────
+
+Color _suitColor(String suit, String face) {
+  if (face == 'neon') {
+    switch (suit) {
+      case 'H':
+        return const Color(0xFFFF4FD8);
+      case 'D':
+        return const Color(0xFFFFE14D);
+      case 'C':
+        return const Color(0xFF39FF88);
+      default:
+        return const Color(0xFF4FE3FF);
+    }
+  }
+  if (face == 'four_color') {
+    switch (suit) {
+      case 'H':
+        return const Color(0xFFC62828);
+      case 'D':
+        return const Color(0xFF1565C0);
+      case 'C':
+        return const Color(0xFF2E7D32);
+      default:
+        return const Color(0xFF212121);
+    }
+  }
+  return (suit == 'H' || suit == 'D') ? const Color(0xFFC62828) : const Color(0xFF212121);
+}
+
+String _courtGlyph(int r) => r == 13 ? '♚' : (r == 12 ? '♛' : (r == 11 ? '♝' : ''));
 
 class PlayingCard extends StatelessWidget {
   final String card;
@@ -261,904 +381,722 @@ class PlayingCard extends StatelessWidget {
   final double height;
   final bool dim;
   final bool glow;
+  final Color? glowColor;
+
+  /// null = تصميم المستخدم الحالي (TrixPrefs.face).
+  final String? face;
   const PlayingCard(
       {super.key,
       required this.card,
       this.width = 50,
       this.height = 72,
       this.dim = false,
-      this.glow = false});
+      this.glow = false,
+      this.glowColor,
+      this.face});
 
   @override
   Widget build(BuildContext context) {
+    final f = face ?? TrixPrefs.face.value;
     final suit = _suitOf(card);
-    final red = suit == 'H' || suit == 'D';
-    final col = red ? const Color(0xFFC62828) : const Color(0xFF212121);
-    final label = _rankLabel(_rankOf(card));
+    final rank = _rankOf(card);
+    final col = _suitColor(suit, f);
+    final label = _rankLabel(rank);
     final sym = _suitSym[suit] ?? '';
+    final gc = glowColor ?? const Color(0xFFFFC107);
+
+    BoxDecoration deco;
+    switch (f) {
+      case 'royal_gold':
+        deco = BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: dim
+                ? const [Color(0xFFB8B0A0), Color(0xFF9C9070)]
+                : const [Color(0xFFFFF6D6), Color(0xFFE8C66A)],
+          ),
+          borderRadius: BorderRadius.circular(width * 0.12),
+          border: Border.all(color: glow ? gc : const Color(0xFFB8860B), width: glow ? 2.4 : 1.6),
+          boxShadow: [
+            BoxShadow(color: glow ? gc.withAlpha(160) : const Color(0x66000000), blurRadius: glow ? 9 : 3, offset: const Offset(1, 2))
+          ],
+        );
+        break;
+      case 'neon':
+        deco = BoxDecoration(
+          color: dim ? const Color(0xFF2A2338) : const Color(0xFF120A22),
+          borderRadius: BorderRadius.circular(width * 0.12),
+          border: Border.all(color: glow ? gc : col.withAlpha(220), width: glow ? 2.4 : 1.4),
+          boxShadow: [
+            BoxShadow(color: (glow ? gc : col).withAlpha(dim ? 40 : 150), blurRadius: glow ? 12 : 7),
+          ],
+        );
+        break;
+      default:
+        deco = BoxDecoration(
+          color: dim ? const Color(0xFFB8B8B8) : const Color(0xFFFFFDF7),
+          borderRadius: BorderRadius.circular(width * 0.12),
+          border: Border.all(color: glow ? gc : const Color(0xFF9E9E9E), width: glow ? 2.2 : 0.8),
+          boxShadow: [
+            BoxShadow(color: glow ? gc.withAlpha(150) : const Color(0x55000000), blurRadius: glow ? 8 : 3, offset: const Offset(1, 2))
+          ],
+        );
+    }
+
+    final court = _courtGlyph(rank);
+    Widget center;
+    if (f == 'jumbo') {
+      center = Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(label,
+              style: TextStyle(color: col, fontSize: width * 0.52, fontWeight: FontWeight.w900, height: 1.0)),
+          Text(sym, style: TextStyle(color: col, fontSize: width * 0.34, height: 1.0)),
+        ]),
+      );
+    } else {
+      final glyph = (f == 'royal_gold' || f == 'neon') && court.isNotEmpty ? court : sym;
+      center = Center(
+        child: Text(glyph,
+            style: TextStyle(
+                color: col.withAlpha(dim ? 120 : 255),
+                fontSize: width * (glyph == sym ? 0.56 : 0.62),
+                shadows: f == 'neon' ? [Shadow(color: col, blurRadius: 8)] : null)),
+      );
+    }
+
     return Container(
       width: width,
       height: height,
-      decoration: BoxDecoration(
-        color: dim ? const Color(0xFFB8B8B8) : const Color(0xFFFFFDF7),
-        borderRadius: BorderRadius.circular(width * 0.12),
-        border: Border.all(
-            color: glow ? const Color(0xFFFFC107) : const Color(0xFF9E9E9E),
-            width: glow ? 2.2 : 0.8),
-        boxShadow: [
-          BoxShadow(
-              color: glow ? const Color(0x99FFC107) : const Color(0x55000000),
-              blurRadius: glow ? 8 : 3,
-              offset: const Offset(1, 2))
-        ],
-      ),
+      decoration: deco,
       child: Stack(children: [
-        Positioned(
-          left: width * 0.07,
-          top: height * 0.03,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text(label,
-                style: TextStyle(
-                    color: col,
-                    fontSize: width * 0.30,
-                    fontWeight: FontWeight.w900,
-                    height: 1.0)),
-            Text(sym,
-                style: TextStyle(color: col, fontSize: width * 0.26, height: 1.0)),
-          ]),
-        ),
-        Center(
-          child: Text(sym,
-              style: TextStyle(color: col.withAlpha(dim ? 120 : 255), fontSize: width * 0.56)),
-        ),
+        if (f != 'jumbo')
+          Positioned(
+            left: width * 0.07,
+            top: height * 0.03,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(label,
+                  style: TextStyle(color: col, fontSize: width * 0.30, fontWeight: FontWeight.w900, height: 1.0)),
+              Text(sym, style: TextStyle(color: col, fontSize: width * 0.26, height: 1.0)),
+            ]),
+          ),
+        center,
       ]),
     );
   }
 }
 
-// ───────────────────────── الدخول والمشغّل ─────────────────────────
+// ───────────────────────── الدخول ─────────────────────────
 
-final Set<String> _openTrix = <String>{};
-
+/// يفتح المباراة في نافذة اللعب العائمة (فوق التطبيق كله، تُكبَّر لملء الشاشة
+/// أو تُصغَّر لنافذة أو أيقونة) بدل صفحة تحجب الشات.
 Future<void> openTrixGame(BuildContext context, String gameId) async {
-  if (!_openTrix.add(gameId)) return;
   playServerSound('game_start');
-  try {
-    await Navigator.of(context).push<void>(MaterialPageRoute<void>(
-      fullscreenDialog: true,
-      builder: (_) => TrixScreen(gameId: gameId),
-    ));
-  } finally {
-    _openTrix.remove(gameId);
-  }
+  TrixWindow.instance.openGame(gameId);
 }
 
 String trixTitle(String type) => type == 'trix_partner'
-    ? 'تركس سوري (شراكة)'
-    : (type == 'trix_solo' ? 'تركس سوري (فردي)' : 'تركس سوري');
+    ? 'تركس (شراكة)'
+    : (type == 'trix_solo' ? 'تركس (فردي)' : 'تركس');
 
 String trixErrorText(Object e) {
   final raw = e.toString();
-  if (raw.contains('ALREADY_IN_GAME')) return 'لديك مباراة تركس جارية بالفعل.';
+  if (raw.contains('ALREADY_IN_GAME')) return 'لديك مباراة أو طاولة تركس جارية بالفعل.';
   if (raw.contains('ILLEGAL_MOVE')) return 'هذه الورقة غير مسموحة الآن.';
   if (raw.contains('CONTRACT_USED')) return 'هذا العقد استُخدم سابقًا.';
   if (raw.contains('CARD_NOT_IN_HAND')) return 'الورقة ليست في يدك.';
   if (raw.contains('NOT_PLAYING')) return 'ليس وقت اللعب.';
+  if (raw.contains('DOUBLING_IN_PROGRESS')) return 'انتظر انتهاء وقت الدبل.';
+  if (raw.contains('NOT_DOUBLING')) return 'انتهى وقت الدبل.';
+  if (raw.contains('CANNOT_DOUBLE')) return 'لا يمكن دبل هذه الورقة.';
   if (raw.contains('GAME_NOT_FOUND')) return 'المباراة غير موجودة.';
+  if (raw.contains('SEAT_TAKEN')) return 'المقعد محجوز.';
+  if (raw.contains('TABLE_NOT_OPEN')) return 'الطاولة لم تعد مفتوحة.';
+  if (raw.contains('TABLE_EXPIRED')) return 'انتهت مهلة الطاولة.';
+  if (raw.contains('NOT_HOST')) return 'هذا للمضيف فقط.';
+  if (raw.contains('ALREADY_SEATED')) return 'أنت جالس على الطاولة بالفعل.';
+  if (raw.contains('INVALID_RECIPIENT')) return 'لا يمكن دعوة نفسك.';
   return gameErrorText(e);
 }
 
-Future<List<Map<String, dynamic>>> _loadBacks() async {
-  try {
-    final raw = await _tdb.rpc('get_card_backs');
-    if (raw is List) {
-      return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-    }
-  } catch (_) {}
-  return <Map<String, dynamic>>[];
-}
+const Map<String, String> trixVariantName = {
+  'classic': 'كلاسيك (5 عقود)',
+  'complex': 'كومبلكس (تركس + كومبلكس)',
+};
 
-/// مشغّل التركس ضد الكمبيوتر: اختيار النمط والرهان وظهر الورق.
+/// مركز التركس: ضد الكمبيوتر، طاولة لاعبين حقيقيين 2×2، الطاولات المفتوحة،
+/// الدعوات، وتصميم الورق.
 Future<void> showTrixLauncher(BuildContext context, {String? roomId}) async {
-  // مباراة جارية؟ استأنفها.
   try {
     final active = await _tdb.rpc('trix_my_active');
     if (active != null && context.mounted) {
-      final resume = await showDialog<bool>(
-        context: context,
-        builder: (c) => AlertDialog(
-          title: const Text('لديك مباراة جارية', textDirection: TextDirection.rtl),
-          content: const Text('هل تريد العودة إلى مباراة التركس؟',
-              textDirection: TextDirection.rtl),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(c, false),
-                child: const Text('لاحقًا')),
-            FilledButton(
-                onPressed: () => Navigator.pop(c, true),
-                child: const Text('العودة للمباراة')),
-          ],
-        ),
-      );
-      if (resume == true && context.mounted) {
-        await openTrixGame(context, active.toString());
-      }
+      TrixWindow.instance.openGame(active.toString());
       return;
     }
   } catch (_) {}
+  unawaited(TrixPrefs.load());
   if (!context.mounted) return;
-  final backs = await _loadBacks();
-  String mine = 'plaid';
-  try {
-    mine = (await _tdb.rpc('get_my_card_back')).toString();
-  } catch (_) {}
-  if (!context.mounted) return;
-  var mode = 'solo';
-  var stake = 0;
-  var back = mine;
-  final started = await showDialog<bool>(
+  await showModalBottomSheet<void>(
     context: context,
-    builder: (c) => StatefulBuilder(builder: (c, setS) {
-      return AlertDialog(
-        backgroundColor: const Color(0xFF171126),
-        title: const Text('تركس سوري ضد الكمبيوتر',
-            style: TextStyle(color: Colors.white),
-            textDirection: TextDirection.rtl),
-        content: SingleChildScrollView(
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('النمط',
-                    style: TextStyle(color: Colors.white70),
-                    textDirection: TextDirection.rtl),
-                const SizedBox(height: 6),
-                Wrap(spacing: 8, textDirection: TextDirection.rtl, children: [
-                  ChoiceChip(
-                      label: const Text('فردي (كل لاعب لنفسه)'),
-                      selected: mode == 'solo',
-                      onSelected: (_) => setS(() => mode = 'solo')),
-                  ChoiceChip(
-                      label: const Text('شراكة (أنت + شريك آلي)'),
-                      selected: mode == 'partner',
-                      onSelected: (_) => setS(() => mode = 'partner')),
-                ]),
-                const SizedBox(height: 12),
-                const Text('الرهان (يُحسم في الخادم)',
-                    style: TextStyle(color: Colors.white70),
-                    textDirection: TextDirection.rtl),
-                const SizedBox(height: 6),
-                Wrap(spacing: 6, runSpacing: 4, textDirection: TextDirection.rtl, children: [
-                  for (final s in const [0, 10, 50, 100, 500, 1000])
-                    ChoiceChip(
-                        label: Text(s == 0 ? 'ودّي' : '$s'),
-                        selected: stake == s,
-                        onSelected: (_) => setS(() => stake = s)),
-                ]),
-                const SizedBox(height: 4),
-                Text(
-                    stake == 0
-                        ? 'بلا نقاط.'
-                        : (mode == 'solo'
-                            ? 'يُحجز $stake من رصيدك. المركز 1: +${stake * 2}، 2: 0، 3 و4: −$stake.'
-                            : 'يُحجز $stake من رصيدك. فريقك يفوز: +$stake، يخسر: −$stake.'),
-                    style: const TextStyle(color: Colors.white54, fontSize: 12),
-                    textDirection: TextDirection.rtl),
-                if (backs.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  const Text('ظهر الورق',
-                      style: TextStyle(color: Colors.white70),
-                      textDirection: TextDirection.rtl),
-                  const SizedBox(height: 6),
-                  _BackPicker(
-                      backs: backs,
-                      selected: back,
-                      onPick: (k) => setS(() => back = k)),
-                ],
-              ]),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')),
-          FilledButton(
-              onPressed: () => Navigator.pop(c, true), child: const Text('ابدأ')),
-        ],
-      );
-    }),
+    isScrollControlled: true,
+    backgroundColor: const Color(0xFF171126),
+    showDragHandle: true,
+    constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.92),
+    builder: (_) => _TrixLobby(roomId: roomId),
   );
-  if (started != true || !context.mounted) return;
-  final messenger = ScaffoldMessenger.of(context);
-  try {
-    if (back != mine) {
-      await _tdb.rpc('set_my_card_back', params: {'p_key': back});
-    }
-    final id = await _tdb.rpc('trix_start_vs_computer',
-        params: {'p_mode': mode, 'p_stake': stake, 'p_room_id': roomId});
-    if (!context.mounted) return;
-    await openTrixGame(context, id.toString());
-  } catch (e) {
-    messenger.showSnackBarSfx(SnackBar(content: Text(trixErrorText(e))));
-  }
 }
 
-class _BackPicker extends StatelessWidget {
-  final List<Map<String, dynamic>> backs;
-  final String selected;
-  final ValueChanged<String> onPick;
-  const _BackPicker(
-      {required this.backs, required this.selected, required this.onPick});
-
+class _TrixLobby extends StatefulWidget {
+  final String? roomId;
+  const _TrixLobby({this.roomId});
   @override
-  Widget build(BuildContext context) {
-    return Wrap(spacing: 8, runSpacing: 8, textDirection: TextDirection.rtl, children: [
-      for (final b in backs)
-        GestureDetector(
-          onTap: () => onPick(b['key'].toString()),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                    color: selected == b['key']
-                        ? const Color(0xFFFFC107)
-                        : Colors.transparent,
-                    width: 2),
-              ),
-              child: CardBack(
-                  params: b['params'] is Map
-                      ? Map<String, dynamic>.from(b['params'] as Map)
-                      : null,
-                  width: 40,
-                  height: 58),
-            ),
-            const SizedBox(height: 2),
-            Text(b['name'].toString(),
-                style: const TextStyle(color: Colors.white70, fontSize: 10)),
-          ]),
-        ),
-    ]);
-  }
+  State<_TrixLobby> createState() => _TrixLobbyState();
 }
 
-// ───────────────────────── شاشة المباراة ─────────────────────────
-
-class TrixScreen extends StatefulWidget {
-  final String gameId;
-  const TrixScreen({super.key, required this.gameId});
-
-  @override
-  State<TrixScreen> createState() => _TrixScreenState();
-}
-
-class _TrixScreenState extends State<TrixScreen> {
-  Map<String, dynamic>? _v;
-  Timer? _timer;
+class _TrixLobbyState extends State<_TrixLobby> with SingleTickerProviderStateMixin {
+  late final TabController _tabs = TabController(length: 5, vsync: this);
+  String _mode = 'partner';
+  String _variant = 'classic';
+  int _stake = 0;
   bool _busy = false;
-  bool _resultShown = false;
-  String? _sel;
-  String? _error;
-  int _lastSeq = -1;
-  List<Map<String, dynamic>> _backs = [];
-  String _myBack = 'plaid';
+  String? _tableId;
+  Map<String, dynamic>? _table;
+  List<Map<String, dynamic>> _open = const [];
+  List<Map<String, dynamic>> _invites = const [];
+  Timer? _poll;
 
   @override
   void initState() {
     super.initState();
-    _bootstrap();
-    _timer = Timer.periodic(const Duration(milliseconds: 900), (_) => _tick());
-    _tick();
-  }
-
-  Future<void> _bootstrap() async {
-    _backs = await _loadBacks();
-    try {
-      _myBack = (await _tdb.rpc('get_my_card_back')).toString();
-    } catch (_) {}
-    if (mounted) setState(() {});
+    _loadMyTable();
+    _loadOpen();
+    _loadInvites();
+    _poll = Timer.periodic(const Duration(seconds: 2), (_) => _pollTick());
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _poll?.cancel();
+    _tabs.dispose();
     super.dispose();
   }
 
-  Map<String, dynamic>? get _backParams {
-    for (final b in _backs) {
-      if (b['key'].toString() == _myBack && b['params'] is Map) {
-        return Map<String, dynamic>.from(b['params'] as Map);
-      }
-    }
-    return null;
+  void _snack(Object msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(msg is String ? msg : trixErrorText(msg))));
   }
 
-  Future<void> _refresh() async {
+  Future<void> _pollTick() async {
+    if (_tableId != null) await _loadTable();
+    if (_tabs.index == 2) await _loadOpen();
+    if (_tabs.index == 3) await _loadInvites();
+  }
+
+  Future<void> _loadMyTable() async {
     try {
-      final raw = await _tdb.rpc('trix_my_view', params: {'p_game': widget.gameId});
-      if (raw is Map && mounted) {
-        final v = Map<String, dynamic>.from(raw);
-        final seq = (v['seq'] as num?)?.toInt() ?? 0;
-        if (seq != _lastSeq) {
-          _lastSeq = seq;
-          if (_sel != null && !(v['legal'] is List && (v['legal'] as List).contains(_sel))) {
-            _sel = null;
-          }
-        }
+      final id = await _tdb.rpc('trix_my_table');
+      if (id != null) {
+        _tableId = id.toString();
+        await _loadTable();
+        if (mounted) _tabs.animateTo(1);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadTable() async {
+    final id = _tableId;
+    if (id == null) return;
+    try {
+      final raw = await _tdb.rpc('trix_table_view', params: {'p_table': id});
+      if (raw is! Map || !mounted) return;
+      final t = Map<String, dynamic>.from(raw);
+      if (t['status'] == 'started' && t['game_id'] != null) {
+        Navigator.of(context).maybePop();
+        TrixWindow.instance.openGame(t['game_id'].toString());
+        return;
+      }
+      if (t['status'] == 'cancelled') {
         setState(() {
-          _v = v;
-          _error = null;
+          _tableId = null;
+          _table = null;
         });
-        if (v['status'] == 'finished' && !_resultShown) {
-          _resultShown = true;
-          WidgetsBinding.instance.addPostFrameCallback((_) => _showResult());
-        }
+        _snack('أُلغيت الطاولة.');
+        return;
       }
-    } catch (e) {
-      if (mounted) setState(() => _error = trixErrorText(e));
-    }
+      setState(() => _table = t);
+    } catch (_) {}
   }
 
-  Future<void> _tick() async {
-    if (_busy || !mounted) return;
-    _busy = true;
+  Future<void> _loadOpen() async {
     try {
-      await _refresh();
-      final v = _v;
-      if (v != null && v['status'] == 'active') {
-        final phase = v['phase']?.toString();
-        final turn = (v['turn'] as num?)?.toInt() ?? -1;
-        final seats = (v['seats'] as List?) ?? const [];
-        final botTurn = turn >= 0 && turn < seats.length && seats[turn] == null;
-        if (phase == 'handover' || botTurn) {
-          final acted = await _tdb.rpc('trix_bot_step', params: {'p_game': widget.gameId});
-          if (acted == true) await _refresh();
-        }
+      final raw = await _tdb.rpc('trix_open_tables', params: {'p_room_id': widget.roomId});
+      if (raw is List && mounted) {
+        setState(() => _open = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList());
       }
-    } catch (_) {
-    } finally {
-      _busy = false;
-    }
+    } catch (_) {}
   }
 
-  Future<void> _play(String card) async {
+  Future<void> _loadInvites() async {
+    try {
+      final raw = await _tdb.rpc('trix_my_table_invites');
+      if (raw is List && mounted) {
+        setState(() => _invites = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList());
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _run(Future<void> Function() f) async {
     if (_busy) return;
-    _busy = true;
+    setState(() => _busy = true);
     try {
-      playServerSound('disc_drop');
-      await _tdb.rpc('trix_play', params: {'p_game': widget.gameId, 'p_card': card});
-      _sel = null;
-      await _refresh();
+      await f();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBarSfx(SnackBar(content: Text(trixErrorText(e))));
-      }
+      _snack(e);
     } finally {
-      _busy = false;
+      if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _choose(String c) async {
-    if (_busy) return;
-    _busy = true;
-    try {
-      await _tdb.rpc('trix_choose_contract',
-          params: {'p_game': widget.gameId, 'p_contract': c});
-      await _refresh();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBarSfx(SnackBar(content: Text(trixErrorText(e))));
-      }
-    } finally {
-      _busy = false;
-    }
+  // ───── أدوات اختيار مشتركة ─────
+  Widget _chips<T>(List<T> values, T selected, String Function(T) label, ValueChanged<T> onPick) {
+    return Wrap(spacing: 6, runSpacing: 4, textDirection: TextDirection.rtl, children: [
+      for (final v in values)
+        ChoiceChip(label: Text(label(v)), selected: v == selected, onSelected: (_) => setState(() => onPick(v))),
+    ]);
   }
 
-  Future<void> _resign() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('الانسحاب', textDirection: TextDirection.rtl),
-        content: Text(
-            ((_v?['stake'] as num?)?.toInt() ?? 0) > 0
-                ? 'الانسحاب يعني خسارة الرهان. متأكد؟'
-                : 'هل تريد إنهاء المباراة؟',
-            textDirection: TextDirection.rtl),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('لا')),
-          FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('انسحاب')),
-        ],
+  Widget _label(String t) => Padding(
+        padding: const EdgeInsets.only(top: 12, bottom: 6),
+        child: Text(t, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700), textDirection: TextDirection.rtl),
+      );
+
+  Widget _setupForm({required bool vsComputer}) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+      _label('النمط'),
+      _chips<String>(const ['partner', 'solo'], _mode,
+          (m) => m == 'partner' ? (vsComputer ? 'شراكة 2×2 (شريكك كمبيوتر)' : 'شراكة 2×2') : 'فردي (كل لاعب لنفسه)', (m) => _mode = m),
+      _label('نوع اللعبة'),
+      _chips<String>(const ['classic', 'complex'], _variant, (v) => trixVariantName[v]!, (v) => _variant = v),
+      _label('الرهان (يُحسم في الخادم)'),
+      _chips<int>(const [0, 10, 50, 100, 500, 1000], _stake, (s) => s == 0 ? 'ودّي' : '$s', (s) => _stake = s),
+      const SizedBox(height: 8),
+      Text(
+        vsComputer
+            ? '🏆 الفوز ضد الكمبيوتر: جائزة 50 نقطة من الخادم (حسب الأهلية والحد اليومي).'
+            : '🏆 مباراة بأربعة لاعبين حقيقيين: جائزة الفائز 200 نقطة + 2 💎 من الخادم. المقاعد الفارغة عند البدء يلعبها الكمبيوتر (جائزتها 50).',
+        textDirection: TextDirection.rtl,
+        style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 12),
       ),
-    );
-    if (ok != true) return;
-    try {
-      await _tdb.rpc('trix_resign', params: {'p_game': widget.gameId});
-      await _refresh();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBarSfx(SnackBar(content: Text(trixErrorText(e))));
-      }
-    }
-  }
-
-  Future<void> _pickBack() async {
-    if (_backs.isEmpty) return;
-    await showDialog<void>(
-      context: context,
-      builder: (c) => StatefulBuilder(builder: (c, setS) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF171126),
-          title: const Text('ظهر الورق',
-              style: TextStyle(color: Colors.white), textDirection: TextDirection.rtl),
-          content: _BackPicker(
-              backs: _backs,
-              selected: _myBack,
-              onPick: (k) async {
-                setS(() => _myBack = k);
-                if (mounted) setState(() {});
-                try {
-                  await _tdb.rpc('set_my_card_back', params: {'p_key': k});
-                } catch (_) {}
-              }),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(c), child: const Text('تم'))
-          ],
-        );
-      }),
-    );
-  }
-
-  List<int> get _scores =>
-      ((_v?['scores'] as List?) ?? const [0, 0, 0, 0]).map((e) => (e as num).toInt()).toList();
-
-  String _name(int seat) {
-    final n = (_v?['names'] as List?) ?? const [];
-    return seat >= 0 && seat < n.length ? n[seat].toString() : 'لاعب';
-  }
-
-  Future<void> _showResult() async {
-    final v = _v;
-    if (v == null || !mounted) return;
-    final me = (v['me'] as num?)?.toInt() ?? 0;
-    final res = v['result'] is Map ? Map<String, dynamic>.from(v['result'] as Map) : <String, dynamic>{};
-    final nets = ((res['nets'] as List?) ?? const [0, 0, 0, 0]).map((e) => (e as num).toInt()).toList();
-    final net = me < nets.length ? nets[me] : 0;
-    final stake = (v['stake'] as num?)?.toInt() ?? 0;
-    playServerSound(net > 0 ? 'game_win' : (net < 0 ? 'game_lose' : 'game_draw'));
-    final sc = _scores;
-    final order = List<int>.generate(4, (i) => i)..sort((a, b) => sc[b].compareTo(sc[a]));
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (c) => AlertDialog(
-        backgroundColor: const Color(0xFF171126),
-        title: Text(
-            res['resigned'] != null
-                ? 'انتهت المباراة (انسحاب)'
-                : (net > 0 ? '🏆 مبروك!' : (net < 0 ? 'حظًا أوفر' : 'تعادل')),
-            style: const TextStyle(color: Colors.white),
-            textDirection: TextDirection.rtl),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          for (final s in order)
-            ListTile(
-              dense: true,
-              title: Text(_name(s) + (s == me ? ' (أنت)' : ''),
-                  style: TextStyle(
-                      color: s == me ? const Color(0xFFFFD54F) : Colors.white),
-                  textDirection: TextDirection.rtl),
-              trailing: Text('${sc[s]}',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-            ),
-          const Divider(color: Colors.white24),
-          Text(
-              stake == 0
-                  ? 'مباراة ودّية.'
-                  : (net > 0
-                      ? 'ربحت $net نقطة (أُضيفت لرصيدك).'
-                      : (net < 0 ? 'خسرت ${-net} نقطة.' : 'استرددت رهانك.')),
-              style: const TextStyle(color: Colors.white70),
-              textDirection: TextDirection.rtl),
-        ]),
-        actions: [
-          FilledButton(
-              onPressed: () {
-                Navigator.pop(c);
-                if (mounted) Navigator.of(context).maybePop();
-              },
-              child: const Text('إغلاق')),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final v = _v;
-    return Scaffold(
-      backgroundColor: const Color(0xFF0E0A18),
-      body: SafeArea(
-        child: v == null
-            ? Center(
-                child: _error != null
-                    ? Text(_error!, style: const TextStyle(color: Colors.white70))
-                    : const CircularProgressIndicator())
-            : _body(v),
-      ),
-    );
-  }
-
-  Widget _body(Map<String, dynamic> v) {
-    final me = (v['me'] as num).toInt();
-    final phase = v['phase']?.toString() ?? '';
-    final turn = (v['turn'] as num?)?.toInt() ?? -1;
-    final contract = v['contract']?.toString();
-    final kingdom = (v['kingdom'] as num?)?.toInt() ?? 0;
-    final handNo = (v['hand_no'] as num?)?.toInt() ?? 0;
-    final stake = (v['stake'] as num?)?.toInt() ?? 0;
-    final mode = v['mode']?.toString() ?? 'solo';
-    final sc = _scores;
-    final myTurn = turn == me;
-    final hand = ((v['hand'] as List?) ?? const []).map((e) => e.toString()).toList();
-    final legal = ((v['legal'] as List?) ?? const []).map((e) => e.toString()).toSet();
-    final sizes = ((v['hand_sizes'] as List?) ?? const [13, 13, 13, 13]).map((e) => (e as num).toInt()).toList();
-
-    String status;
-    if (v['status'] == 'finished') {
-      status = 'انتهت المباراة';
-    } else if (phase == 'choose') {
-      status = turn == me ? 'أنت الملك — اختر العقد' : '${_name(turn)} يختار العقد…';
-    } else if (phase == 'handover') {
-      status = 'انتهت اليد — التالية بعد لحظات…';
-    } else {
-      status = myTurn ? 'دورك — العب ورقة' : 'دور ${_name(turn)}';
-    }
-
-    return Column(children: [
-      // الشريط العلوي
-      Padding(
-        padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
-        child: Row(children: [
-          IconButton(
-              onPressed: _resign,
-              tooltip: 'انسحاب',
-              icon: const Icon(Icons.flag_rounded, color: Colors.white54)),
-          Expanded(
-            child: Column(children: [
-              Text(
-                  '${mode == 'partner' ? 'شراكة' : 'فردي'} • الملك: ${_name(kingdom)} (${kingdom + 1}/4) • يد ${math.min(handNo + 1, 5)}/5'
-                  '${stake > 0 ? ' • رهان $stake' : ''}',
-                  textAlign: TextAlign.center,
-                  textDirection: TextDirection.rtl,
-                  style: const TextStyle(color: Colors.white70, fontSize: 11)),
-              if (contract != null && phase != 'choose')
-                Text('${_contractName[contract]} — ${_contractHint[contract]}',
-                    textAlign: TextAlign.center,
-                    textDirection: TextDirection.rtl,
-                    style: const TextStyle(
-                        color: Color(0xFFFFD54F), fontSize: 12, fontWeight: FontWeight.w800)),
-            ]),
-          ),
-          IconButton(
-              onPressed: _pickBack,
-              tooltip: 'ظهر الورق',
-              icon: const Icon(Icons.style_rounded, color: Colors.white54)),
-          IconButton(
-              onPressed: () => Navigator.of(context).maybePop(),
-              icon: const Icon(Icons.close_rounded, color: Colors.white54)),
-        ]),
-      ),
-      // النتائج
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        child: Row(children: [
-          for (var s = 0; s < 4; s++)
-            Expanded(
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                decoration: BoxDecoration(
-                  color: turn == s ? const Color(0x44FFC107) : const Color(0x22FFFFFF),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                      color: s == me ? const Color(0xFFFFD54F) : Colors.transparent, width: 1),
-                ),
-                child: Column(children: [
-                  Text(_name(s),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white70, fontSize: 10)),
-                  Text('${sc[s]}',
-                      style: TextStyle(
-                          color: sc[s] < 0 ? const Color(0xFFFF8A80) : const Color(0xFFA5D6A7),
-                          fontWeight: FontWeight.w900,
-                          fontSize: 14)),
-                ]),
-              ),
-            ),
-        ]),
-      ),
-      // الطاولة
-      Expanded(child: _table(v, me, sizes, phase)),
-      // الحالة
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        color: myTurn ? const Color(0x33FFC107) : Colors.transparent,
-        child: Text(status,
-            textAlign: TextAlign.center,
-            textDirection: TextDirection.rtl,
-            style: TextStyle(
-                color: myTurn ? const Color(0xFFFFD54F) : Colors.white60,
-                fontWeight: FontWeight.w800,
-                fontSize: 13)),
-      ),
-      if (phase == 'choose' && turn == me) _contractPicker(v),
-      // يدي
-      SizedBox(height: 92, child: _handFan(hand, legal, myTurn && phase == 'play')),
       const SizedBox(height: 4),
+      const Text('🔥 الدبل: من يملك شايب الكبّة أو بنتًا يستطيع دبلها؛ آكلها يخسر الضعف وصاحب الدبل يكسب قيمتها.',
+          textDirection: TextDirection.rtl, style: TextStyle(color: Colors.white54, fontSize: 11.5)),
     ]);
   }
 
-  Widget _contractPicker(Map<String, dynamic> v) {
-    final rem = ((v['remaining'] as List?) ?? const []).map((e) => e.toString()).toList();
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 6,
-        runSpacing: 4,
-        children: [
-          for (final c in rem)
-            FilledButton.tonal(
-              onPressed: () => _choose(c),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Text(_contractName[c] ?? c,
-                    style: const TextStyle(fontWeight: FontWeight.w900)),
-                Text(_contractHint[c] ?? '',
-                    style: const TextStyle(fontSize: 9),
-                    textDirection: TextDirection.rtl),
-              ]),
-            ),
-        ],
+  // ───── التبويبات ─────
+  Widget _vsComputerTab() {
+    return ListView(padding: const EdgeInsets.all(16), children: [
+      _setupForm(vsComputer: true),
+      const SizedBox(height: 16),
+      FilledButton.icon(
+        onPressed: _busy
+            ? null
+            : () => _run(() async {
+                  final id = await _tdb.rpc('trix_start_game', params: {
+                    'p_mode': _mode,
+                    'p_variant': _variant,
+                    'p_stake': _stake,
+                    'p_room_id': widget.roomId,
+                  });
+                  if (!mounted) return;
+                  Navigator.of(context).maybePop();
+                  playServerSound('game_start');
+                  TrixWindow.instance.openGame(id.toString());
+                }),
+        icon: const Icon(Icons.smart_toy_rounded),
+        label: const Text('ابدأ ضد الكمبيوتر'),
       ),
-    );
-  }
-
-  Widget _handFan(List<String> hand, Set<String> legal, bool canPlay) {
-    return LayoutBuilder(builder: (context, box) {
-      const cw = 52.0, ch = 76.0;
-      final n = hand.length;
-      if (n == 0) return const SizedBox.shrink();
-      final avail = box.maxWidth - cw - 8;
-      final step = n <= 1 ? 0.0 : math.min(cw * 0.8, avail / (n - 1));
-      final total = step * (n - 1) + cw;
-      final start = (box.maxWidth - total) / 2;
-      return Stack(children: [
-        for (var i = 0; i < n; i++)
-          Positioned(
-            left: start + step * i,
-            bottom: _sel == hand[i] ? 10 : 2,
-            child: GestureDetector(
-              onTap: () {
-                if (!canPlay) return;
-                final c = hand[i];
-                if (!legal.contains(c)) {
-                  ScaffoldMessenger.of(context).showSnackBarSfx(
-                      const SnackBar(content: Text('هذه الورقة غير مسموحة الآن.')));
-                  return;
-                }
-                if (_sel == c) {
-                  _play(c);
-                } else {
-                  setState(() => _sel = c);
-                }
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 120),
-                child: PlayingCard(
-                  card: hand[i],
-                  width: cw,
-                  height: ch,
-                  dim: canPlay && !legal.contains(hand[i]),
-                  glow: canPlay && legal.contains(hand[i]) && _sel == hand[i],
-                ),
-              ),
-            ),
-          ),
-      ]);
-    });
-  }
-
-  Widget _opponent(int seat, List<int> sizes, {required bool vertical}) {
-    final n = sizes[seat];
-    final shown = math.min(n, 7);
-    final bp = _backParams;
-    final cards = <Widget>[
-      for (var i = 0; i < shown; i++)
-        Positioned(
-          left: vertical ? 0 : i * 9.0,
-          top: vertical ? i * 9.0 : 0,
-          child: CardBack(params: bp, width: 30, height: 43),
-        ),
-    ];
-    final w = vertical ? 30.0 : 30.0 + math.max(0, shown - 1) * 9.0;
-    final h = vertical ? 43.0 + math.max(0, shown - 1) * 9.0 : 43.0;
-    return Column(mainAxisSize: MainAxisSize.min, children: [
-      Text('${_name(seat)} • $n',
-          style: const TextStyle(color: Colors.white70, fontSize: 10)),
-      const SizedBox(height: 2),
-      SizedBox(width: w, height: h, child: Stack(children: cards)),
     ]);
   }
 
-  Widget _table(Map<String, dynamic> v, int me, List<int> sizes, String phase) {
-    final contract = v['contract']?.toString();
-    final trick = ((v['trick'] as List?) ?? const [])
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList();
-    final last = v['last_trick'] is Map ? Map<String, dynamic>.from(v['last_trick'] as Map) : null;
-    final right = (me + 1) % 4, top = (me + 2) % 4, left = (me + 3) % 4;
+  Widget _tableTab() {
+    final t = _table;
+    if (_tableId == null || t == null) {
+      return ListView(padding: const EdgeInsets.all(16), children: [
+        _setupForm(vsComputer: false),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: _busy
+              ? null
+              : () => _run(() async {
+                    final id = await _tdb.rpc('trix_table_create', params: {
+                      'p_mode': _mode,
+                      'p_variant': _variant,
+                      'p_stake': _stake,
+                      'p_room_id': widget.roomId,
+                    });
+                    _tableId = id.toString();
+                    await _loadTable();
+                  }),
+          icon: const Icon(Icons.table_restaurant_rounded),
+          label: const Text('أنشئ طاولة وادعُ اللاعبين'),
+        ),
+      ]);
+    }
+    final seats = (t['seats'] as List?) ?? const [null, null, null, null];
+    final names = (t['names'] as List?) ?? const [null, null, null, null];
+    final invites = ((t['invites'] as List?) ?? const []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final isHost = t['is_host'] == true;
+    final partner = t['mode'] == 'partner';
+    final mySeat = (t['my_seat'] as num?)?.toInt() ?? 0;
 
-    Widget center;
-    if (contract == 'trix' && phase != 'choose') {
-      center = _trixLayout(v);
-    } else {
-      List<Map<String, dynamic>> cards = trick;
-      int? winner;
-      var ghost = false;
-      if (cards.isEmpty && last != null) {
-        cards = ((last['cards'] as List?) ?? const [])
-            .map((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
-        winner = (last['winner'] as num?)?.toInt();
-        ghost = true;
-      }
-      center = SizedBox(
-        width: 190,
-        height: 170,
-        child: Stack(children: [
-          for (final c in cards)
-            _trickCard(me, (c['s'] as num).toInt(), c['c'].toString(),
-                ghost: ghost, win: ghost && winner == (c['s'] as num).toInt()),
-          if (ghost && cards.isNotEmpty)
-            Align(
-              alignment: Alignment.center,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                decoration: BoxDecoration(
-                    color: const Color(0x99000000), borderRadius: BorderRadius.circular(8)),
-                child: Text('أكلها ${_name(winner ?? 0)}',
-                    style: const TextStyle(color: Colors.white70, fontSize: 9)),
-              ),
+    Widget seatTile(int s) {
+      final occupied = s < seats.length && seats[s] != null;
+      final inv = invites.where((x) => (x['seat'] as num?)?.toInt() == s).toList();
+      final role = s == mySeat
+          ? 'أنت'
+          : (partner ? ((s - mySeat) % 2 == 0 ? 'شريك' : 'خصم') : 'لاعب');
+      return Container(
+        width: 132,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: occupied ? const Color(0x3343A047) : const Color(0x22FFFFFF),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: s == mySeat ? const Color(0xFFFFD54F) : Colors.white24),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('مقعد ${s + 1} • $role', style: const TextStyle(color: Colors.white54, fontSize: 10.5)),
+          const SizedBox(height: 4),
+          Text(
+            occupied ? (names[s]?.toString() ?? 'لاعب') : (inv.isNotEmpty ? '⏳ ${inv.first['name']}' : 'فارغ (كمبيوتر)'),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: occupied ? Colors.white : Colors.white60, fontWeight: FontWeight.w800),
+          ),
+          if (!occupied && isHost)
+            TextButton(
+              onPressed: _busy ? null : () => _invitePicker(s),
+              child: Text(inv.isNotEmpty ? 'تغيير الدعوة' : 'دعوة لاعب'),
             ),
         ]),
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
-      child: Transform(
-        alignment: Alignment.center,
-        transform: Matrix4.identity()
-          ..setEntry(3, 2, 0.0009)
-          ..rotateX(0.16),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(26),
-            gradient: const RadialGradient(
-              colors: [Color(0xFF2E7D4F), Color(0xFF14522F)],
-              radius: 0.95,
-            ),
-            border: Border.all(color: const Color(0xFF5D4037), width: 6),
-            boxShadow: const [
-              BoxShadow(color: Color(0xAA000000), blurRadius: 14, offset: Offset(0, 8))
-            ],
+    return ListView(padding: const EdgeInsets.all(16), children: [
+      Text(
+        '${partner ? 'شراكة 2×2' : 'فردي'} • ${trixVariantName[t['variant']] ?? ''}${((t['stake'] as num?) ?? 0) > 0 ? ' • رهان ${t['stake']}' : ''}',
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.rtl,
+        style: const TextStyle(color: Color(0xFFFFD54F), fontWeight: FontWeight.w800),
+      ),
+      const SizedBox(height: 12),
+      // ترتيب الطاولة كما في اللعب: الشريك مقابلك، والخصمان يمينًا ويسارًا.
+      Center(child: seatTile((mySeat + 2) % 4)),
+      const SizedBox(height: 8),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        seatTile((mySeat + 3) % 4),
+        const Text('🃏', style: TextStyle(fontSize: 34)),
+        seatTile((mySeat + 1) % 4),
+      ]),
+      const SizedBox(height: 8),
+      Center(child: seatTile(mySeat)),
+      const SizedBox(height: 14),
+      if (isHost)
+        FilledButton.icon(
+          onPressed: _busy
+              ? null
+              : () => _run(() async {
+                    final gid = await _tdb.rpc('trix_table_start', params: {'p_table': _tableId});
+                    if (!mounted) return;
+                    Navigator.of(context).maybePop();
+                    playServerSound('game_start');
+                    TrixWindow.instance.openGame(gid.toString());
+                  }),
+          icon: const Icon(Icons.play_arrow_rounded),
+          label: const Text('ابدأ المباراة (الفارغ يلعبه الكمبيوتر)'),
+        )
+      else
+        const Text('بانتظار المضيف ليبدأ المباراة…', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60)),
+      const SizedBox(height: 6),
+      TextButton.icon(
+        onPressed: _busy
+            ? null
+            : () => _run(() async {
+                  await _tdb.rpc('trix_table_leave', params: {'p_table': _tableId});
+                  setState(() {
+                    _tableId = null;
+                    _table = null;
+                  });
+                }),
+        icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
+        label: Text(isHost ? 'إلغاء الطاولة' : 'مغادرة الطاولة', style: const TextStyle(color: Colors.redAccent)),
+      ),
+    ]);
+  }
+
+  Future<void> _invitePicker(int seat) async {
+    final picked = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => const _PlayerSearchDialog(),
+    );
+    if (picked == null || !mounted) return;
+    await _run(() async {
+      await _tdb.rpc('trix_table_invite', params: {'p_table': _tableId, 'p_to': picked['id'], 'p_seat': seat});
+      _snack('تم إرسال الدعوة إلى ${picked['name']} ✓');
+      await _loadTable();
+    });
+  }
+
+  Widget _openTab() {
+    if (_open.isEmpty) {
+      return const Center(child: Text('لا توجد طاولات مفتوحة الآن.', style: TextStyle(color: Colors.white60)));
+    }
+    return ListView(padding: const EdgeInsets.all(12), children: [
+      for (final t in _open)
+        Card(
+          color: const Color(0xFF221A33),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text('${t['mode'] == 'partner' ? 'شراكة 2×2' : 'فردي'} • ${trixVariantName[t['variant']] ?? ''} • المضيف: ${((t['names'] as List?) ?? const [])[0] ?? ''}',
+                  textDirection: TextDirection.rtl, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              Wrap(spacing: 6, textDirection: TextDirection.rtl, children: [
+                for (var s = 1; s < 4; s++)
+                  if (((t['seats'] as List?) ?? const [])[s] == null)
+                    OutlinedButton(
+                      onPressed: _busy
+                          ? null
+                          : () => _run(() async {
+                                await _tdb.rpc('trix_table_join', params: {'p_table': t['id'], 'p_seat': s});
+                                _tableId = t['id'].toString();
+                                await _loadTable();
+                                _tabs.animateTo(1);
+                              }),
+                      child: Text('اجلس بمقعد ${s + 1}${t['mode'] == 'partner' && s == 2 ? ' (شريك المضيف)' : ''}'),
+                    ),
+              ]),
+            ]),
           ),
-          child: Stack(children: [
-            Align(alignment: Alignment.topCenter, child: Padding(
-                padding: const EdgeInsets.only(top: 6), child: _opponent(top, sizes, vertical: false))),
-            Align(alignment: Alignment.centerLeft, child: Padding(
-                padding: const EdgeInsets.only(left: 6), child: _opponent(left, sizes, vertical: true))),
-            Align(alignment: Alignment.centerRight, child: Padding(
-                padding: const EdgeInsets.only(right: 6), child: _opponent(right, sizes, vertical: true))),
-            Center(child: center),
-            if (phase == 'handover') Center(child: _handoverCard(v)),
+        ),
+    ]);
+  }
+
+  Widget _invitesTab() {
+    if (_invites.isEmpty) {
+      return const Center(child: Text('لا توجد دعوات تركس.', style: TextStyle(color: Colors.white60)));
+    }
+    return ListView(padding: const EdgeInsets.all(12), children: [
+      for (final x in _invites)
+        Card(
+          color: const Color(0xFF221A33),
+          child: ListTile(
+            title: Text('${x['from_name']} يدعوك', textDirection: TextDirection.rtl, style: const TextStyle(color: Colors.white)),
+            subtitle: Text(
+                '${x['mode'] == 'partner' ? (x['seat'] == 2 ? 'شريكًا له' : 'خصمًا') : 'فردي'} • ${trixVariantName[x['variant']] ?? ''}${((x['stake'] as num?) ?? 0) > 0 ? ' • ${x['stake']} نقطة' : ''}',
+                textDirection: TextDirection.rtl,
+                style: const TextStyle(color: Colors.white60)),
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.redAccent),
+                onPressed: _busy
+                    ? null
+                    : () => _run(() async {
+                          await _tdb.rpc('trix_table_respond', params: {'p_invite': x['id'], 'p_accept': false});
+                          await _loadInvites();
+                        }),
+              ),
+              IconButton(
+                icon: const Icon(Icons.check_rounded, color: Colors.greenAccent),
+                onPressed: _busy
+                    ? null
+                    : () => _run(() async {
+                          final tid = await _tdb.rpc('trix_table_respond', params: {'p_invite': x['id'], 'p_accept': true});
+                          _tableId = tid?.toString();
+                          await _loadTable();
+                          _tabs.animateTo(1);
+                        }),
+              ),
+            ]),
+          ),
+        ),
+    ]);
+  }
+
+  Widget _designTab() => const TrixDesignPicker();
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Column(children: [
+        const Text('🃏 تركس', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+        TabBar(
+          controller: _tabs,
+          isScrollable: true,
+          tabs: [
+            const Tab(text: 'ضد الكمبيوتر'),
+            Tab(text: _tableId != null ? 'طاولتي ●' : 'طاولة لاعبين'),
+            const Tab(text: 'طاولات مفتوحة'),
+            Tab(text: _invites.isNotEmpty ? 'دعواتي (${_invites.length})' : 'دعواتي'),
+            const Tab(text: 'تصميم الورق'),
+          ],
+        ),
+        Expanded(
+          child: TabBarView(controller: _tabs, children: [
+            _vsComputerTab(),
+            _tableTab(),
+            _openTab(),
+            _invitesTab(),
+            _designTab(),
           ]),
         ),
-      ),
-    );
-  }
-
-  Widget _trickCard(int me, int seat, String card, {bool ghost = false, bool win = false}) {
-    final rel = (seat - me + 4) % 4; // 0 أنا، 1 يمين، 2 أعلى، 3 يسار
-    const w = 42.0, h = 60.0;
-    Alignment al;
-    switch (rel) {
-      case 0:
-        al = const Alignment(0, 0.95);
-        break;
-      case 1:
-        al = const Alignment(0.7, 0.05);
-        break;
-      case 2:
-        al = const Alignment(0, -0.95);
-        break;
-      default:
-        al = const Alignment(-0.7, 0.05);
-    }
-    return Align(
-      alignment: al,
-      child: Opacity(
-        opacity: ghost ? 0.75 : 1,
-        child: PlayingCard(card: card, width: w, height: h, glow: win),
-      ),
-    );
-  }
-
-  Widget _trixLayout(Map<String, dynamic> v) {
-    final layout = v['layout'] is Map ? Map<String, dynamic>.from(v['layout'] as Map) : <String, dynamic>{};
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 34, vertical: 52),
-      child: LayoutBuilder(builder: (context, box) {
-        final cw = math.min(26.0, box.maxWidth / 13);
-        final ch = cw * 1.38;
-        return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          for (final s in const ['S', 'H', 'D', 'C'])
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 1.5),
-              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                for (var r = 2; r <= 14; r++)
-                  Builder(builder: (_) {
-                    final lay = layout[s];
-                    final has = lay is Map &&
-                        r >= (lay['lo'] as num).toInt() &&
-                        r <= (lay['hi'] as num).toInt();
-                    return SizedBox(
-                      width: cw,
-                      height: ch,
-                      child: has
-                          ? FittedBox(
-                              child: PlayingCard(card: '$s$r', width: 50, height: 69))
-                          : Container(
-                              margin: const EdgeInsets.all(1),
-                              decoration: BoxDecoration(
-                                  color: const Color(0x14FFFFFF),
-                                  borderRadius: BorderRadius.circular(3)),
-                            ),
-                    );
-                  }),
-              ]),
-            ),
-        ]);
-      }),
-    );
-  }
-
-  Widget _handoverCard(Map<String, dynamic> v) {
-    final d = ((v['hand_delta'] as List?) ?? const [0, 0, 0, 0]).map((e) => (e as num).toInt()).toList();
-    final contract = v['contract']?.toString();
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-          color: const Color(0xEE171126),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0x66FFC107))),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Text('نتيجة ${_contractName[contract] ?? ''}',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-        const SizedBox(height: 4),
-        for (var s = 0; s < 4; s++)
-          Text('${_name(s)}: ${d[s] > 0 ? '+' : ''}${d[s]}',
-              textDirection: TextDirection.rtl,
-              style: TextStyle(
-                  color: d[s] < 0
-                      ? const Color(0xFFFF8A80)
-                      : (d[s] > 0 ? const Color(0xFFA5D6A7) : Colors.white60),
-                  fontSize: 12)),
       ]),
     );
+  }
+}
+
+class _PlayerSearchDialog extends StatefulWidget {
+  const _PlayerSearchDialog();
+  @override
+  State<_PlayerSearchDialog> createState() => _PlayerSearchDialogState();
+}
+
+class _PlayerSearchDialogState extends State<_PlayerSearchDialog> {
+  final _q = TextEditingController();
+  Timer? _deb;
+  List<Map<String, dynamic>> _players = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _search();
+  }
+
+  @override
+  void dispose() {
+    _deb?.cancel();
+    _q.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search() async {
+    try {
+      final raw = await _tdb.rpc('search_game_players', params: {'p_query': _q.text});
+      if (raw is List && mounted) {
+        setState(() => _players = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList());
+      }
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: const Color(0xFF171126),
+      title: const Text('دعوة لاعب', style: TextStyle(color: Colors.white), textDirection: TextDirection.rtl),
+      content: SizedBox(
+        width: 340,
+        height: 420,
+        child: Column(children: [
+          TextField(
+            controller: _q,
+            textDirection: TextDirection.rtl,
+            style: const TextStyle(color: Colors.white),
+            decoration: const InputDecoration(hintText: 'ابحث بالاسم…', prefixIcon: Icon(Icons.search_rounded), isDense: true),
+            onChanged: (_) {
+              _deb?.cancel();
+              _deb = Timer(const Duration(milliseconds: 350), _search);
+            },
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: ListView(children: [
+              for (final p in _players)
+                ListTile(
+                  dense: true,
+                  leading: Icon(Icons.circle, size: 10, color: p['online'] == true ? Colors.greenAccent : Colors.white24),
+                  title: Text(p['name']?.toString() ?? 'عضو', textDirection: TextDirection.rtl, style: const TextStyle(color: Colors.white)),
+                  onTap: () => Navigator.pop(context, p),
+                ),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// اختيار تصميم وجه الورق وظهره — يُحفظ في الخادم ويُطبَّق فورًا.
+class TrixDesignPicker extends StatefulWidget {
+  const TrixDesignPicker({super.key});
+  @override
+  State<TrixDesignPicker> createState() => _TrixDesignPickerState();
+}
+
+class _TrixDesignPickerState extends State<TrixDesignPicker> {
+  @override
+  void initState() {
+    super.initState();
+    TrixPrefs.load().then((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(padding: const EdgeInsets.all(14), children: [
+      const Text('وجه الورق', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700), textDirection: TextDirection.rtl),
+      const SizedBox(height: 8),
+      ValueListenableBuilder<String>(
+        valueListenable: TrixPrefs.face,
+        builder: (_, sel, __) => Wrap(spacing: 10, runSpacing: 10, textDirection: TextDirection.rtl, children: [
+          for (final f in TrixPrefs.faces)
+            GestureDetector(
+              onTap: () => TrixPrefs.setFace(f['key'].toString()),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(color: sel == f['key'] ? const Color(0xFFFFC107) : Colors.transparent, width: 2),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    PlayingCard(card: 'H13', width: 38, height: 54, face: f['key'].toString()),
+                    const SizedBox(width: 2),
+                    PlayingCard(card: 'D12', width: 38, height: 54, face: f['key'].toString()),
+                  ]),
+                ),
+                const SizedBox(height: 3),
+                Text(f['name'].toString(), style: const TextStyle(color: Colors.white70, fontSize: 11)),
+              ]),
+            ),
+        ]),
+      ),
+      const SizedBox(height: 18),
+      const Text('ظهر الورق', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700), textDirection: TextDirection.rtl),
+      const SizedBox(height: 8),
+      ValueListenableBuilder<String>(
+        valueListenable: TrixPrefs.back,
+        builder: (_, sel, __) => Wrap(spacing: 10, runSpacing: 10, textDirection: TextDirection.rtl, children: [
+          for (final b in TrixPrefs.backs)
+            GestureDetector(
+              onTap: () => TrixPrefs.setBack(b['key'].toString()),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: sel == b['key'] ? const Color(0xFFFFC107) : Colors.transparent, width: 2),
+                  ),
+                  child: CardBack(params: b['params'] is Map ? Map<String, dynamic>.from(b['params'] as Map) : null, width: 40, height: 58),
+                ),
+                const SizedBox(height: 2),
+                Text(b['name'].toString(), style: const TextStyle(color: Colors.white70, fontSize: 10)),
+              ]),
+            ),
+        ]),
+      ),
+    ]);
   }
 }
