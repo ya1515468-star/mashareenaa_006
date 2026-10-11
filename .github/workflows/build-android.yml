@@ -138,6 +138,19 @@ jobs:
             out/THIRD_PARTY_NOTICES.txt
           generate_release_notes: true
 
+      # رابط تنزيل مباشر لآخر نسخة على main: إصدار تمهيدي ثابت الاسم يُحدَّث كل بناء.
+      - name: Publish latest build (pre-release)
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-build
+          name: Latest build (${{ github.sha }})
+          prerelease: true
+          target_commitish: ${{ github.sha }}
+          files: |
+            out/*.apk
+            out/SHA256SUMS.txt
+
       - name: Remove temporary signing files
         if: always()
         run: rm -f android/app/mashareena-upload.jks android/key.properties
