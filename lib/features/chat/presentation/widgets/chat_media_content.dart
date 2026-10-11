@@ -69,9 +69,57 @@ class ChatMediaContent extends StatelessWidget {
     return _buildForUrl(context, url);
   }
 
+  /// البند 4: قائمة روابط السمايلات المتحركة المرسَلة في رسالة واحدة.
+  /// الخادم يحفظ metadata.gif_urls كما هي (مفتاح غير معروف يُمرَّر دون
+  /// مساس)، فأي رسالة GIF تحمل أكثر من رابط تُعرَض في فقاعة واحدة.
+  /// الرسائل القديمة بلا هذا المفتاح تمر على المسار المفرد نفسه تمامًا.
+  List<String> get _gifUrls {
+    final raw = message.metadata?['gif_urls'];
+    if (raw is! List) return const <String>[];
+    final urls = raw
+        .map((e) => e.toString().trim())
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
+    return urls.length > 1 ? urls : const <String>[];
+  }
+
+  /// عرض عدّة سمايلات متحركة داخل فقاعة واحدة: صفّ متعدد الأسطر يتمدّد
+  /// بعرض الفقاعة. حجم كل سمايل هو نفس حجم السمايل المفرد (22) حتى لا
+  /// يتغيّر الإحساس البصري، وكل سمايل يبقى قابلًا للضغط كما في المفرد.
+  Widget _buildGifGroup(BuildContext context, List<String> urls) {
+    const smileySize = 22.0;
+    return Align(
+      alignment: Alignment.centerRight,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Wrap(
+          alignment: WrapAlignment.end,
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final u in urls)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onGifTap == null ? null : () => onGifTap!(u),
+                child: SizedBox(
+                  width: isMashareenaBannerGif(u) ? 150.0 : smileySize,
+                  height: isMashareenaBannerGif(u) ? 47.0 : smileySize,
+                  child: _box(u.startsWith('assets/')
+                      ? Image.asset(u, fit: BoxFit.contain)
+                      : Image.network(u, fit: BoxFit.contain)),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildForUrl(BuildContext context, String url) {
     switch (message.type) {
       case MessageType.gif:
+        final many = _gifUrls;
+        if (many.isNotEmpty) return _buildGifGroup(context, many);
         // Match the visual footprint of normal WhatsApp-style chat emojis.
         // GIF smileys are media, but their box stays the same compact size.
         final banner = isMashareenaBannerGif(url);

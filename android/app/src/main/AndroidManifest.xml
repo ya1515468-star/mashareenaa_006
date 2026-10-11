@@ -15,6 +15,14 @@
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="false"
         android:networkSecurityConfig="@xml/network_security_config">
+        <!-- البند 3: صورة فيديو يوتيوب كانت غائبة مع استمرار الصوت. سجل أخطاء
+             الجهاز لا يحتوي أي استثناء من يوتيوب أو WebView في البناء الحالي
+             (جسر JS يُهيَّأ بنجاح والصوت يعمل)، فالعلة في تركيب سطح العرض
+             المنصّي لا في التهيئة: Impeller لا يدمج سطح الفيديو الذي ينشئه
+             WebView داخل الإطار. هذا هو مَخرَج التعطيل الرسمي على أندرويد. -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

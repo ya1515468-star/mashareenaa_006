@@ -10,7 +10,6 @@ import '../../domain/entities/chat_message_entity.dart';
 import 'emoji_picker_sheet.dart';
 import 'chat_media_content.dart';
 import '../../../../core/widgets/embedded_media_player.dart';
-import 'reply_3d_anchor.dart';
 import '../../../../core/widgets/dynamic_avatar_frame.dart';
 import 'chat_mention_badge.dart';
 import '../../../vip/presentation/widgets/vip_link_preview.dart';
@@ -353,19 +352,14 @@ class MessageBubble extends ConsumerWidget {
                               .toSet()
                           : const <String>{},
                     ),
+                  // البند 11: حُذف الرد ثلاثي الأبعاد والاقتباس ثلاثي الأبعاد.
+                  // الرسائل القديمة التي تحمل reply_mode = reply_3d/quote_3d
+                  // تُعرَض الآن ببطاقة الرد العادية نفسها، فلا يبقى أي مسار
+                  // ثلاثي الأبعاد في العرض ولا تُفقَد معاينة رسالة قديمة.
                   if (message.replyToId != null && !deletedForEveryone)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6),
-                      child: (message.metadata?['reply_mode'] == 'reply_3d' ||
-                              message.metadata?['reply_mode'] == 'quote_3d')
-                          ? Reply3DAnchor(
-                              messageId: message.id,
-                              targetMessageId: message.replyToId!,
-                              preview: message.replyToPreview,
-                              compact: true,
-                              onTap: () =>
-                                  onJumpToMessage?.call(message.replyToId!))
-                          : InkWell(
+                      child: InkWell(
                               onTap: () =>
                                   onJumpToMessage?.call(message.replyToId!),
                               child: Container(

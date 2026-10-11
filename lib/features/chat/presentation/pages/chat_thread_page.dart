@@ -89,6 +89,10 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
   Timer? _mentionTimer;
   Timer? _typingStopTimer;
   final Map<String, BuildContext> _messageContexts = {};
+  // البند 4: الخاص كان يرسل كل GIF فورًا رسالة مستقلة (لا قائمة معلّقة
+  // إطلاقًا، بخلاف الغرف). الآن تُجمَّع هنا وتظهر معاينتها فوق صندوق
+  // الكتابة، ولا تُرسَل إلا بالضغط على زر الإرسال، في فقاعة واحدة.
+  final List<String> _pendingGifs = [];
   final _sound = ChatSoundService(Supabase.instance.client);
   Color _mentionFrameColor = const Color(0xFFFFD54F);
 
@@ -258,9 +262,25 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
 
   Future<void> _send() async {
     final text = _textController.text.trim();
-    if (text.isEmpty) return;
+    // البند 4: الإرسال يصحّ أيضًا بسمايلات معلّقة بلا نص.
+    if (text.isEmpty && _pendingGifs.isEmpty) return;
     final myUid = ref.read(authControllerProvider).valueOrNull?.uid;
     if (myUid == null) return;
+
+    if (_pendingGifs.isNotEmpty) {
+      final gifsSent = await _sendPendingGifs(myUid);
+      if (!mounted) return;
+      if (!gifsSent) {
+        ScaffoldMessenger.of(context).showSnackBarSfx(
+          const SnackBar(content: Text('تعذّر إرسال السمايلات، حاول مرة أخرى.')),
+        );
+        return;
+      }
+      if (text.isEmpty) {
+        await _sound.play(ChatSoundEvent.send);
+        return;
+      }
+    }
 
     final replyingTo = ref.read(replyingToProvider);
     final replyMode = ref.read(replyingModeProvider);
@@ -340,8 +360,38 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
       context,
       onEmojiSelected: _sendEmoji,
       multiGif: true,
-      onGifSelected: (gif) => _sendAttachment(MessageType.gif, gif, 'gif.gif'),
+      // لا إرسال فوري: يُخزَّن معلَّقًا ويظهر فوق صندوق الكتابة.
+      onGifSelected: (gif) {
+        if (!mounted) return;
+        setState(() => _pendingGifs.add(gif));
+      },
     );
+  }
+
+  void _removePendingGif(int index) {
+    if (index < 0 || index >= _pendingGifs.length) return;
+    setState(() => _pendingGifs.removeAt(index));
+  }
+
+  /// إرسال كل السمايلات المعلّقة في رسالة واحدة (فقاعة واحدة). النوع يبقى
+  /// gif ليقبله الخادم (قائمته البيضاء لا تسمح بنوع جديد)، والروابط كلها
+  /// في metadata.gif_urls الذي يحفظه الخادم كما هو.
+  Future<bool> _sendPendingGifs(String myUid) async {
+    final gifs = List<String>.from(_pendingGifs);
+    if (gifs.isEmpty) return true;
+    final sent = await ref.read(chatControllerProvider.notifier).sendMessage(
+          fromUid: myUid,
+          toUid: widget.otherUid,
+          text: 'GIF',
+          type: MessageType.gif,
+          mediaUrl: gifs.first,
+          metadata: {
+            'request_id': const Uuid().v4(),
+            if (gifs.length > 1) 'gif_urls': gifs,
+          },
+        );
+    if (sent && mounted) setState(() => _pendingGifs.clear());
+    return sent;
   }
 
   Future<void> _sendEmoji(String emoji) async {
@@ -773,6 +823,60 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
               replyingTo: replyingTo,
               onCancel: () =>
                   ref.read(replyingToProvider.notifier).state = null,
+            ),
+          // البند 4: معاينة السمايلات المعلّقة فوق صندوق الكتابة، كل واحد
+          // قابل للحذف قبل الإرسال؛ ترسل كلها في فقاعة واحدة.
+          if (_pendingGifs.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: p.surfaceElevated,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: p.divider),
+              ),
+              child: Row(children: [
+                Icon(Icons.emoji_emotions_outlined,
+                    size: 16, color: p.textMuted),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (var i = 0; i < _pendingGifs.length; i++)
+                        Stack(clipBehavior: Clip.none, children: [
+                          SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: _pendingGifs[i].startsWith('assets/')
+                                ? Image.asset(_pendingGifs[i],
+                                    fit: BoxFit.contain)
+                                : Image.network(_pendingGifs[i],
+                                    fit: BoxFit.contain),
+                          ),
+                          Positioned(
+                            top: -6,
+                            left: -6,
+                            child: GestureDetector(
+                              onTap: () => _removePendingGif(i),
+                              child: Container(
+                                decoration: const BoxDecoration(
+                                    color: Colors.black54,
+                                    shape: BoxShape.circle),
+                                padding: const EdgeInsets.all(1),
+                                child: const Icon(Icons.close_rounded,
+                                    size: 11, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ]),
+                    ],
+                  ),
+                ),
+                Text('${_pendingGifs.length}',
+                    style: TextStyle(color: p.textMuted, fontSize: 11)),
+              ]),
             ),
           if (_mentionSuggestions.isNotEmpty)
             Container(

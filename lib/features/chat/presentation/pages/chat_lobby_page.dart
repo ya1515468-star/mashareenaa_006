@@ -544,6 +544,12 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     String? replyToSenderUid,
     String? replyToPreview,
     String replyMode = 'none',
+    // البند 4: عدّة GIF تُرسَل في رسالة واحدة (فقاعة واحدة). الخادم يرفض
+    // أي kind جديد (`p_kind not in ('text','emoji','gif',…)`)، لكنه يحفظ
+    // مفاتيح p_metadata غير المعروفة كما هي (v_meta := coalesce(p_metadata,
+    // '{}') ثم jsonb_set فوقه) — فالقائمة تُحمَل هنا بلا أي هجرة خادمية،
+    // ويبقى kind='gif' وattachment_url = أول GIF لتوافق الرسائل القديمة.
+    List<String>? gifUrls,
   }) async {
     final user = _user;
     final payload = (message ?? body).trim();
@@ -558,6 +564,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       'request_id': requestId,
       if (replyToId != null && replyMode.contains('quote'))
         'quoted_message_id': replyToId,
+      if (gifUrls != null && gifUrls.length > 1) 'gif_urls': gifUrls,
     };
     await _db.rpc('send_public_chat_message_v2', params: {
       'p_room_id': _roomId,
@@ -581,12 +588,16 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       _error = null;
     });
     try {
-      for (final gif in gifs) {
+      // البند 4: كانت حلقة ترسل رسالة مستقلة لكل GIF، فثلاث سمايلات تنتج
+      // ثلاث فقاعات. الآن رسالة واحدة تحمل كل الروابط في metadata.gif_urls
+      // فتُعرَض في فقاعة واحدة.
+      if (gifs.isNotEmpty) {
         await _insertPublicMessage(
-          body: gif,
+          body: gifs.first,
           message: 'GIF',
           kind: 'gif',
-          attachmentUrl: gif,
+          attachmentUrl: gifs.first,
+          gifUrls: gifs,
         );
       }
       if (text.isNotEmpty) {
