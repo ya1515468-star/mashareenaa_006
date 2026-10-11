@@ -168,7 +168,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
             }
           },
         );
-        channel!.subscribe();
+        channel!.subscribe((_, __) {});
       } catch (e, st) {
         if (!controller.isClosed) controller.addError(e, st);
       }

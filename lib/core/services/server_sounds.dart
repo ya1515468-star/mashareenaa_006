@@ -106,8 +106,26 @@ class ServerSounds {
       if (bytes == null) return false;
       final player = AudioPlayer();
       await player.setReleaseMode(ReleaseMode.release);
-      unawaited(player.onPlayerComplete.first.then((_) => player.dispose()));
-      Timer(const Duration(seconds: 12), () => unawaited(player.dispose()));
+      // كان هناك مسارا تخلّص: عند انتهاء المقطع ومؤقّت 12ث. المسار الثاني
+      // يستدعي dispose() على مشغّل تخلّص منه الأول، فيرمي أندرويد
+      // "Player has not yet been created or has already been disposed"
+      // كخطأ غير ملتقَط (أكثر خطأ متكرّر في مراقب الأخطاء: 87 مرة).
+      // كذلك onPlayerComplete.first يرمي "Bad state: No element" إن أُغلق
+      // المجرى بالتخلّص قبل أن يُصدر أي حدث. حارس واحد يمنع الاثنين.
+      var released = false;
+      Future<void> release() async {
+        if (released) return;
+        released = true;
+        try {
+          await player.dispose();
+        } catch (_) {
+          // المشغّل الأصلي اختفى مسبقًا — لا شيء يُفعل.
+        }
+      }
+      unawaited(player.onPlayerComplete.first
+          .then((_) => release())
+          .catchError((_) {}));
+      Timer(const Duration(seconds: 12), () => unawaited(release()));
       await player.play(
         BytesSource(bytes, mimeType: _mime[key] ?? 'audio/wav'),
         volume: volume,

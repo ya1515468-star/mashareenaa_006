@@ -61,12 +61,24 @@ class ErrorMonitor {
         message = 'انهيار تخطيط متسلسل (نتيجة خطأ تخطيط سابق)';
       }
 
-      if (_shouldSkip('$scr|$source|$message')) return;
+      // كل سجلّات المراقب كانت screen=null (setScreen لا يُستدعى من أي
+      // شاشة، ولا توجد أسماء مسارات في التطبيق)، فيصل الخطأ للمالك بلا
+      // مكان. أول إطار يعود لملفاتنا في الـstack يحدّد الملف المسؤول
+      // فعليًا، وهو أدقّ من اسم شاشة يدوي.
+      var place = scr;
+      if (place == null || place.isEmpty) {
+        final m = RegExp(r'package:mashareena/([A-Za-z0-9_/]+\.dart)')
+            .firstMatch(stack?.toString() ?? '');
+        place = m?.group(1);
+      }
+      final scrFinal = place;
+
+      if (_shouldSkip('$scrFinal|$source|$message')) return;
 
       await Supabase.instance.client.rpc('log_client_error', params: {
         'p_message': message,
         'p_severity': severity,
-        'p_screen': scr,
+        'p_screen': scrFinal,
         'p_source': source,
         'p_details': stack?.toString(),
         'p_platform': kIsWeb ? 'web' : defaultTargetPlatform.name,

@@ -179,7 +179,10 @@ class _PackagesGrid extends ConsumerWidget {
         final featured = pkgs.where((p) => p['is_featured'] == true).toList();
         final regular  = pkgs.where((p) => p['is_featured'] != true).toList();
 
-        return ListView(
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(currencyPackagesProvider(type)),
+          child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
             if (featured.isNotEmpty) ...[
@@ -215,6 +218,7 @@ class _PackagesGrid extends ConsumerWidget {
               ),
             ),
           ],
+        ),
         );
       },
       loading: () => const Center(
@@ -238,8 +242,10 @@ class _OwnerEditOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!enabled) return child;
+    // الابن غير مُموضَع عمدًا: Stack كل أبنائه Positioned ينكمش إلى ارتفاع
+    // صفر داخل ListView (ارتفاع غير محدود) فتختفي البطاقة المميّزة.
     return Stack(children: [
-      Positioned.fill(child: child),
+      child,
       PositionedDirectional(
         top: 4,
         end: 4,
@@ -641,6 +647,8 @@ class _PackageEditorSheetState extends ConsumerState<_PackageEditorSheet> {
         displayStyle:  _style,
         bonusAmount:   int.tryParse(_bonusCtrl.text) ?? 0,
       );
+      // بدون إبطال لا تظهر الباقة الجديدة إطلاقًا (القراءة select لا stream).
+      refreshCurrencyPackages(ref);
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBarSfx(
@@ -676,6 +684,7 @@ class _PackageEditorSheetState extends ConsumerState<_PackageEditorSheet> {
     if (confirm != true) return;
     try {
       await ref.read(currencyStoreControllerProvider).deletePackage(widget.existing!['id']);
+      refreshCurrencyPackages(ref);
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {

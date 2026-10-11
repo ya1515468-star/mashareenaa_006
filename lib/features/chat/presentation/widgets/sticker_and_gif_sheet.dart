@@ -110,11 +110,12 @@ class _GifTabContent extends StatelessWidget {
       {required this.onSelected, this.keepOpen = false, this.counter});
 
   Widget _tile(BuildContext context, String path, {required bool wide}) {
-    return Tooltip(
-      message: mashareenaChatGifNames[path] ?? '',
-      triggerMode: mashareenaChatGifNames.containsKey(path)
-          ? TooltipTriggerMode.longPress
-          : TooltipTriggerMode.manual,
+    // كان هنا Tooltip: يبني OverlayPortal، وحين تُغلق الورقة والبطاقات
+    // تُعاد بناءها يختفي الـOverlay فيُرمى "No Overlay widget found"
+    // (٢٠ مرة في مراقب الأخطاء). الاسم يبقى متاحًا عبر Semantics بلا
+    // أي طبقة Overlay.
+    return Semantics(
+      label: mashareenaChatGifNames[path] ?? '',
       child: GestureDetector(
         // يُغلق الورقة بسياقه الخاص (سليل حقيقي للورقة دائمًا وقت الضغط).
         onTap: () {

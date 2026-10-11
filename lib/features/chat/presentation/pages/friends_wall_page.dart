@@ -53,7 +53,7 @@ final platformWallProductsProvider =
       table: 'platform_wall_products',
       callback: (_) => unawaited(load()),
     )
-    ..subscribe();
+    ..subscribe((_, __) {});
 
   ref.onDispose(() {
     disposed = true;

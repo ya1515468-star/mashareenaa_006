@@ -1,25 +1,42 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// ─── Stream الباقات ─────────────────────────────────────────────────
+// ─── قراءة الباقات ──────────────────────────────────────────────────
+//
+// كان هذا StreamProvider يعتمد على Realtime مع مُرشِّحَين متتاليين
+// (currency_type + is_active). مجرى Supabase لا يحمل إلا مُرشِّحًا واحدًا،
+// ولا يُصدِر أي قيمة إطلاقًا ما لم تنجح قناة Realtime — ومراقب الأخطاء
+// يسجّل RealtimeSubscribeException (channelError/timedOut) فعليًا على هذا
+// المشروع. النتيجة: قائمة باقات فارغة دائمًا للمستخدم وللمالك معًا رغم
+// وجود الصفوف على الخادم. قراءة عادية (select) تعمل دائمًا، والتحديث
+// الفوري يتم بإبطال المزوّد بعد كل تعديل من المالك.
 final currencyPackagesProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>((ref, type) {
-  return Supabase.instance.client
+    FutureProvider.family<List<Map<String, dynamic>>, String>((ref, type) async {
+  final rows = await Supabase.instance.client
       .from('currency_packages')
-      .stream(primaryKey: ['id'])
+      .select()
       .eq('currency_type', type)
       .eq('is_active', true)
       .order('sort_order');
+  return List<Map<String, dynamic>>.from(rows as List);
 });
 
+/// للمالك: كل الباقات بما فيها المعطّلة.
 final allCurrencyPackagesProvider =
-    StreamProvider<List<Map<String, dynamic>>>((ref) {
-  return Supabase.instance.client
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final rows = await Supabase.instance.client
       .from('currency_packages')
-      .stream(primaryKey: ['id'])
+      .select()
       .order('currency_type')
       .order('sort_order');
+  return List<Map<String, dynamic>>.from(rows as List);
 });
+
+/// تُستدعى بعد أي إضافة/تعديل/حذف من المالك حتى تظهر النتيجة فورًا.
+void refreshCurrencyPackages(WidgetRef ref) {
+  ref.invalidate(currencyPackagesProvider);
+  ref.invalidate(allCurrencyPackagesProvider);
+}
 
 // ─── Controller ─────────────────────────────────────────────────────
 class CurrencyStoreController {

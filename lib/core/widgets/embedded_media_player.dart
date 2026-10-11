@@ -384,8 +384,14 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
   @override
   Widget build(BuildContext context) {
     if (_disposed) return const SizedBox.shrink();
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
+    return Container(
+      // كان ClipRRect يقصّ الـWebView بحوافّ منحنية، وهو ما يكسر تركيب
+      // سطح الفيديو على أندرويد (صوت بلا صورة). الحوافّ الآن على الحاوية
+      // فقط دون قصّ العرض المنصّي.
+      decoration: BoxDecoration(
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(14),
+      ),
       // يوتيوب يشترط ألا يقل المشغّل المضمَّن عن 200×200 بكسل. في فقاعة الشات
       // كان ارتفاعه بنسبة 16:9 حوالي 146 فقط (عرض الفقاعة ~258)، فيُرفض.
       // النسبة تُحسب بحيث لا يقل الارتفاع عن 200 مهما كان عرض الفقاعة.

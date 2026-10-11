@@ -336,8 +336,10 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
   /// منطق إرسال خالص بلا أي تعامل مع Navigator.
   Future<void> _showGifPicker(BuildContext context) async {
     await StickerAndGifSheet.show(
+      // تبقى اللوحة مفتوحة: يختار عدّة GIF في دفعة واحدة بدل واحد لكل فتح.
       context,
       onEmojiSelected: _sendEmoji,
+      multiGif: true,
       onGifSelected: (gif) => _sendAttachment(MessageType.gif, gif, 'gif.gif'),
     );
   }

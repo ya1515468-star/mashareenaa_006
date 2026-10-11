@@ -811,7 +811,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
               value: _roomId),
           callback: (payload) => unawaited(_onDiceEvent(payload.newRecord)),
         )
-        .subscribe();
+        .subscribe((_, __) {});
     if (me != null) {
       _challengeChannel = _db
           .channel('dice-challenge-$me-${DateTime.now().millisecondsSinceEpoch}')
@@ -826,7 +826,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
             callback: (payload) =>
                 unawaited(_routeGameRequest(payload.newRecord)),
           )
-          .subscribe();
+          .subscribe((_, __) {});
       // المرسِل يدخل اللعبة تلقائيًا فور قبول الطرف الآخر (ينشأ صف المباراة).
       _matchChannel = _db
           .channel('game-match-$me-${DateTime.now().millisecondsSinceEpoch}')
@@ -863,7 +863,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
               }
             },
           )
-          .subscribe();
+          .subscribe((_, __) {});
       unawaited(_checkPendingChallenge(me));
     }
   }

@@ -76,7 +76,8 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
         autoPlay: true,
         params: const YoutubePlayerParams(
           origin: kYoutubeEmbedOrigin,
-          showControls: false,
+          // أدوات يوتيوب نفسها ظاهرة أيضًا إلى جانب شريطنا الخاص.
+          showControls: true,
           mute: false,
           strictRelatedVideos: false,
         ),
@@ -146,7 +147,11 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
                   border: Border.all(
                       color: minimized ? Colors.transparent : Colors.white12),
                 ),
-                clipBehavior: Clip.antiAlias,
+                // لا قصّ منحنٍ هنا: قصّ العرض المنصّي (WebView) بـantiAlias
+                // يفرض saveLayer على مُركِّب أندرويد فيضيع سطح الفيديو
+                // ويظهر مستطيل رمادي بينما يستمر الصوت. البطاقة تبقى
+                // بحوافّ دائرية عبر decoration، والفيديو مستطيل عادي.
+                clipBehavior: Clip.none,
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
                   Offstage(
                     offstage: minimized,
@@ -181,7 +186,8 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
                       ]),
                     ),
                   ),
-                  SizedBox(
+                  Container(
+                    color: Colors.black,
                     width: minimized ? 200 : width,
                     height: minimized ? 200 : videoHeight,
                     child: YoutubePlayer(

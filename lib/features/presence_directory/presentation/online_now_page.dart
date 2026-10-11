@@ -57,7 +57,7 @@ final onlineNowProvider =
         if (!disposed) unawaited(load());
       },
     )
-    ..subscribe();
+    ..subscribe((_, __) {});
 
   // Slow safety net only (covers a dropped socket); the realtime channel is
   // what makes it feel instant.
