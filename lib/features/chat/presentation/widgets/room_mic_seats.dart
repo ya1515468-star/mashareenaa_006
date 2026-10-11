@@ -393,7 +393,13 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
             // البند ٦: كانت الصورة هنا دائرة عادية بلا أي إطار ملوّن، رغم
             // أن نفس العضو يظهر بإطاره في كل مكان آخر بالغرفة. مؤشر
             // "يتحدث الآن" الأخضر يبقى طبقة خارجية مستقلة حول الإطار.
-            AnimatedContainer(
+            SizedBox(
+              width: 58,
+              height: 58,
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
@@ -426,6 +432,9 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
                           color: Colors.white60,
                           size: 22),
                     ),
+            ),
+                ),
+              ),
             ),
             if (occupant != null && muted)
               const Positioned(

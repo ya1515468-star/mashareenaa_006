@@ -519,11 +519,22 @@ class _ActiveCallPageState extends ConsumerState<ActiveCallPage> {
             Positioned.fill(
                 child: Center(
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
-              ProfileAvatar(
-                  avatarUrl: profile?.avatarUrl,
-                  displayName: profile?.displayName ?? '',
-                  radius: 58,
-                  frameKey: profile?.avatarFrameKey),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                ProfileAvatar(
+                    avatarUrl: (widget.isCaller ? myProfile : profile)?.avatarUrl,
+                    displayName: (widget.isCaller ? myProfile : profile)?.displayName ?? '',
+                    radius: 44,
+                    frameKey: (widget.isCaller ? myProfile : profile)?.avatarFrameKey),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  child: Icon(Icons.swap_horiz_rounded, color: Colors.white54, size: 26),
+                ),
+                ProfileAvatar(
+                    avatarUrl: (widget.isCaller ? profile : myProfile)?.avatarUrl,
+                    displayName: (widget.isCaller ? profile : myProfile)?.displayName ?? '',
+                    radius: 44,
+                    frameKey: (widget.isCaller ? profile : myProfile)?.avatarFrameKey),
+              ]),
               const SizedBox(height: 16),
               if (profile?.uid != null) ServerUsernameDisplay(uid: profile!.uid, fallbackName: profile.displayName, fallbackFontSize: 24, center: true),
               const SizedBox(height: 8),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'youtube_control_bar.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -117,8 +118,10 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
 
   Widget _buildPlayer(
       YoutubePlayerController controller, MiniPlayerTrack track, bool minimized) {
-    const width = 188.0;
-    const videoHeight = width * 9 / 16;
+    // يوتيوب لا يعرض واجهة المشغّل المضمَّن (الصورة وأدوات التحكم) إذا قلّ عن
+    // 200×200، وكان 188×105 فيعمل الصوت بلا عرض. الحد الأدنى المضبوط الآن.
+    const width = 240.0;
+    const videoHeight = 200.0;
     return Positioned(
       left: minimized ? 0 : 14,
       top: minimized ? 0 : 130,
@@ -184,7 +187,7 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
                     child: YoutubePlayer(
                       key: _playerKey,
                       controller: controller,
-                      aspectRatio: minimized ? 1 : 16 / 9,
+                      aspectRatio: minimized ? 1 : width / videoHeight,
                     ),
                   ),
                 ]),

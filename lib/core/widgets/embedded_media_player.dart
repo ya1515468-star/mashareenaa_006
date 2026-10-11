@@ -1,5 +1,6 @@
 import 'package:mashareena/core/utils/safe_launch.dart';
 import 'dart:async';
+import 'youtube_control_bar.dart';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -392,7 +393,14 @@ class _InlineYoutubePlayerState extends State<_InlineYoutubePlayer> {
         builder: (context, c) {
           final w = c.maxWidth.isFinite ? c.maxWidth : 320.0;
           final h = (w * 9 / 16) < 200 ? 200.0 : w * 9 / 16;
-          return YoutubePlayer(controller: _controller, aspectRatio: w / h);
+          return Column(mainAxisSize: MainAxisSize.min, children: [
+            YoutubePlayer(controller: _controller, aspectRatio: w / h),
+            Container(
+              color: const Color(0xFF14101F),
+              width: double.infinity,
+              child: YoutubeControlBar(controller: _controller),
+            ),
+          ]);
         },
       ),
     );

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../calls/domain/entities/call_entity.dart';
 import '../../../calls/presentation/pages/active_call_page.dart';
 import '../../../calls/presentation/providers/call_provider.dart';
+import '../../../calls/presentation/widgets/incoming_call_card.dart';
 import 'home_dashboard_page.dart';
 import '../../../chat/presentation/pages/chat_lobby_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -303,46 +304,37 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     final myUid = ref.read(authControllerProvider).valueOrNull?.uid;
     if (!mounted || myUid == null || call.id == _handledCallId) return;
     _handledCallId = call.id;
-    showDialog<void>(
+    showGeneralDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(call.type == CallType.video
-            ? '📹 مكالمة فيديو واردة'
-            : '📞 مكالمة صوتية واردة'),
-        content: const Text(
-            'لديك مكالمة واردة. يمكنك القبول أو الرفض.'),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await ref.read(callControllerProvider.notifier).updateStatus(
-                    callId: call.id,
-                    status: CallStatus.declined,
-                  );
-              if (dialogContext.mounted) Navigator.pop(dialogContext);
-            },
-            child: const Text('رفض'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await ref.read(callControllerProvider.notifier).updateStatus(
-                    callId: call.id,
-                    status: CallStatus.accepted,
-                  );
-              if (dialogContext.mounted) Navigator.pop(dialogContext);
-              if (!mounted) return;
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => ActiveCallPage(
-                  callId: call.id,
-                  otherUid: call.callerUid,
-                  type: call.type,
-                  isCaller: false,
-                ),
-              ));
-            },
-            child: const Text('قبول'),
-          ),
-        ],
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (dialogContext, _, __) => IncomingCallCard(
+        callerUid: call.callerUid,
+        type: call.type,
+        onDecline: () async {
+          if (dialogContext.mounted) Navigator.pop(dialogContext);
+          await ref.read(callControllerProvider.notifier).updateStatus(
+                callId: call.id,
+                status: CallStatus.declined,
+              );
+        },
+        onAccept: () async {
+          if (dialogContext.mounted) Navigator.pop(dialogContext);
+          await ref.read(callControllerProvider.notifier).updateStatus(
+                callId: call.id,
+                status: CallStatus.accepted,
+              );
+          if (!mounted) return;
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => ActiveCallPage(
+              callId: call.id,
+              otherUid: call.callerUid,
+              type: call.type,
+              isCaller: false,
+            ),
+          ));
+        },
       ),
     );
   }
