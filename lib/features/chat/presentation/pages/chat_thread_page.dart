@@ -654,7 +654,25 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
             );
       }
       if (toMarkDelivered.isNotEmpty) {
-        unawaited(_sound.play(ChatSoundEvent.receive));
+        // في الخاص أيضًا: نغمة مميزة للاقتباس، ثم الرد، ثم المنشن، وإلا العادية.
+        final fresh = msgs.where((m) => toMarkDelivered.contains(m.id));
+        ChatSoundEvent ev = ChatSoundEvent.receive;
+        for (final m in fresh) {
+          final md = m.metadata ?? const <String, dynamic>{};
+          final mentions = md['mention_user_ids'] is List
+              ? (md['mention_user_ids'] as List).map((e) => e.toString()).toSet()
+              : const <String>{};
+          final repliedToMe = m.replyToSenderUid == myUid;
+          if (repliedToMe && md['reply_mode']?.toString() == 'quote') {
+            ev = ChatSoundEvent.quote;
+            break;
+          } else if (repliedToMe) {
+            ev = ChatSoundEvent.reply;
+          } else if (mentions.contains(myUid) && ev == ChatSoundEvent.receive) {
+            ev = ChatSoundEvent.mention;
+          }
+        }
+        unawaited(_sound.play(ev));
       }
     });
 

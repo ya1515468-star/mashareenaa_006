@@ -226,10 +226,15 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       // منشورات بوت المحتوى صامتة: تتكرر كل بضع دقائق، ونغمة لكل منشور
       // ستزعج الأعضاء.
       if (metadata['system_event']?.toString() == 'content_bot') continue;
-      if (mentioned.contains(currentUid)) {
-        unawaited(_sound.play(ChatSoundEvent.mention, roomId: _roomId));
+      // الرد والاقتباس الموجّهان لي أولًا (الخادم يضيفني أيضًا إلى
+      // mention_user_ids عند الرد، فكان المنشن يطغى عليهما)، ثم المنشن العادي.
+      final replyMode = metadata['reply_mode']?.toString();
+      if (replyToUid == currentUid && replyMode == 'quote') {
+        unawaited(_sound.play(ChatSoundEvent.quote, roomId: _roomId));
       } else if (replyToUid == currentUid) {
         unawaited(_sound.play(ChatSoundEvent.reply, roomId: _roomId));
+      } else if (mentioned.contains(currentUid)) {
+        unawaited(_sound.play(ChatSoundEvent.mention, roomId: _roomId));
       } else if (kind == 'gift') {
         unawaited(_sound.play(ChatSoundEvent.gift, roomId: _roomId));
       } else {

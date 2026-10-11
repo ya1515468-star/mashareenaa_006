@@ -1,3 +1,4 @@
+import 'call_tones.dart';
 import 'dart:async';
 
 import '../data/supabase_document_compat.dart';
@@ -42,7 +43,6 @@ class _PresenceLifecycleObserverState
   ProviderSubscription<AsyncValue<UserEntity?>>? _authSubscription;
   Set<String> _knownNotificationIds = <String>{};
   Set<String> _knownFriendRequestIds = <String>{};
-  Set<String> _knownCallIds = <String>{};
   late final ChatSoundService _chatSound =
       ChatSoundService(Supabase.instance.client);
 
@@ -396,14 +396,29 @@ class _PresenceLifecycleObserverState
                   row['doc_id']?.toString() ?? row['id']?.toString() ?? '');
             }
           }
-          if (_knownCallIds.isEmpty) {
-            _knownCallIds = ringing;
-            return;
+          // رنين متكرّر طوال بقاء مكالمة واردة بحالة "ترنّ"، ويتوقف تلقائيًا
+          // فور تغيّر حالتها (قبول/رفض/فائتة/إنهاء المتصل). كانت نغمة واحدة
+          // قصيرة عند الوصول ثم صمت — ولم تكن تُسمع إطلاقًا إن كانت المكالمة
+          // أول ما وصل (الشرط القديم يتجاهل أول دفعة من المجرى).
+          final fresh = ringing.where((id) {
+            final row = rows.firstWhere(
+                (r) => (r['doc_id']?.toString() ?? r['id']?.toString()) == id,
+                orElse: () => const <String, dynamic>{});
+            final data = row['data'] is Map
+                ? Map<String, dynamic>.from(row['data'] as Map)
+                : const <String, dynamic>{};
+            final created =
+                DateTime.tryParse(data['createdAt']?.toString() ?? '');
+            // لا نرنّ لمكالمات قديمة معلّقة (أقدم من دقيقة) عند فتح التطبيق.
+            return created == null ||
+                DateTime.now().toUtc().difference(created.toUtc()) <
+                    const Duration(seconds: 60);
+          }).toSet();
+          if (fresh.isNotEmpty) {
+            unawaited(CallTones.instance.startRingtone());
+          } else {
+            unawaited(CallTones.instance.stopRingtone());
           }
-          if (ringing.difference(_knownCallIds).isNotEmpty) {
-            unawaited(_chatSound.play(ChatSoundEvent.call));
-          }
-          _knownCallIds = ringing;
         });
   }
 

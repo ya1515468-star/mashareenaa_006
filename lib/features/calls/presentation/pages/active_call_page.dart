@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../../core/monitoring/error_monitor.dart';
+import '../../../../core/services/call_tones.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../profile/presentation/providers/profile_provider.dart';
 import '../../../profile/presentation/widgets/profile_avatar.dart';
@@ -73,6 +74,8 @@ class _ActiveCallPageState extends ConsumerState<ActiveCallPage> {
   }
 
   Future<void> _bootstrap() async {
+    // المستقبِل ردّ: أوقف رنين المكالمة الواردة فورًا.
+    unawaited(CallTones.instance.stopRingtone());
     try {
       final permissions = await [
         Permission.microphone,
@@ -135,10 +138,15 @@ class _ActiveCallPageState extends ConsumerState<ActiveCallPage> {
             // فعليًا لأي طرف غير المالك.
             if (widget.isCaller) {
               unawaited(_beginBilling());
+              // نغمة انتظار حتى يدخل الطرف الآخر القناة.
+              if (_remoteUids.isEmpty) {
+                unawaited(CallTones.instance.startRingback());
+              }
             }
           }
         },
         onUserJoined: (_, remoteUid, __) {
+          unawaited(CallTones.instance.stopRingback());
           if (!mounted) return;
           setState(() {
             _remoteUids.add(remoteUid);
@@ -238,6 +246,7 @@ class _ActiveCallPageState extends ConsumerState<ActiveCallPage> {
           stack: st,
           screen: 'active_call',
           source: 'bootstrap_${widget.isCaller ? 'caller' : 'callee'}_${widget.type.wire}'));
+      unawaited(CallTones.instance.stopRingback());
       await _endBilling();
       try {
         await ref
@@ -283,6 +292,7 @@ class _ActiveCallPageState extends ConsumerState<ActiveCallPage> {
   }
 
   Future<void> _hangup() async {
+    unawaited(CallTones.instance.stopRingback());
     await _engine?.leaveChannel();
     await _engine?.release();
     _timer?.cancel();
@@ -295,6 +305,7 @@ class _ActiveCallPageState extends ConsumerState<ActiveCallPage> {
 
   @override
   void dispose() {
+    unawaited(CallTones.instance.stopRingback());
     _timer?.cancel();
     unawaited(_engine?.leaveChannel());
     unawaited(_engine?.release());

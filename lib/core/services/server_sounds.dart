@@ -21,6 +21,27 @@ class ServerSounds {
 
   SupabaseClient get _db => Supabase.instance.client;
 
+  static const int _poolSize = 4;
+  final List<AudioPlayer> _pool = <AudioPlayer>[];
+  int _poolNext = 0;
+
+  Future<AudioPlayer> _nextPlayer() async {
+    if (_pool.length < _poolSize) {
+      final p = AudioPlayer();
+      await p.setReleaseMode(ReleaseMode.stop);
+      _pool.add(p);
+      return p;
+    }
+    final p = _pool[_poolNext % _poolSize];
+    _poolNext++;
+    return p;
+  }
+
+  /// بايتات نغمة من الخادم (للمشغّلات الطويلة مثل رنين المكالمات).
+  Future<Uint8List?> bytesFor(String key) => _load(key);
+
+  String mimeFor(String key) => _mime[key] ?? 'audio/wav';
+
   /// يحوّل اسم حدث الدردشة القديم إلى مفتاح النغمة في الخادم.
   static String keyForEvent(String event) {
     switch (event) {
@@ -33,6 +54,8 @@ class ServerSounds {
         return 'mention';
       case 'reply':
         return 'reply';
+      case 'quote':
+        return 'quote';
       case 'friendRequest':
         return 'friend_request';
       case 'gift':
@@ -104,28 +127,16 @@ class ServerSounds {
       _lastPlayed[key] = now;
       final bytes = await _load(key);
       if (bytes == null) return false;
-      final player = AudioPlayer();
-      await player.setReleaseMode(ReleaseMode.release);
-      // كان هناك مسارا تخلّص: عند انتهاء المقطع ومؤقّت 12ث. المسار الثاني
-      // يستدعي dispose() على مشغّل تخلّص منه الأول، فيرمي أندرويد
-      // "Player has not yet been created or has already been disposed"
-      // كخطأ غير ملتقَط (أكثر خطأ متكرّر في مراقب الأخطاء: 87 مرة).
-      // كذلك onPlayerComplete.first يرمي "Bad state: No element" إن أُغلق
-      // المجرى بالتخلّص قبل أن يُصدر أي حدث. حارس واحد يمنع الاثنين.
-      var released = false;
-      Future<void> release() async {
-        if (released) return;
-        released = true;
-        try {
-          await player.dispose();
-        } catch (_) {
-          // المشغّل الأصلي اختفى مسبقًا — لا شيء يُفعل.
-        }
-      }
-      unawaited(player.onPlayerComplete.first
-          .then((_) => release())
-          .catchError((_) {}));
-      Timer(const Duration(seconds: 12), () => unawaited(release()));
+      // مجمّع مشغّلات ثابت يُعاد استعماله ولا يُتخلَّص منه أبدًا.
+      // السبب المُثبت لأكثر خطأ تكرارًا (87 مرة، fatal): تتبّع الجهاز يُظهر
+      // AudioPlayer.dispose → release → stop يرمي على أندرويد
+      // "Player has not yet been created or has already been disposed" كخطأ
+      // غير ملتقَط من داخل المكتبة نفسها — try/catch حول dispose لا يلتقطه.
+      // إنشاء مشغّل جديد والتخلّص منه لكل نغمة كان مصدره. المجمّع يلغي dispose.
+      final player = await _nextPlayer();
+      try {
+        await player.stop();
+      } catch (_) {}
       await player.play(
         BytesSource(bytes, mimeType: _mime[key] ?? 'audio/wav'),
         volume: volume,

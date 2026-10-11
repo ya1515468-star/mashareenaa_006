@@ -8,6 +8,7 @@ enum ChatSoundEvent {
   privateMessage,
   mention,
   reply,
+  quote,
   friendRequest,
   gift,
   notification,
@@ -28,16 +29,26 @@ class ChatSoundService {
     if (uid == null) return;
 
     try {
-      final raw = roomId == null
-          ? await client.rpc('get_my_chat_notification_preferences')
-          : await _loadRoomSoundPreferences(roomId);
-      final m = raw is Map
-          ? Map<String, dynamic>.from(raw)
+      // السبب المُثبت لصمت المنشن/الرد/الاقتباس في الغرف: الغرفة العامة بلا
+      // أي إعداد أصوات محفوظ (settings.notification_sounds = null)، وكان
+      // غياب الإعداد يُعامَل كـ"صامت" فتسكت كل نغمات الغرفة. الآن إعداد الغرفة
+      // يُطبَّق فقط إن ضبطه المالك صراحةً؛ وإلا تُستخدم إعدادات المستخدم
+      // ونغمات الخادم الافتراضية. القيمة 'none' وحدها تعني الصمت.
+      final personalRaw =
+          await client.rpc('get_my_chat_notification_preferences');
+      final personal = personalRaw is Map
+          ? Map<String, dynamic>.from(personalRaw)
           : const <String, dynamic>{};
+      if (personal['master_chat_sound'] == false) return;
+      Map<String, dynamic> roomPrefs = const <String, dynamic>{};
+      if (roomId != null) {
+        try {
+          roomPrefs = await _loadRoomSoundPreferences(roomId);
+        } catch (_) {}
+      }
+      final m = personal;
 
-      if (roomId == null && m['master_chat_sound'] == false) return;
-
-      if (roomId == null && event != ChatSoundEvent.call && event != ChatSoundEvent.warning) {
+      if (event != ChatSoundEvent.call && event != ChatSoundEvent.warning) {
         final smartRaw = await client.rpc('get_profile_service_runtime', params: {'p_feature_key': 'chat_smart_mute'});
         if (smartRaw is Map && smartRaw['enabled'] == true) {
           final settings = smartRaw['settings'];
@@ -56,6 +67,7 @@ class ChatSoundService {
         ChatSoundEvent.receive => 'privateMessage',
         ChatSoundEvent.mention => 'mention',
         ChatSoundEvent.reply => 'reply',
+        ChatSoundEvent.quote => 'quote',
         ChatSoundEvent.friendRequest => 'friendRequest',
         ChatSoundEvent.gift => 'gift',
         ChatSoundEvent.notification => 'notification',
@@ -65,12 +77,8 @@ class ChatSoundService {
         ChatSoundEvent.block => 'notification',
       };
 
-      if (roomId != null) {
-        final roomSound = m[roomKey]?.toString();
-        if (roomSound == null || roomSound == 'none') return;
-        await playChatSound(roomSound);
-        return;
-      }
+      final roomSound = roomPrefs[roomKey]?.toString();
+      if (roomSound == 'none') return;
 
       final personalKey = switch (event) {
         ChatSoundEvent.publicMessage => 'public_message_sound',
@@ -79,6 +87,7 @@ class ChatSoundService {
         ChatSoundEvent.receive => 'private_message_sound',
         ChatSoundEvent.mention => 'mention_sound',
         ChatSoundEvent.reply => 'reply_sound',
+        ChatSoundEvent.quote => 'reply_sound',
         ChatSoundEvent.friendRequest ||
         ChatSoundEvent.gift ||
         ChatSoundEvent.notification ||
@@ -89,6 +98,10 @@ class ChatSoundService {
         ChatSoundEvent.call => 'calls_sound',
       };
       if (m[personalKey] == false) return;
+      if (roomSound != null && roomSound.isNotEmpty) {
+        await playChatSound(roomSound);
+        return;
+      }
       await playChatSound(event.name);
     } catch (_) {
       // Sound is non-critical and must never break chat functionality.

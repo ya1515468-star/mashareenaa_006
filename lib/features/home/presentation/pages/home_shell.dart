@@ -8,6 +8,7 @@ import '../../../calls/domain/entities/call_entity.dart';
 import '../../../calls/presentation/pages/active_call_page.dart';
 import '../../../calls/presentation/providers/call_provider.dart';
 import '../../../calls/presentation/widgets/incoming_call_card.dart';
+import '../../../../core/services/call_tones.dart';
 import '../../../../core/widgets/sewing_machine_splash.dart';
 import 'home_dashboard_page.dart';
 import '../../../chat/presentation/pages/chat_lobby_page.dart';
@@ -331,6 +332,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         callerUid: call.callerUid,
         type: call.type,
         onDecline: () async {
+          unawaited(CallTones.instance.stopRingtone());
           if (dialogContext.mounted) Navigator.pop(dialogContext);
           await ref.read(callControllerProvider.notifier).updateStatus(
                 callId: call.id,
@@ -338,6 +340,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               );
         },
         onAccept: () async {
+          unawaited(CallTones.instance.stopRingtone());
           if (dialogContext.mounted) Navigator.pop(dialogContext);
           await ref.read(callControllerProvider.notifier).updateStatus(
                 callId: call.id,
