@@ -24,7 +24,8 @@ class PinLockGate extends StatefulWidget {
   State<PinLockGate> createState() => _PinLockGateState();
 }
 
-class _PinLockGateState extends State<PinLockGate> {
+class _PinLockGateState extends State<PinLockGate> with WidgetsBindingObserver {
+  DateTime? _pausedAt;
   final _localSession = LocalSessionService();
   bool _checked = false;
   bool _locked = false;
@@ -33,7 +34,32 @@ class _PinLockGateState extends State<PinLockGate> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkLock();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// يُعاد القفل كلما عاد التطبيق من الخلفية بعد أكثر من 15 ثانية (مهلة قصيرة
+  /// حتى لا يُقفل أثناء اختيار ملف أو منح صلاحية).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _pausedAt = DateTime.now();
+    } else if (state == AppLifecycleState.resumed) {
+      final at = _pausedAt;
+      _pausedAt = null;
+      if (at != null &&
+          _locked &&
+          _unlocked &&
+          DateTime.now().difference(at) > const Duration(seconds: 15)) {
+        setState(() => _unlocked = false);
+      }
+    }
   }
 
   Future<void> _checkLock() async {

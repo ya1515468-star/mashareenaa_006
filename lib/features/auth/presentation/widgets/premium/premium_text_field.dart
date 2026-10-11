@@ -43,6 +43,7 @@ class _PremiumTextFieldState extends State<PremiumTextField> {
   final _focusNode = FocusNode();
   _FieldValidity _validity = _FieldValidity.neutral;
   bool _focused = false;
+  late bool _obscured = widget.obscureText;
 
   @override
   void initState() {
@@ -83,6 +84,17 @@ class _PremiumTextFieldState extends State<PremiumTextField> {
   Widget build(BuildContext context) {
     final p = context.palette;
     Widget? trailing = widget.suffixWidget;
+    if (trailing == null && widget.obscureText) {
+      trailing = GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => setState(() => _obscured = !_obscured),
+        child: Icon(
+          _obscured ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+          color: p.textMuted,
+          size: 22,
+        ),
+      );
+    }
     if (trailing == null && _validity != _FieldValidity.neutral) {
       trailing = AnimatedSwitcher(
         duration: const Duration(milliseconds: 200),
@@ -116,7 +128,7 @@ class _PremiumTextFieldState extends State<PremiumTextField> {
       child: TextFormField(
         controller: widget.controller,
         focusNode: _focusNode,
-        obscureText: widget.obscureText,
+        obscureText: _obscured,
         keyboardType: widget.keyboardType,
         textAlign: TextAlign.right,
         readOnly: widget.readOnly,

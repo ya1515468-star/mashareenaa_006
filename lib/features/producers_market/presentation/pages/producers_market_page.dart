@@ -613,24 +613,6 @@ class _ReelInfoOverlay extends StatelessWidget {
             ],
           ),
         ),
-        // الفئة
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          margin: const EdgeInsets.only(bottom: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFD700).withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-                color: const Color(0xFFFFD700).withValues(alpha: 0.4)),
-          ),
-          child: Text(
-            _categoryLabel(reel.category),
-            style: const TextStyle(
-                color: Color(0xFFFFD700),
-                fontSize: 11,
-                fontWeight: FontWeight.w600),
-          ),
-        ),
         // العنوان
         Text(
           reel.title,
