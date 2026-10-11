@@ -25,7 +25,6 @@ class PinLockGate extends StatefulWidget {
 }
 
 class _PinLockGateState extends State<PinLockGate> with WidgetsBindingObserver {
-  DateTime? _pausedAt;
   final _localSession = LocalSessionService();
   bool _checked = false;
   bool _locked = false;
@@ -44,19 +43,26 @@ class _PinLockGateState extends State<PinLockGate> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  /// يُعاد القفل كلما عاد التطبيق من الخلفية بعد أكثر من 15 ثانية (مهلة قصيرة
-  /// حتى لا يُقفل أثناء اختيار ملف أو منح صلاحية).
+  /// البند 6: القفل يعمل مع **كل** عودة للتطبيق، لا بعد 15 ثانية فقط.
+  /// المهلة القديمة كانت تعني أن إغلاق التطبيق وفتحه فورًا يتجاوز الـPIN
+  /// تمامًا — وهو نقض لمعنى القفل.
+  ///
+  /// الاستثناء الوحيد هو مسار داخلي في التطبيق نفسه يُغيّب الواجهة بلا أن
+  /// يخرج المستخدم فعلًا (منتقي ملفات، منتقي صور، طلب صلاحية، كاميرا):
+  /// يُعلِن عن نفسه بـ[suppressNextLock] فلا يُطلب الـPIN عند رجوعه.
+  static bool _suppressOnce = false;
+
+  /// يُنادى قبل فتح منتقي ملفات/صور أو طلب صلاحية من داخل التطبيق.
+  static void suppressNextLock() => _suppressOnce = true;
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
-      _pausedAt = DateTime.now();
-    } else if (state == AppLifecycleState.resumed) {
-      final at = _pausedAt;
-      _pausedAt = null;
-      if (at != null &&
-          _locked &&
-          _unlocked &&
-          DateTime.now().difference(at) > const Duration(seconds: 15)) {
+    if (state == AppLifecycleState.resumed) {
+      if (_suppressOnce) {
+        _suppressOnce = false;
+        return;
+      }
+      if (_locked && _unlocked) {
         setState(() => _unlocked = false);
       }
     }

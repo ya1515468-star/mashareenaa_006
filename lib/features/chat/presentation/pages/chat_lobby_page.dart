@@ -558,13 +558,29 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       throw const FormatException('EMPTY_MESSAGE');
     }
     final requestId = const Uuid().v4();
+    // البند 10: الاقتباس يجعل صاحب الرسالة المقتبسة مَنشونًا فعليًا — اسمه
+    // يظهر كمنشن ويصله تنبيه صوتي. منطق الاستقبال الموجود أصلًا يشغّل نغمة
+    // المنشن حين يجد معرّف القارئ في mention_user_ids، فإضافته هنا تكفي
+    // ولا تحتاج أي تغيير في الخادم ولا في مسار الاستقبال.
+    final mentionIds = _mentionUserIds.values.toSet();
+    final mentionNames = _mentionUserNames.toSet();
+    final quoting = replyMode.contains('quote');
+    if (quoting && replyToSenderUid != null && replyToSenderUid.isNotEmpty) {
+      // لا يُمنشَن المرء نفسه فلا تصله نغمة على اقتباسه الخاص.
+      if (replyToSenderUid != user.id) {
+        mentionIds.add(replyToSenderUid);
+        final quotedName = _replyingTo?['display_name']?.toString().trim();
+        if (quotedName != null && quotedName.isNotEmpty) {
+          mentionNames.add(quotedName);
+        }
+      }
+    }
     final metadata = <String, dynamic>{
       'reply_mode': replyMode,
-      'mention_user_ids': _mentionUserIds.values.toSet().toList(),
-      'mention_user_names': _mentionUserNames.toList(),
+      'mention_user_ids': mentionIds.toList(),
+      'mention_user_names': mentionNames.toList(),
       'request_id': requestId,
-      if (replyToId != null && replyMode.contains('quote'))
-        'quoted_message_id': replyToId,
+      if (replyToId != null && quoting) 'quoted_message_id': replyToId,
       if (gifUrls != null && gifUrls.length > 1) 'gif_urls': gifUrls,
     };
     await _db.rpc('send_public_chat_message_v2', params: {

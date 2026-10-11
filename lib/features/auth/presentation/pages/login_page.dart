@@ -110,15 +110,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.isLoading;
     final variantAsync = ref.watch(loginVisualVariantProvider);
-    // كان يُعرض طراز افتراضي (atelier) أثناء الانتظار القصير، ثم يتبدّل
-    // فجأة إلى الطراز الحقيقي الذي يختاره الخادم بمجرد وصوله — وبما أن
-    // الطرز الثلاثة تختلف فعليًا في خيارات ظاهرة (مثل ظهور زر Apple)، كان
-    // هذا التبديل يُرى كوميض حقيقي: يظهر الزر ثم يختفي أو العكس. عرض حالة
-    // تحميل نظيفة بدل الافتراض التفاؤلي يمنع هذا التناقض المرئي كليًا.
-    if (!variantAsync.hasValue) {
-      return const Scaffold(body: SewingMachineSplash());
-    }
-    final variant = variantAsync.value!;
+    // البند 6 (توحيد شاشة الدخول): الخادم صار يُرجع طرازًا واحدًا ثابتًا
+    // (get_login_visual_variant ترجع 'royal' دائمًا)، فلم يبقَ أي تبديل
+    // مرئي يُخشى منه — وشاشة التحميل التي كانت تسبق الدخول صارت شاشة
+    // زائدة بلا داعٍ تُرى كأنها شاشة ثانية في كل مرة. الطراز الثابت
+    // يُعرض فورًا، وقيمة الخادم تُستعمل إن وصلت.
+    final variant = variantAsync.value ?? LoginVisualVariant.royal;
     final style = loginVariantStyles[variant]!;
     final rememberMe = _rememberMeOverride ?? style.defaultRememberMe;
 
