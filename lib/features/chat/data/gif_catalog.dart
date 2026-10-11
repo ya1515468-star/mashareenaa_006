@@ -42,6 +42,12 @@ bool isMashareenaBannerGif(String path) => path.contains('/gif_banners/');
 const List<String> mashareenaChatGifCatalog = [
   // أول سمايل من اليمين.
   'assets/chat/kolobok/stickers/owner_smoke.gif',
+  // السطر الأول: سمايلات أضافها المالك.
+  'assets/chat/gif_first/smile_wink.gif',
+  'assets/chat/gif_first/arrow_left_green.gif',
+  'assets/chat/gif_first/ahlan_wsahlan.gif',
+  'assets/chat/gif_first/note_small.gif',
+  'assets/chat/gif_first/note_pair.gif',
   ...mashareenaChatExtraGifs,
   'assets/chat/kolobok/stickers/kolobok_001.gif',
   'assets/chat/kolobok/stickers/kolobok_002.gif',

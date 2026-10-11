@@ -154,6 +154,7 @@ flutter:
     - assets/chat/kolobok/
     - assets/chat/kolobok/stickers/
     - assets/chat/gif_extra/
+    - assets/chat/gif_first/
     - assets/chat/gif_banners/
     - assets/chat/welcome/
     - assets/fonts/decorative/
