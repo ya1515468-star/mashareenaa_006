@@ -190,6 +190,16 @@ class _GlobalMiniPlayerState extends ConsumerState<GlobalMiniPlayer> {
                       aspectRatio: minimized ? 1 : width / videoHeight,
                     ),
                   ),
+                  // أزرار تحكم أصلية خارج الـWebView (إيقاف/تقديم/تأخير/صوت)؛
+                  // Offstage عند التصغير لتبقى الشجرة ثابتة ولا يُتلف الـiframe.
+                  Offstage(
+                    offstage: minimized,
+                    child: Container(
+                      color: const Color(0xFF14101F),
+                      width: double.infinity,
+                      child: YoutubeControlBar(controller: controller),
+                    ),
+                  ),
                 ]),
               ),
             ),

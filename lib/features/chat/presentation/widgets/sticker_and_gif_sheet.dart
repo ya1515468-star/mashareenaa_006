@@ -10,18 +10,26 @@ import 'emoji_picker_sheet.dart';
 class StickerAndGifSheet extends StatelessWidget {
   final ValueChanged<String> onEmojiSelected;
   final ValueChanged<String> onGifSelected;
+  /// true = تبقى اللوحة مفتوحة بعد كل GIF لاختيار أكثر من واحد، مع عدّاد
+  /// وزر "تم". false = السلوك القديم (إغلاق بعد أول اختيار).
+  final bool multiGif;
+  final ValueNotifier<int>? gifCount;
 
   const StickerAndGifSheet({
     super.key,
     required this.onEmojiSelected,
     required this.onGifSelected,
+    this.multiGif = false,
+    this.gifCount,
   });
 
   static Future<void> show(
     BuildContext context, {
     required ValueChanged<String> onEmojiSelected,
     required ValueChanged<String> onGifSelected,
+    bool multiGif = false,
   }) {
+    final count = ValueNotifier<int>(0);
     return showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF171126),
@@ -32,9 +40,11 @@ class StickerAndGifSheet extends StatelessWidget {
         child: StickerAndGifSheet(
           onEmojiSelected: onEmojiSelected,
           onGifSelected: onGifSelected,
+          multiGif: multiGif,
+          gifCount: count,
         ),
       ),
-    );
+    ).whenComplete(count.dispose);
   }
 
   @override
@@ -55,11 +65,33 @@ class StickerAndGifSheet extends StatelessWidget {
                 Tab(icon: Icon(Icons.gif_box_outlined), text: 'GIF'),
               ],
             ),
+            if (multiGif && gifCount != null)
+              ValueListenableBuilder<int>(
+                valueListenable: gifCount!,
+                builder: (ctx, n, _) => n == 0
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                        child: Row(children: [
+                          Text('تم اختيار $n — اضغط للمزيد أو "تم"',
+                              style: const TextStyle(
+                                  color: Color(0xFFFFD700), fontSize: 12)),
+                          const Spacer(),
+                          FilledButton(
+                            onPressed: () => Navigator.of(ctx).pop(),
+                            child: const Text('تم'),
+                          ),
+                        ]),
+                      ),
+              ),
             Expanded(
               child: TabBarView(
                 children: [
                   EmojiPickerContent(onSelect: onEmojiSelected),
-                  _GifTabContent(onSelected: onGifSelected),
+                  _GifTabContent(
+                      onSelected: onGifSelected,
+                      keepOpen: multiGif,
+                      counter: gifCount),
                 ],
               ),
             ),
@@ -72,7 +104,10 @@ class StickerAndGifSheet extends StatelessWidget {
 
 class _GifTabContent extends StatelessWidget {
   final ValueChanged<String> onSelected;
-  const _GifTabContent({required this.onSelected});
+  final bool keepOpen;
+  final ValueNotifier<int>? counter;
+  const _GifTabContent(
+      {required this.onSelected, this.keepOpen = false, this.counter});
 
   Widget _tile(BuildContext context, String path, {required bool wide}) {
     return Tooltip(
@@ -83,8 +118,13 @@ class _GifTabContent extends StatelessWidget {
       child: GestureDetector(
         // يُغلق الورقة بسياقه الخاص (سليل حقيقي للورقة دائمًا وقت الضغط).
         onTap: () {
-          Navigator.of(context).pop();
-          onSelected(path);
+          if (keepOpen) {
+            onSelected(path);
+            if (counter != null) counter!.value++;
+          } else {
+            Navigator.of(context).pop();
+            onSelected(path);
+          }
         },
         child: ClipRRect(
           borderRadius: BorderRadius.circular(wide ? 8 : 6),

@@ -636,7 +636,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     if (_sending) return;
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF171126),
+      backgroundColor: const Color(0xFF15141A),
       showDragHandle: true,
       builder: (sheetContext) => SafeArea(
         child: Wrap(
@@ -686,7 +686,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF171126),
+      backgroundColor: const Color(0xFF15141A),
       showDragHandle: true,
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setState) => Padding(
@@ -745,7 +745,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   Future<void> _openGamesPanel() async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF171126),
+      backgroundColor: const Color(0xFF15141A),
       showDragHandle: true,
       builder: (sheetContext) => SafeArea(
         child: Padding(
@@ -1137,6 +1137,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   Future<void> _showStickerAndGifPicker() async {
     await StickerAndGifSheet.show(
       context,
+      multiGif: true,
       onEmojiSelected: (emoji) {
         final selection = _controller.selection;
         final text = _controller.text;
@@ -1346,7 +1347,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     final body = (row['body'] ?? row['message'])?.toString() ?? '';
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF171126),
+      backgroundColor: const Color(0xFF15141A),
       showDragHandle: true,
       builder: (sheetContext) => SafeArea(
         child: Wrap(
@@ -1880,7 +1881,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       behavior: HitTestBehavior.translucent,
       onPointerDown: (_) => _unlockRoomAudio(),
       child: Scaffold(
-      backgroundColor: const Color(0xFF0C0714),
+      backgroundColor: const Color(0xFF0A0A0C),
       // The private conversation floats ABOVE the room in a Stack, so the
       // public chat stays visible and usable underneath instead of being
       // covered by a full-screen page.
@@ -2396,7 +2397,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     };
     final selected = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: const Color(0xFF171126),
+      backgroundColor: const Color(0xFF15141A),
       showDragHandle: true,
       builder: (sheetContext) => SafeArea(
         child: Wrap(
@@ -2536,7 +2537,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
           return StatefulBuilder(
             builder: (context, setDialogState) {
               return AlertDialog(
-                backgroundColor: const Color(0xFF171126),
+                backgroundColor: const Color(0xFF15141A),
                 title: const Text('إنشاء غرفة جديدة',
                     style: TextStyle(
                         color: Colors.white, fontWeight: FontWeight.w900)),
@@ -2552,7 +2553,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                           labelText: 'اسم الغرفة *',
                           labelStyle: const TextStyle(color: Colors.white70),
                           filled: true,
-                          fillColor: const Color(0xFF241832),
+                          fillColor: const Color(0xFF1E1C24),
                           border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
                               borderSide: BorderSide.none),
@@ -2567,7 +2568,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                           labelText: 'وصف الغرفة',
                           labelStyle: const TextStyle(color: Colors.white70),
                           filled: true,
-                          fillColor: const Color(0xFF241832),
+                          fillColor: const Color(0xFF1E1C24),
                           border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
                               borderSide: BorderSide.none),
@@ -2666,7 +2667,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                   maxHeight: MediaQuery.of(dialogContext).size.height * .82,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF171126),
+                  color: const Color(0xFF15141A),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: const Color(0x663E1B50)),
                   boxShadow: const [
@@ -2718,7 +2719,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                       Container(
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                              colors: [Color(0xFF7E0BB8), Color(0xFFB04CE4)]),
+                              colors: [Color(0xFF8A6D1C), Color(0xFFB04CE4)]),
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: ListTile(
@@ -3135,7 +3136,7 @@ class _TopBar extends ConsumerWidget {
           gradient: LinearGradient(
             begin: Alignment.centerRight,
             end: Alignment.centerLeft,
-            colors: [Color(0xFF4E0B78), Color(0xFF7E0BB8), Color(0xFF321042)],
+            colors: [Color(0xFF3A2C0A), Color(0xFF8A6D1C), Color(0xFF2A1F06)],
           ),
         ),
         child: Directionality(
@@ -4580,7 +4581,7 @@ class _VideoStyleBottomBar extends StatelessWidget {
         height: 64,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF7E0BB8), Color(0xFF4E0B78)],
+            colors: [Color(0xFF8A6D1C), Color(0xFF3A2C0A)],
           ),
         ),
         child: SingleChildScrollView(
@@ -4798,7 +4799,7 @@ class _PendingBar extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      color: const Color(0xFF241733),
+      color: const Color(0xFF1E1C24),
       child: Row(children: [
         Icon(icon, color: const Color(0xFFC187FF), size: 18),
         const SizedBox(width: 8),
@@ -4827,9 +4828,9 @@ class _PendingGifBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      height: 52,
+      height: 58,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      color: const Color(0xFF241733),
+      color: const Color(0xFF1E1C24),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: gifs.length,
@@ -4838,8 +4839,8 @@ class _PendingGifBar extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             SizedBox(
-              width: 42,
-              height: 42,
+              width: 48,
+              height: 48,
               child: gifs[i].startsWith('http')
                   ? Image.network(gifs[i], fit: BoxFit.contain, gaplessPlayback: true)
                   : Image.asset(gifs[i], fit: BoxFit.contain, gaplessPlayback: true),

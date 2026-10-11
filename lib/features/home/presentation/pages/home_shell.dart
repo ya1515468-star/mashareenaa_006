@@ -379,7 +379,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         currentIndex: _index.clamp(0, _navItems.length - 1),
         onTap: (i) => setState(() => _index = i),
         type: BottomNavigationBarType.fixed,
-        backgroundColor: const Color(0xFF0C0714),
+        backgroundColor: const Color(0xFF0A0A0C),
         selectedItemColor: const Color(0xFFFFD700),
         unselectedItemColor: Colors.white38,
         selectedLabelStyle: const TextStyle(

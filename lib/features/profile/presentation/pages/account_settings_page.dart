@@ -1,3 +1,5 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../rbac/presentation/widgets/server_user_identity_badges.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'dart:ui' as ui;
@@ -194,7 +196,11 @@ class AccountSettingsContent extends ConsumerWidget {
             messageFontFamily: value,
           );
           if (ok && context.mounted) {
+            // الخط الخادمي له الأولوية في الشات؛ اختيار خط محلي يلغيه.
+            try { await Supabase.instance.client.rpc('set_my_message_font', params: {'p_font_key': null}); } catch (_) {}
             ref.invalidate(currentProfileProvider);
+            ref.invalidate(serverUserIdentityProvider);
+            ref.invalidate(serverUserIdentityInRoomProvider);
             ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم تطبيق خط الرسائل فورًا')));
           }
         },

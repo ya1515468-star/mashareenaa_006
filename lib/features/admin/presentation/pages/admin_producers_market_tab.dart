@@ -159,16 +159,31 @@ class _ReelAdminCardState extends State<_ReelAdminCard> {
       // owner_moderate_reel حُذفت من الخادم عند تنظيف ازدواج الريلز؛
       // owner_update_reel هي المسار الحيّ الوحيد الآن. 'approve' هنا
       // يعني نشرًا وموافقة معًا، و'reject'/'block' يعني حجبًا مع سبب.
-      final patch = <String, dynamic>{
-        if (action == 'approve') ...{'is_published': true, 'is_approved': true},
-        if (action == 'reject' || action == 'block')
-          ...{'is_blocked': true, 'owner_note': note ?? ''},
-        if (action == 'unblock') 'is_blocked': false,
-      };
-      await Supabase.instance.client.rpc('owner_update_reel', params: {
-        'p_reel_id': widget.reel['id'],
-        'p_patch': patch,
-      });
+      if (action == 'delete') {
+        await Supabase.instance.client.rpc('owner_delete_reel', params: {
+          'p_reel_id': widget.reel['id'],
+          'p_reason': note ?? 'حذف من المالك',
+        });
+      } else {
+        final patch = <String, dynamic>{
+          if (action == 'approve') ...{'is_published': true, 'is_approved': true},
+          if (action == 'reject' || action == 'block')
+            ...{'is_blocked': true, 'owner_note': note ?? ''},
+          if (action == 'unblock') 'is_blocked': false,
+          if (action == 'feature') 'is_featured': true,
+          if (action == 'unfeature') 'is_featured': false,
+        };
+        await Supabase.instance.client.rpc('owner_update_reel', params: {
+          'p_reel_id': widget.reel['id'],
+          'p_patch': patch,
+        });
+      }
+      // القوائم مبنية على stream قد لا يُسقط الصف المحذوف فورًا: أعد التحميل.
+      try {
+        final c = ProviderScope.containerOf(context, listen: false);
+        c.invalidate(_pendingReelsProvider);
+        c.invalidate(_allReelsProvider);
+      } catch (_) {}
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(

@@ -2767,13 +2767,13 @@ class _RoleColorTabState extends State<_RoleColorTab> {
 
 
 /// اختيار خط الرسائل من خطوط عربية محفوظة في الخادم (جدول server_fonts).
-class _ServerFontPicker extends StatefulWidget {
+class _ServerFontPicker extends ConsumerStatefulWidget {
   const _ServerFontPicker();
   @override
-  State<_ServerFontPicker> createState() => _ServerFontPickerState();
+  ConsumerState<_ServerFontPicker> createState() => _ServerFontPickerState();
 }
 
-class _ServerFontPickerState extends State<_ServerFontPicker> {
+class _ServerFontPickerState extends ConsumerState<_ServerFontPicker> {
   List<Map<String, dynamic>> _fonts = [];
   String? _current;
   bool _loading = true;
@@ -2811,6 +2811,11 @@ class _ServerFontPickerState extends State<_ServerFontPicker> {
     setState(() => _busyKey = key ?? '');
     try {
       await Supabase.instance.client.rpc('set_my_message_font', params: {'p_font_key': key});
+      if (key != null) unawaited(ServerFonts.ensure(key));
+      // الهوية مخزَّنة مؤقتًا: بدون إبطال لا يصل الخط الجديد إلى فقاعات الرسائل.
+      ref.invalidate(serverUserIdentityProvider);
+      ref.invalidate(serverUserIdentityInRoomProvider);
+      ref.invalidate(currentProfileProvider);
       if (mounted) setState(() => _current = key);
     } catch (_) {
       if (mounted) {

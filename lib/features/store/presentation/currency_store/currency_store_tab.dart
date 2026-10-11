@@ -160,7 +160,12 @@ class _PackagesGrid extends ConsumerWidget {
                 if (isOwner) ...[
                   const SizedBox(height: 12),
                   TextButton(
-                    onPressed: () {},
+                    onPressed: () => showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => const _PackageEditorSheet(),
+                    ),
                     child: const Text('+ أضف باقة',
                         style: TextStyle(color: Color(0xFFFFD700))),
                   ),
@@ -178,10 +183,14 @@ class _PackagesGrid extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
             if (featured.isNotEmpty) ...[
-              ...featured.map((p) => _FeaturedPackageCard(
+              ...featured.map((p) => _OwnerEditOverlay(
+                    enabled: isOwner,
                     package: p,
-                    type: type,
-                    isOwner: isOwner,
+                    child: _FeaturedPackageCard(
+                      package: p,
+                      type: type,
+                      isOwner: isOwner,
+                    ),
                   )),
               const SizedBox(height: 8),
             ],
@@ -195,10 +204,14 @@ class _PackagesGrid extends ConsumerWidget {
                 childAspectRatio: 0.85,
               ),
               itemCount: regular.length,
-              itemBuilder: (_, i) => _PackageCard(
+              itemBuilder: (_, i) => _OwnerEditOverlay(
+                enabled: isOwner,
                 package: regular[i],
-                type: type,
-                isOwner: isOwner,
+                child: _PackageCard(
+                  package: regular[i],
+                  type: type,
+                  isOwner: isOwner,
+                ),
               ),
             ),
           ],
@@ -210,6 +223,45 @@ class _PackagesGrid extends ConsumerWidget {
       error: (e, _) =>
           Center(child: Text('خطأ: $e', style: const TextStyle(color: Colors.red))),
     );
+  }
+}
+
+/// زر "تعديل" ظاهر للمالك فوق كل باقة (كان التعديل بالضغط المطوّل فقط
+/// فلا يكتشفه أحد): يفتح محرر الباقة (الاسم، الكمية، المكافأة، السعر…).
+class _OwnerEditOverlay extends StatelessWidget {
+  final bool enabled;
+  final Map<String, dynamic> package;
+  final Widget child;
+  const _OwnerEditOverlay(
+      {required this.enabled, required this.package, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) return child;
+    return Stack(children: [
+      Positioned.fill(child: child),
+      PositionedDirectional(
+        top: 4,
+        end: 4,
+        child: Material(
+          color: Colors.black87,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: () => showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => _PackageEditorSheet(existing: package),
+            ),
+            child: const Padding(
+              padding: EdgeInsets.all(7),
+              child: Icon(Icons.edit_rounded, size: 16, color: Color(0xFFFFD700)),
+            ),
+          ),
+        ),
+      ),
+    ]);
   }
 }
 

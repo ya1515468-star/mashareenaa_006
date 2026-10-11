@@ -953,7 +953,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
       final saved = await showModalBottomSheet<bool>(
         context: context,
         isScrollControlled: true,
-        backgroundColor: const Color(0xFF171126),
+        backgroundColor: const Color(0xFF15141A),
         builder: (sheetContext) => StatefulBuilder(
           builder: (sheetContext, setSheetState) {
             final image = imageUrl;
@@ -1601,7 +1601,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
         controls['is_room_owner'] == true;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0C0714),
+      backgroundColor: const Color(0xFF0A0A0C),
       appBar: AppBar(
         backgroundColor: const Color(0xFF5A1185),
         foregroundColor: Colors.white,
@@ -1615,7 +1615,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
               padding: const EdgeInsets.all(12),
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF241733),
+                color: const Color(0xFF1E1C24),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(
@@ -1637,7 +1637,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
               padding: const EdgeInsets.all(12),
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF241733),
+                color: const Color(0xFF1E1C24),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(_message!, style: const TextStyle(color: Colors.white70)),
