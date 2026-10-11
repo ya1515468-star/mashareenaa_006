@@ -3327,6 +3327,43 @@ class _ChatMessageRow extends ConsumerWidget {
     final url = row['attachment_url']?.toString() ?? '';
 
     if (type == 'gif') {
+      // البند 4: رسالة واحدة قد تحمل عدّة سمايلات في metadata.gif_urls.
+      // كان هذا الموضع يقرأ attachment_url وحده (أي أول سمايل فقط)، فتُرسَل
+      // الثلاثة في فقاعة واحدة ولا يظهر منها إلا واحد — وهذا ما كان ناقصًا
+      // في الغرف بعد إصلاح الإرسال.
+      final metaGifs = () {
+        final raw = row['metadata'] is Map
+            ? (row['metadata'] as Map)['gif_urls']
+            : null;
+        if (raw is! List) return const <String>[];
+        final list = raw
+            .map((e) => e.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toList(growable: false);
+        return list.length > 1 ? list : const <String>[];
+      }();
+      if (metaGifs.isNotEmpty) {
+        return Wrap(
+          alignment: WrapAlignment.end,
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final u in metaGifs)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onGifTap == null ? null : () => onGifTap!(u),
+                child: SizedBox(
+                  width: isMashareenaBannerGif(u) ? 150.0 : 25.0,
+                  height: isMashareenaBannerGif(u) ? 47.0 : 25.0,
+                  child: u.startsWith('assets/')
+                      ? Image.asset(u, fit: BoxFit.contain)
+                      : Image.network(u,
+                          fit: BoxFit.contain, gaplessPlayback: true),
+                ),
+              ),
+          ],
+        );
+      }
       final banner = isMashareenaBannerGif(url);
       final gifW = banner ? 150.0 : 25.0;
       final gifH = banner ? 47.0 : 25.0;

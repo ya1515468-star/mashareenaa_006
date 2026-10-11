@@ -8,6 +8,8 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../rbac/presentation/widgets/server_chat_inline_message.dart';
 import '../../domain/entities/chat_message_entity.dart';
 import 'emoji_picker_sheet.dart';
+import '../../../../core/services/server_fonts.dart';
+import '../../../../core/services/server_font_for_user.dart';
 import 'chat_media_content.dart';
 import '../../../../core/widgets/embedded_media_player.dart';
 import '../../../../core/widgets/dynamic_avatar_frame.dart';
@@ -235,7 +237,16 @@ class MessageBubble extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context, WidgetRef ref) =>
+      // الخط الخادمي يُنزَّل بعد أول بناء وترتفع ServerFonts.revision عند
+      // جهوزيته؛ بلا هذا المستمع تبقى الفقاعة بالخط الاحتياطي ولا تُعاد
+      // بناءً أبدًا، فلا يظهر الخط مهما نُزِّل بنجاح.
+      ValueListenableBuilder<int>(
+        valueListenable: ServerFonts.revision,
+        builder: (context, _, __) => _buildContent(context, ref),
+      );
+
+  Widget _buildContent(BuildContext context, WidgetRef ref) {
     final p = context.palette;
     // profiles.message_color defaults to 0xFFFFFFFF (opaque white) for anyone
     // who hasn't picked a store message color — treat that sentinel as "no
@@ -261,6 +272,9 @@ class MessageBubble extends ConsumerWidget {
     final linkPreviewEnabled = (vip['chat_link_preview_plus'] as Map?)?['enabled'] == true;
     final mediaPlusEnabled = (vip['chat_media_plus'] as Map?)?['enabled'] == true;
 
+    // الخط الخادمي يُنزَّل بعد أول بناء، وServerFonts.revision ترتفع عند
+    // جهوزيته. بلا الاستماع إليها تبقى الفقاعة مرسومة بالخط الاحتياطي ولا
+    // تُعاد البناء أبدًا — فلا يظهر الخط إطلاقًا مهما نُزِّل بنجاح.
     final bubble = GestureDetector(
       onLongPress: deletedForEveryone ? null : () => _showActions(context),
       child: Align(
@@ -430,7 +444,25 @@ class MessageBubble extends ConsumerWidget {
                             isMine ? p.surfaceHighlight : p.accent),
                         frameColor: mentionFrameColor,
                         showMentionBadge: _currentUserIsMentioned(message),
-                        fontFamily: localArabicFontFamily(isMine ? ref.watch(currentProfileProvider).valueOrNull?.messageFontFamily : 'system_default'),
+                        // الخطوط العربية محفوظة في الخادم لا في المشروع،
+                        // ومفاتيحها (cairo, rakkas…) لا يعرفها الكتالوج
+                        // المحلي فكان يُرجع null دائمًا. وكان الخط يُطبَّق
+                        // على رسائلي وحدها (`isMine ? … : 'system_default'`)
+                        // فخطّ الطرف الآخر لا يظهر أبدًا. الآن: مفتاح
+                        // الخادم لمرسِل هذه الرسالة تحديدًا، مع احتياطي
+                        // محلي ريثما يُنزَّل الخط.
+                        fontFamily: loadedServerFontFamily(
+                              ref
+                                  .watch(serverMessageFontKeyProvider(
+                                      message.senderUid))
+                                  .valueOrNull,
+                            ) ??
+                            localArabicFontFamily(isMine
+                                ? ref
+                                    .watch(currentProfileProvider)
+                                    .valueOrNull
+                                    ?.messageFontFamily
+                                : 'system_default'),
                         mentionNames: (message.metadata?['mention_user_names'] is List)
                             ? (message.metadata!['mention_user_names'] as List<dynamic>)
                                 .map((e) => e.toString())
