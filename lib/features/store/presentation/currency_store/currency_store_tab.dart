@@ -5,8 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../chat/presentation/pages/chat_thread_page.dart';
 import 'currency_packages_provider.dart';
-import 'currency_purchase_service.dart';
 
 /// ═══════════════════════════════════════════════════════════════════
 /// متجر النقاط والجواهر — قسم داخل متجر الشات
@@ -64,7 +64,7 @@ class _CurrencyStoreTabState extends ConsumerState<CurrencyStoreTab>
                             color: Colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.bold)),
-                    Text('اشحن رصيدك، انطلق في التفاعل',
+                    Text('الأسعار والعروض — للشراء تواصل مع المالك',
                         style: TextStyle(color: Colors.white54, fontSize: 12)),
                   ],
                 ),
@@ -923,31 +923,46 @@ class _TypeBtn extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// تدفّق الشراء المشترك بين بطاقة الباقة الكبيرة والبطاقة المدمجة.
-// يعرض تأكيدًا يبيّن ما سيُخصم وما سيُضاف، ثم ينادي الخادم، ثم يُحدّث
-// المحافظ في الواجهة. لا حساب مالي هنا إطلاقًا — الخادم هو المرجع.
+// ═══════════════════════════════════════════════════════════════════
+// البند 20 (إعادة التصميم): لم يبقَ شراء آلي داخل التطبيق.
+//
+// القسم صار **لوحة عرض** للأسعار والعروض فقط، ومن أراد الشراء يضغط زرًّا
+// يفتح محادثة خاصة مباشرة مع مالك المنصة برسالة جاهزة تحمل اسم الباقة
+// والكمية والهدية والسعر — فيُتَمّ الدفع والشحن يدويًا بينهما.
+//
+// الدالة الخادمية purchase_currency_package وCurrencyPurchaseService
+// بقيتا على حالهما بلا حذف، فإن أراد المالك عودة الشراء الآلي لاحقًا
+// فالمسار موجود كما هو.
 // ═══════════════════════════════════════════════════════════════════
 class CurrencyStorePurchaseFlow {
   const CurrencyStorePurchaseFlow._();
 
+  static String _threadIdFor(String a, String b) {
+    final sorted = [a, b]..sort();
+    return '${sorted[0]}_${sorted[1]}';
+  }
+
   static Future<void> run(
       BuildContext context, Map<String, dynamic> package) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
-    final isPoints = (package['currency_type']?.toString() ?? 'points') == 'points';
+    final isPoints =
+        (package['currency_type']?.toString() ?? 'points') == 'points';
     final label = isPoints ? 'نقطة' : 'جوهرة';
     final amount = (package['amount'] as num?)?.toInt() ?? 0;
     final bonus = (package['bonus_amount'] as num?)?.toInt() ?? 0;
     final total = amount + bonus;
-    final priceText = package['price_display']?.toString().trim().isNotEmpty == true
-        ? package['price_display'].toString()
-        : '\$${package['price_usd'] ?? 0}';
+    final name = package['name']?.toString() ?? 'باقة';
+    final priceText =
+        package['price_display']?.toString().trim().isNotEmpty == true
+            ? package['price_display'].toString()
+            : '\$${package['price_usd'] ?? 0}';
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          title: Text(package['name']?.toString() ?? 'شراء باقة'),
+          title: Text(name),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -965,8 +980,8 @@ class CurrencyStorePurchaseFlow {
               const SizedBox(height: 12),
               Text('السعر: $priceText',
                   style: const TextStyle(fontSize: 14)),
-              const SizedBox(height: 6),
-              const Text('يُخصم من رصيد شام كاش.',
+              const SizedBox(height: 10),
+              const Text('الدفع والشحن يتمّان مباشرة مع مالك المنصة.',
                   style: TextStyle(fontSize: 11.5, color: Colors.white54)),
             ],
           ),
@@ -974,28 +989,65 @@ class CurrencyStorePurchaseFlow {
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('إلغاء')),
-            FilledButton(
+            FilledButton.icon(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('تأكيد الشراء')),
+                icon: const Icon(Icons.chat_bubble_rounded, size: 18),
+                label: const Text('تواصل مع المالك')),
           ],
         ),
       ),
     );
     if (confirmed != true) return;
 
-    messenger?.showSnackBarSfx(const SnackBar(
-        content: Text('جارٍ تنفيذ الشراء…'),
-        duration: Duration(seconds: 2)));
+    final client = Supabase.instance.client;
+    final myUid = client.auth.currentUser?.id;
+    if (myUid == null) {
+      messenger?.showSnackBarSfx(
+          const SnackBar(content: Text('سجّل الدخول أولًا.')));
+      return;
+    }
 
-    final result = await CurrencyPurchaseService.purchase(
-        packageId: package['id'].toString());
+    String? ownerUid;
+    try {
+      final raw = await client.rpc('get_platform_owner_uid');
+      ownerUid = raw?.toString();
+    } catch (_) {
+      ownerUid = null;
+    }
+    if (ownerUid == null || ownerUid.isEmpty || ownerUid == myUid) {
+      messenger?.showSnackBarSfx(const SnackBar(
+          content: Text('تعذّر الوصول إلى المالك الآن. حاول مرة أخرى.')));
+      return;
+    }
 
-    messenger?.hideCurrentSnackBar();
-    messenger?.showSnackBarSfx(SnackBar(
-      content: Text(result.ok ? result.successMessage : (result.error ?? '')),
-      backgroundColor:
-          result.ok ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
-      duration: const Duration(seconds: 3),
+    // رسالة جاهزة تحمل تفاصيل الطلب كاملة، فلا يحتاج المالك أن يسأل عنها.
+    final request = 'طلب شراء: $name — '
+        '${isPoints ? '⭐' : '💎'} $total $label'
+        '${bonus > 0 ? ' (منها $bonus هدية)' : ''} — السعر $priceText';
+    try {
+      await client.rpc('send_chat_message', params: {
+        'p_to_uid': ownerUid,
+        'p_text': request,
+        'p_type': 'text',
+        'p_media_url': null,
+        'p_thumbnail_url': null,
+        'p_media_duration_seconds': null,
+        'p_reply_to_id': null,
+        'p_reply_to_preview': null,
+        'p_reply_to_sender_uid': null,
+        'p_metadata': {'currency_order': true, 'package_id': package['id']},
+      });
+    } catch (_) {
+      // إن تعذّر إرسال الرسالة الجاهزة تبقى المحادثة تُفتح ليكتب بنفسه.
+    }
+
+    if (!context.mounted) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ChatThreadPage(
+        threadId: _threadIdFor(myUid, ownerUid!),
+        otherUid: ownerUid!,
+        otherName: 'مالك المنصة',
+      ),
     ));
   }
 }

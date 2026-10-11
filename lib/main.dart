@@ -15,6 +15,8 @@ import 'core/monitoring/error_monitor.dart';
 import 'core/widgets/upload_progress_overlay.dart';
 import 'core/widgets/global_mini_player.dart';
 import 'core/widgets/sewing_machine_splash.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'core/services/background_keepalive.dart';
 import 'core/services/server_realtime_sync.dart';
 
 Future<void> main() async {
@@ -40,6 +42,17 @@ Future<void> main() async {
 
   // إعادة وصل Realtime بتوكن صالح عند عودة التطبيق من الخلفية.
   RealtimeResilience.instance.install();
+
+  // البند 16: مراقب دورة الحياة الذي يُشغّل الخدمة الأمامية عند أول خروج
+  // فعلي إلى الخلفية. لا يبدأ أي خدمة ولا يطلب أي إذن الآن — تركيب المراقب
+  // وحده، فإقلاع التطبيق لا يتغيّر. وملفوف بـtry/catch لأن إقلاع التطبيق
+  // أهم من هذه الإضافة.
+  try {
+    FlutterForegroundTask.initCommunicationPort();
+    BackgroundKeepAlive.instance.install();
+  } catch (_) {
+    // بلا خدمة أمامية يبقى السلوك كما كان قبل الإضافة.
+  }
 
   runApp(
     const ProviderScope(

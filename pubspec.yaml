@@ -77,6 +77,8 @@ dependencies:
   # Utilities
   # ===========================
   uuid: ^4.4.0
+  # البند 16: خدمة أمامية لإبقاء التطبيق عاملًا في الخلفية.
+  flutter_foreground_task: ^11.0.3
   connectivity_plus: ^6.0.5
 
 

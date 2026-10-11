@@ -8,6 +8,11 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- البند 16: الخدمة الأمامية التي تُبقي التطبيق عاملًا في الخلفية.
+         إشعار الخدمة الدائم شرطٌ يفرضه أندرويد على كل خدمة أمامية. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:label="مشاريعنا | Mashareena"
@@ -47,6 +52,11 @@
                 <data android:scheme="com.mashareena.mashareena" android:host="login-callback"/>
             </intent-filter>
         </activity>
+        <!-- البند 16: اسم الخدمة ثابت تفرضه الحزمة؛ لا يُغيَّر. -->
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
