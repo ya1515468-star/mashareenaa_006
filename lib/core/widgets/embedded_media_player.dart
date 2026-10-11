@@ -247,62 +247,65 @@ class _YoutubeFloatingLaunchCardState
     final nowPlaying =
         ref.watch(miniPlayerProvider)?.videoId == widget.videoId;
     const gold = Color(0xFFFFD700);
+    // فقاعة الأغنية: صورة الفيديو كاملة بنسبة 16:9 مع زر تشغيل فوقها،
+    // والعنوان تحتها. الضغط يفتح المشغّل ويبدأ الفيديو؛ لا تشغيل قبله.
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: _playInFloatingPlayer,
       child: Container(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
           color: p.surfaceHighlight,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: nowPlaying ? gold : p.divider),
         ),
-        child: Row(children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              'https://i.ytimg.com/vi/${widget.videoId}/hqdefault.jpg',
-              width: 56,
-              height: 40,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                width: 56,
-                height: 40,
-                color: Colors.black26,
-                child: const Icon(Icons.music_note, color: Colors.white38, size: 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: Stack(fit: StackFit.expand, children: [
+                  Image.network(
+                    'https://i.ytimg.com/vi/${widget.videoId}/hqdefault.jpg',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: Colors.black26,
+                      child: const Icon(Icons.music_note,
+                          color: Colors.white38, size: 30),
+                    ),
+                  ),
+                  Center(
+                    child: Container(
+                      decoration: const BoxDecoration(
+                          color: Colors.black54, shape: BoxShape.circle),
+                      padding: const EdgeInsets.all(6),
+                      child: Icon(
+                        nowPlaying
+                            ? Icons.graphic_eq_rounded
+                            : Icons.play_arrow_rounded,
+                        color: nowPlaying ? gold : Colors.white,
+                        size: 34,
+                      ),
+                    ),
+                  ),
+                ]),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _title ?? 'فيديو يوتيوب',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      color: p.textPrimary, fontSize: 12.5, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  nowPlaying ? 'قيد التشغيل في المشغّل العائم' : 'اضغط للتشغيل في المشغّل العائم',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      color: nowPlaying ? gold : p.textMuted, fontSize: 10.5),
-                ),
-              ],
+            const SizedBox(height: 6),
+            Text(
+              _title ?? 'فيديو يوتيوب',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  color: nowPlaying ? gold : p.textPrimary,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700),
             ),
-          ),
-          Icon(
-            nowPlaying ? Icons.graphic_eq_rounded : Icons.play_circle_fill_rounded,
-            color: nowPlaying ? gold : p.accent,
-            size: 26,
-          ),
-        ]),
+          ],
+        ),
       ),
     );
   }

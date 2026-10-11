@@ -78,28 +78,37 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
   int _seconds = 0;
   Timer? _ticker;
 
-  // رسم/تصميم → توليد صورة. طلب "صورة" لشيء موجود → بحث في الإنترنت (صور
-  // حقيقية). يُفعَّل الوضع تلقائيًا ويظهر بوضوح قبل الإرسال حتى لا تُخصم
-  // نقاط دون علم المستخدم.
-  static const _imageTriggers = [
-    'ارسم', 'ولد صورة', 'ولّد صورة', 'صمم لي', 'صمّم لي', 'اعمل صورة',
-    'سوي صورة', 'انشئ صورة', 'أنشئ صورة', 'اعمل لي صورة',
-  ];
-  static const _webTriggers = [
-    'اعطيني صورة', 'أعطيني صورة', 'اعطني صورة', 'أعطني صورة', 'اريد صورة',
-    'أريد صورة', 'ارني', 'أرني', 'اعرض لي صورة', 'صورة ماكينة', 'صور ماكينة',
-    'ابحث', 'سعر ', 'اسعار', 'أسعار',
-  ];
+  // لا كلمات مفتاحية ثابتة بعد الآن: الخادم (ai-assistant-v2) يفهم النيّة
+  // من السياق ويقرّر التنفيذ. زرّا الكرة والفرشاة يبقيان لإجبار وضع بعينه.
 
-  void _onTyped(String v) {
-    if (_imageMode || _webMode) return;
-    if (_imageTriggers.any(v.contains)) {
-      setState(() => _imageMode = true);
-      _toast('تم تفعيل «توليد صورة». اضغط زر الفرشاة لإلغائه.');
-    } else if (_webTriggers.any(v.contains)) {
-      setState(() => _webMode = true);
-      _toast('تم تفعيل «بحث في الإنترنت». اضغط زر الكرة الأرضية لإلغائه.');
+  /// السياق المرسَل للخادم: آخر 12 دورًا مكتملًا (لا قيد التحميل ولا خطأ).
+  List<Map<String, String>> _history() {
+    final out = <Map<String, String>>[];
+    for (final m in _msgs) {
+      if (m.loading || m.error) continue;
+      var text = m.text.trim();
+      if (!m.user && text.isEmpty && m.image != null) text = '[أرسلتُ صورة مولَّدة]';
+      if (!m.user && m.photos.isNotEmpty) text = '$text\n[عرضتُ ${m.photos.length} صور حقيقية]';
+      if (text.isEmpty) continue;
+      out.add({'role': m.user ? 'user' : 'assistant', 'text': text});
     }
+    return out.length > 12 ? out.sublist(out.length - 12) : out;
+  }
+
+  /// آخر صورة ولّدها المساعد، لتعديلها إن طُلب ("خلّيها أحمر").
+  AiImage? _lastGeneratedImage() {
+    for (final m in _msgs.reversed) {
+      final img = m.image;
+      if (!m.user && img != null) return AiImage(img, _mimeOf(img));
+    }
+    return null;
+  }
+
+  static String _mimeOf(Uint8List b) {
+    if (b.length > 3 && b[0] == 0x89 && b[1] == 0x50) return 'image/png';
+    if (b.length > 2 && b[0] == 0xFF && b[1] == 0xD8) return 'image/jpeg';
+    if (b.length > 11 && b[8] == 0x57 && b[9] == 0x45) return 'image/webp';
+    return 'image/png';
   }
 
   @override
@@ -235,6 +244,8 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
     if (wantImage && typed.isEmpty) return _toast('اكتب وصف الصورة المطلوبة.');
     if (wantWeb && typed.isEmpty) return _toast('اكتب ما تريد البحث عنه.');
     final images = List<AiImage>.of(_pending);
+    final history = _history();
+    final lastImage = _lastGeneratedImage();
     final userMsg = _Msg(
       user: true,
       text: audio != null ? '🎤 رسالة صوتية…' : typed,
@@ -257,6 +268,8 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
         images: images,
         image: wantImage,
         web: wantWeb,
+        history: history,
+        lastImage: lastImage,
       );
       if (!mounted) return;
       setState(() {
@@ -611,7 +624,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
               counterText: '',
               hintText: _imageMode
                   ? 'صف الصورة التي تريدها…'
-                  : (_webMode ? 'ابحث في الإنترنت عن…' : 'اكتب سؤالك…'),
+                  : (_webMode ? 'ابحث في الإنترنت عن…' : 'اطلب أي شيء: سؤال، حل مشكلة، صورة، رسم…'),
               hintStyle: const TextStyle(color: Colors.white38),
               filled: true,
               fillColor: _card,
@@ -619,7 +632,6 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
               border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(22), borderSide: BorderSide.none),
             ),
-            onChanged: _onTyped,
             onSubmitted: (_) => _send(),
           ),
         ),

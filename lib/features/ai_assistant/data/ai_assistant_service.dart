@@ -72,6 +72,8 @@ class AiPhoto {
 }
 
 class AiAnswer {
+  /// ما قرّر الخادم تنفيذه: answer / web_search / find_photos / generate_image.
+  final String action;
   final String transcript;
   final String answer;
   final Uint8List? image;
@@ -80,6 +82,7 @@ class AiAnswer {
   /// طُلبت صور حقيقية لكن ميزة البحث عن الصور غير مضبوطة في الخادم.
   final bool photosMissing;
   const AiAnswer({
+    this.action = 'answer',
     required this.transcript,
     required this.answer,
     this.image,
@@ -149,13 +152,24 @@ class AiAssistantService {
     List<AiImage> images = const [],
     bool image = false,
     bool web = false,
+    // سياق المحادثة: آخر الأدوار (role: user|assistant، text). بدونه كان كل
+    // سؤال يصل الخادم منفردًا فلا يفهم "عدّلها" ولا "وكم سعرها".
+    List<Map<String, String>> history = const [],
+    // آخر صورة ولّدها المساعد، ليقدر الخادم على تعديلها حين يُطلب ذلك.
+    AiImage? lastImage,
   }) async {
     try {
       final res = await SupabaseService.client.functions.invoke(
-        'ai-assistant',
+        // ai-assistant-v2: موجِّه نوايا خادمي يقرّر التنفيذ (إجابة/بحث/صور/
+        // توليد) من السياق. ai-assistant القديمة باقية للنسخ القديمة.
+        'ai-assistant-v2',
         body: {
           'request_id': requestId,
+          // بلا وضع = تلقائي (الخادم يقرّر). الأزرار تُجبر وضعًا إن ضُغطت.
           if (image) 'mode': 'image' else if (web) 'mode': 'web',
+          if (history.isNotEmpty) 'history': history,
+          if (lastImage != null)
+            'last_image': {'mime': lastImage.mime, 'b64': base64Encode(lastImage.bytes)},
           if (text.trim().isNotEmpty) 'text': text.trim(),
           if (audio != null) 'audio_base64': base64Encode(audio),
           if (audio != null) 'audio_mime': audioMime,
@@ -173,6 +187,7 @@ class AiAssistantService {
           img = base64Decode(im['b64'].toString());
         }
         return AiAnswer(
+          action: (data['action'] ?? 'answer').toString(),
           transcript: (data['transcript'] ?? '').toString(),
           answer: (data['answer'] ?? '').toString(),
           image: img,

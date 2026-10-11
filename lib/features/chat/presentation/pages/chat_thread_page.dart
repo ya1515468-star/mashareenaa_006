@@ -2,7 +2,6 @@ import '../../../../core/widgets/mini_player_chip.dart';
 import '../../../../core/services/snack_sfx.dart';
 import '../widgets/voice_hold_button.dart';
 import '../../../../core/widgets/song_search_sheet.dart';
-import '../../../../core/providers/mini_player_provider.dart';
 import 'dart:async';
 import '../../../../core/monitoring/error_monitor.dart';
 import 'package:flutter/material.dart';
@@ -340,8 +339,8 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
     final myUid = ref.read(authControllerProvider).valueOrNull?.uid;
     if (myUid == null) return;
     await SongSearchSheet.show(context, onSend: (videoId, title) async {
-      ref.read(miniPlayerProvider.notifier).state =
-          MiniPlayerTrack(videoId: videoId, title: title);
+      // الأغنية تُرسَل أولًا فقاعةً بصورة الفيديو، ولا تُشغَّل إلا بالضغط
+      // على الفقاعة نفسها — كان التشغيل يبدأ فورًا قبل ظهورها في الشات.
       await ref.read(chatControllerProvider.notifier).sendMessage(
             fromUid: myUid,
             toUid: widget.otherUid,

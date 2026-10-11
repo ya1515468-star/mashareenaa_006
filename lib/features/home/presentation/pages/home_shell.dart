@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/services/server_sounds.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/mini_player_provider.dart';
 import '../../../calls/domain/entities/call_entity.dart';
 import '../../../calls/presentation/pages/active_call_page.dart';
 import '../../../calls/presentation/providers/call_provider.dart';
@@ -377,7 +378,15 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       ]),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _index.clamp(0, _navItems.length - 1),
-        onTap: (i) => setState(() => _index = i),
+        onTap: (i) {
+          // فيديو يوتيوب يعمل حصرًا داخل الشات (تبويب 0، ويشمل الخاص
+          // المفتوح فوقه). الانتقال إلى أي قسم آخر يوقفه ويغلقه.
+          if (i != 0) {
+            ref.read(miniPlayerProvider.notifier).state = null;
+            ref.read(miniPlayerMinimizedProvider.notifier).state = false;
+          }
+          setState(() => _index = i);
+        },
         type: BottomNavigationBarType.fixed,
         backgroundColor: const Color(0xFF0A0A0C),
         selectedItemColor: const Color(0xFFFFD700),

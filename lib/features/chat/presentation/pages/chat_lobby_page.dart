@@ -11,7 +11,6 @@ import '../widgets/forward_message_sheet.dart';
 import '../widgets/voice_message_player.dart';
 import '../providers/unread_dm_provider.dart';
 import '../../../../core/widgets/song_search_sheet.dart';
-import '../../../../core/providers/mini_player_provider.dart';
 import '../widgets/voice_hold_button.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/widgets/fullscreen_image_viewer.dart';
@@ -280,12 +279,18 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
         .from('public_chat_messages')
         .stream(primaryKey: ['id'])
         .eq('room_id', _roomId)
-        .order('created_at', ascending: true)
+        // ascending:true مع limit يجلب **أقدم** N صفّ؛ متى تجاوز الجدول N لا تدخل
+        // أي رسالة جديدة القائمة أبدًا (الغرفة بلغت 161 > 150 فاختفى كل جديد).
+        // الأحدث أولًا ثم يُعاد الترتيب تصاعديًا في البناء (displayRows.sort).
+        .order('created_at', ascending: false)
         .limit(150);
     _globalEvents = _db
         .from('chat_global_events')
         .stream(primaryKey: ['id'])
-        .order('created_at', ascending: true)
+        // ascending:true مع limit يجلب **أقدم** N صفّ؛ متى تجاوز الجدول N لا تدخل
+        // أي رسالة جديدة القائمة أبدًا (الغرفة بلغت 161 > 150 فاختفى كل جديد).
+        // الأحدث أولًا ثم يُعاد الترتيب تصاعديًا في البناء (displayRows.sort).
+        .order('created_at', ascending: false)
         .limit(40);
     _subscribeDice();
 
@@ -1195,8 +1200,8 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   Future<void> _showSongSearch() async {
     if (_user == null) return;
     await SongSearchSheet.show(context, onSend: (videoId, title) async {
-      ref.read(miniPlayerProvider.notifier).state =
-          MiniPlayerTrack(videoId: videoId, title: title);
+      // الأغنية تُرسَل أولًا فقاعةً بصورة الفيديو، ولا تُشغَّل إلا بالضغط
+      // على الفقاعة نفسها — كان التشغيل يبدأ فورًا قبل ظهورها في الشات.
       await _insertPublicMessage(
         body: 'https://www.youtube.com/watch?v=$videoId',
         message: 'https://www.youtube.com/watch?v=$videoId',
@@ -2471,7 +2476,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
           .from('public_chat_messages')
           .stream(primaryKey: ['id'])
           .eq('room_id', _roomId)
-          .order('created_at', ascending: true)
+          .order('created_at', ascending: false)
           .limit(150);
     });
     ScaffoldMessenger.of(context).showSnackBarSfx(
