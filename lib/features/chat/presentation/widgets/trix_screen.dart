@@ -196,6 +196,113 @@ class TrixScreen extends StatefulWidget {
   State<TrixScreen> createState() => _TrixScreenState();
 }
 
+class _TrixTableSurfacePainter extends CustomPainter {
+  final Animation<double> animation;
+  final Color accent;
+
+  _TrixTableSurfacePainter({
+    required this.animation,
+    required this.accent,
+  }) : super(repaint: animation);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final t = animation.value;
+    final bounds = Offset.zero & size;
+    final radius = Radius.circular(math.min(size.width, size.height) * 0.14);
+    final outer = RRect.fromRectAndRadius(bounds.deflate(3), radius);
+
+    canvas.drawRRect(
+      outer,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.3
+        ..color = const Color(0x66F8DFA1),
+    );
+
+    final ring = Rect.fromLTWH(
+      size.width * 0.105,
+      size.height * 0.12,
+      size.width * 0.79,
+      size.height * 0.76,
+    );
+    final ringAlpha = (34 + 24 * (0.5 + 0.5 * math.sin(t * math.pi * 2))).round().clamp(0, 255);
+    canvas.drawOval(
+      ring,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.1
+        ..color = const Color(0xFFFFD166).withAlpha(ringAlpha),
+    );
+    canvas.drawOval(
+      ring.deflate(8),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.7
+        ..color = Colors.white.withAlpha(15),
+    );
+
+    void drawSuit(String suit, double x, double y, Color color) {
+      final painter = TextPainter(
+        text: TextSpan(
+          text: suit,
+          style: TextStyle(
+            color: color,
+            fontSize: math.min(size.width, size.height) * 0.065,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      painter.paint(canvas, Offset(size.width * x, size.height * y));
+    }
+
+    drawSuit('♠', 0.19, 0.25, Colors.white.withAlpha(22));
+    drawSuit('♥', 0.76, 0.25, const Color(0x33FFD166));
+    drawSuit('♣', 0.19, 0.67, Colors.white.withAlpha(22));
+    drawSuit('♦', 0.76, 0.67, const Color(0x33FFD166));
+
+    // A soft moving light gives the felt depth without covering cards or seats.
+    final bandWidth = math.max(42.0, size.width * 0.22);
+    final shine = Rect.fromLTWH(
+      -bandWidth + t * (size.width + bandWidth),
+      0,
+      bandWidth,
+      size.height,
+    );
+    canvas.save();
+    canvas.clipRRect(outer);
+    canvas.drawRect(
+      shine,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0x00000000),
+            Color(0x15FFFFFF),
+            Color(0x00000000),
+          ],
+          stops: [0.0, 0.5, 1.0],
+        ).createShader(shine),
+    );
+    canvas.restore();
+
+    canvas.drawOval(
+      Rect.fromLTWH(size.width * 0.3, size.height * 0.32, size.width * 0.4, size.height * 0.36),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0
+        ..color = accent.withAlpha((18 + 20 * (0.5 + 0.5 * math.sin(t * math.pi * 2))).round().clamp(0, 255)),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _TrixTableSurfacePainter oldDelegate) =>
+      oldDelegate.animation != animation || oldDelegate.accent != accent;
+}
+
 class _TrixScreenState extends State<TrixScreen> with TickerProviderStateMixin {
   Map<String, dynamic>? _v;
   String? _error;
@@ -213,6 +320,8 @@ class _TrixScreenState extends State<TrixScreen> with TickerProviderStateMixin {
   int _fxSeq = 0;
   late final AnimationController _shake =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 560));
+  late final AnimationController _tableGlow =
+      AnimationController(vsync: this, duration: const Duration(seconds: 8));
   double _shakeAmp = 0;
   String? _pending;
   Set<String> _shownTrick = <String>{};
@@ -228,6 +337,7 @@ class _TrixScreenState extends State<TrixScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _tableGlow.repeat();
     TrixPrefs.face.addListener(_prefsChanged);
     TrixPrefs.back.addListener(_prefsChanged);
     unawaited(TrixPrefs.load().then((_) => _prefsChanged()));
@@ -294,6 +404,7 @@ class _TrixScreenState extends State<TrixScreen> with TickerProviderStateMixin {
     _toastTimer?.cancel();
     TrixPrefs.face.removeListener(_prefsChanged);
     TrixPrefs.back.removeListener(_prefsChanged);
+    _tableGlow.dispose();
     _shake.dispose();
     super.dispose();
   }
@@ -1143,15 +1254,60 @@ class _TrixScreenState extends State<TrixScreen> with TickerProviderStateMixin {
   }
 
   Widget _loading() {
-    return Center(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        if (_error == null)
-          const CircularProgressIndicator()
-        else
-          Text(_error!, style: const TextStyle(color: Colors.white70), textAlign: TextAlign.center),
-        const SizedBox(height: 12),
-        TextButton(onPressed: TrixWindow.instance.close, child: const Text('إغلاق')),
-      ]),
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: _felt(null),
+          ),
+        ),
+        const Positioned.fill(
+          child: ColoredBox(color: Color(0xA60E0A18)),
+        ),
+        Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 320),
+            margin: const EdgeInsets.all(24),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            decoration: BoxDecoration(
+              color: const Color(0xE8171126),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0x77FFD166)),
+              boxShadow: const [
+                BoxShadow(color: Color(0x55000000), blurRadius: 24, offset: Offset(0, 10)),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_error == null)
+                  const CircularProgressIndicator(color: Color(0xFFFFD166))
+                else
+                  Text(
+                    _error!,
+                    style: const TextStyle(color: Colors.white70),
+                    textAlign: TextAlign.center,
+                  ),
+                const SizedBox(height: 12),
+                if (_error != null)
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() => _error = null);
+                      unawaited(_refresh());
+                    },
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('إعادة المحاولة'),
+                  ),
+                TextButton(
+                  onPressed: TrixWindow.instance.close,
+                  child: const Text('إغلاق'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1315,30 +1471,109 @@ class _TrixScreenState extends State<TrixScreen> with TickerProviderStateMixin {
   }
 
   Widget _felt(String? contract) {
-    final c = _contractColor[contract] ?? const Color(0xFF5D4037);
+    final c = _contractColor[contract] ?? const Color(0xFFFFD166);
+    final pulse = 0.5 + 0.5 * math.sin(_tableGlow.value * math.pi * 2);
     return Transform(
       alignment: Alignment.center,
       transform: Matrix4.identity()
-        ..setEntry(3, 2, 0.0008)
-        ..rotateX(0.14),
+        ..setEntry(3, 2, 0.0011)
+        ..rotateX(0.16)
+        ..rotateZ(math.sin(_tableGlow.value * math.pi * 2) * 0.002),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
-          gradient: const RadialGradient(colors: [Color(0xFF2F8A55), Color(0xFF125030)], radius: 0.95),
-          border: Border.all(color: const Color(0xFF6D4C41), width: 7),
+          borderRadius: BorderRadius.circular(36),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFB17A42),
+              Color(0xFF4E2818),
+              Color(0xFF29150F),
+              Color(0xFF8D5A31),
+            ],
+            stops: [0.0, 0.34, 0.68, 1.0],
+          ),
+          border: Border.all(color: Color(0xFFE9C879), width: 2.2),
           boxShadow: [
-            const BoxShadow(color: Color(0xAA000000), blurRadius: 16, offset: Offset(0, 10)),
-            BoxShadow(color: c.withAlpha(70), blurRadius: 18, spreadRadius: 1),
+            BoxShadow(
+              color: Colors.black.withAlpha(150),
+              blurRadius: 22,
+              spreadRadius: 1,
+              offset: const Offset(0, 13),
+            ),
+            BoxShadow(
+              color: c.withAlpha((30 + 55 * pulse).round().clamp(0, 255)),
+              blurRadius: 24,
+              spreadRadius: 1,
+            ),
           ],
         ),
-        child: Center(
-          child: Text(
-            'TRIX',
-            style: TextStyle(
-              color: Colors.white.withAlpha(18),
-              fontSize: 56,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 8,
+        padding: const EdgeInsets.all(7),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: const RadialGradient(
+              center: Alignment(-0.15, -0.22),
+              radius: 1.15,
+              colors: [
+                Color(0xFF368B5C),
+                Color(0xFF165638),
+                Color(0xFF082A1E),
+              ],
+              stops: [0.0, 0.66, 1.0],
+            ),
+            border: Border.all(color: const Color(0xFFE3C27A), width: 1.3),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(26),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: _TrixTableSurfacePainter(
+                      animation: _tableGlow,
+                      accent: c,
+                    ),
+                  ),
+                ),
+                const Positioned(
+                  left: 20,
+                  top: 14,
+                  child: Text('♠', style: TextStyle(color: Color(0x22FFFFFF), fontSize: 27, fontWeight: FontWeight.w900)),
+                ),
+                const Positioned(
+                  right: 20,
+                  top: 14,
+                  child: Text('♥', style: TextStyle(color: Color(0x22FFD166), fontSize: 27, fontWeight: FontWeight.w900)),
+                ),
+                const Positioned(
+                  left: 20,
+                  bottom: 14,
+                  child: Text('♣', style: TextStyle(color: Color(0x22FFFFFF), fontSize: 27, fontWeight: FontWeight.w900)),
+                ),
+                const Positioned(
+                  right: 20,
+                  bottom: 14,
+                  child: Text('♦', style: TextStyle(color: Color(0x22FFD166), fontSize: 27, fontWeight: FontWeight.w900)),
+                ),
+                Center(
+                  child: Opacity(
+                    opacity: 0.12 + 0.06 * pulse,
+                    child: Text(
+                      'TRIX',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 54,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 10,
+                        shadows: [
+                          Shadow(color: c.withAlpha(170), blurRadius: 18),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
