@@ -243,7 +243,7 @@ class _EmailVerificationCodePageState
               ),
               const SizedBox(height: 16),
               Text(
-                'تعتمد عملية إنشاء الحساب على تأكيد البريد الرسمي في Supabase. إذا لم تصل الرسالة، افحص البريد غير المرغوب أو أعد الإرسال.',
+                'إذا لم تصل الرسالة، افحص البريد غير المرغوب ثم أعد الإرسال. تحتاج هذه الشاشة قالب Confirm signup الذي يعرض رمز OTP ({{ .Token }})، كما يحتاج التطبيق مزوّد SMTP مخصصًا للإرسال إلى جميع الأعضاء.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: p.textMuted, fontSize: 11.5),
               ),
