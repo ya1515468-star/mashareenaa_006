@@ -227,7 +227,7 @@ class _TrixTableSurfacePainter extends CustomPainter {
       size.width * 0.79,
       size.height * 0.76,
     );
-    final ringAlpha = (34 + 24 * (0.5 + 0.5 * math.sin(t * math.pi * 2))).round().clamp(0, 255);
+    final ringAlpha = (34 + 24 * (0.5 + 0.5 * math.sin(t * math.pi * 2))).round().clamp(0, 255).toInt();
     canvas.drawOval(
       ring,
       Paint()
@@ -294,7 +294,7 @@ class _TrixTableSurfacePainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.0
-        ..color = accent.withAlpha((18 + 20 * (0.5 + 0.5 * math.sin(t * math.pi * 2))).round().clamp(0, 255)),
+        ..color = accent.withAlpha((18 + 20 * (0.5 + 0.5 * math.sin(t * math.pi * 2))).round().clamp(0, 255).toInt()),
     );
   }
 
@@ -1502,7 +1502,7 @@ class _TrixScreenState extends State<TrixScreen> with TickerProviderStateMixin {
               offset: const Offset(0, 13),
             ),
             BoxShadow(
-              color: c.withAlpha((30 + 55 * pulse).round().clamp(0, 255)),
+              color: c.withAlpha((30 + 55 * pulse).round().clamp(0, 255).toInt()),
               blurRadius: 24,
               spreadRadius: 1,
             ),
