@@ -276,7 +276,7 @@ class _TrixTableSurfacePainter extends CustomPainter {
     canvas.drawRect(
       shine,
       Paint()
-        ..shader = const LinearGradient(
+        ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
