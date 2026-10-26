@@ -218,6 +218,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         );
       }
 
+      // With Confirm Email enabled Supabase intentionally returns a user without a session.
+      // Keep the registration flow successful and let the UI open the verification page;
+      // session-dependent security checks run after the user completes confirmation/sign-in.
+      if (response.session == null) {
+        return UserModel.fromSupabaseUser(user);
+      }
+
       final status = await getAccountStatus(user.id);
       await _syncSecuritySession();
 
@@ -331,6 +338,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       await supabase.auth.resend(
         type: sb.OtpType.signup,
         email: normalizedEmail,
+        emailRedirectTo: authRedirectUrl(),
       );
     } on sb.AuthException catch (e) {
       throw AuthException(
