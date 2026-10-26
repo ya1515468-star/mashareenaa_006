@@ -198,7 +198,7 @@ class _EmailVerificationCodePageState
               ),
               const SizedBox(height: 8),
               Text(
-                'أرسلنا رمز التأكيد إلى:\n${widget.email}',
+                'تحقق من بريدك الوارد وغير المرغوب فيه لرمز التأكيد:\n${widget.email}',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: p.textSecondary, fontSize: 13),
               ),
