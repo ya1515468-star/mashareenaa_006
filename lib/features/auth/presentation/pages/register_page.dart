@@ -168,10 +168,25 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       _shakeKey.currentState?.shake();
       if (mounted) {
         final error = ref.read(authControllerProvider);
-        final raw = error.error?.toString().toLowerCase() ?? '';
-        final message = raw.contains('confirm') || raw.contains('email') || raw.contains('تأكيد البريد')
-            ? 'يرجى تأكيد البريد الإلكتروني ثم المحاولة مرة أخرى.'
-            : 'تعذر إنشاء الحساب الآن. تحقق من البيانات والاتصال ثم أعد المحاولة.';
+        final detail = error.error?.toString().trim() ?? '';
+        final raw = detail.toLowerCase();
+        final mailDeliveryProblem = [
+          'smtp',
+          'mailer',
+          'email rate limit',
+          'rate limit',
+          'too many requests',
+          'sending email',
+          'email provider',
+          'deliver',
+        ].any(raw.contains);
+        final message = mailDeliveryProblem
+            ? 'تعذّر إرسال رسالة التأكيد من مزوّد البريد: ${detail.isEmpty ? 'راجع إعدادات SMTP في Supabase' : detail}'
+            : (raw.contains('confirm') || raw.contains('email') || raw.contains('تأكيد البريد'))
+                ? 'تعذّر إكمال تأكيد البريد. ${detail.isEmpty ? 'تحقق من إعدادات البريد ثم أعد المحاولة.' : detail}'
+                : (detail.isNotEmpty
+                    ? 'تعذّر إنشاء الحساب: $detail'
+                    : 'تعذر إنشاء الحساب الآن. تحقق من البيانات والاتصال ثم أعد المحاولة.');
         ScaffoldMessenger.of(context).showSnackBarSfx(
           SnackBar(content: Text(message)),
         );
