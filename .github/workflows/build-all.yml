@@ -248,10 +248,20 @@ jobs:
       - name: Bootstrap and configure iOS project
         run: bash tool/ios_bootstrap.sh
 
+      # السجل الخام لا يُنزَّل من بعض البيئات، فتُطبع أسطر الخطأ كتعليقات
+      # GitHub (::error::) لتُقرأ عبر الواجهة البرمجية مباشرة.
       - name: Build iOS (unsigned)
         run: |
-          flutter build ios --release --no-codesign \
-            --obfuscate --split-debug-info=build/symbols/ios
+          set -o pipefail
+          if ! flutter build ios --release --no-codesign \
+                 --obfuscate --split-debug-info=build/symbols/ios 2>&1 | tee ios_build.txt; then
+            echo "::group::آخر 80 سطرًا"
+            tail -80 ios_build.txt
+            echo "::endgroup::"
+            grep -iE "error|fatal|required|minimum deployment|CocoaPods|not compatible|could not find" ios_build.txt \
+              | tail -25 | sed 's/^/::error::/'
+            exit 1
+          fi
 
       - name: Package unsigned app
         run: |
