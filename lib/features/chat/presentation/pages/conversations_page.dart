@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/served_ad_slot.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -113,15 +114,27 @@ class ConversationsPage extends ConsumerWidget {
                 ]),
               );
             }
+            // خانة إعلان واحدة بعد المحادثة الثالثة: الموضع الذي
+            // اشتراه المعلن. واحدة لا أكثر — قائمة محادثات مليئة
+            // بالإعلانات تُهجَر، فيذهب جمهور المعلن نفسه.
+            const adAfter = 3;
+            final showAd = list.length > adAfter;
+            final count = list.length + (showAd ? 1 : 0);
             return ListView.separated(
               controller: scrollController,
-              itemCount: list.length,
+              itemCount: count,
               separatorBuilder: (_, __) =>
                   const Divider(height: 1, color: Colors.white10, indent: 76),
-              itemBuilder: (_, i) => _ThreadTile(
-                thread: list[i],
-                onChanged: () => ref.invalidate(myThreadsProvider),
-              ),
+              itemBuilder: (_, i) {
+                if (showAd && i == adAfter) {
+                  return const ServedAdSlot(placement: 'conversations');
+                }
+                final index = (showAd && i > adAfter) ? i - 1 : i;
+                return _ThreadTile(
+                  thread: list[index],
+                  onChanged: () => ref.invalidate(myThreadsProvider),
+                );
+              },
             );
           },
             ),
