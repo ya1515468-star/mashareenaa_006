@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' show AuthChangeEvent;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/services/supabase_service.dart';
+import '../data/ai_assistant_service.dart';
 import 'ai_assistant_sheet.dart';
 
 /// أيقونة المساعد الذكي: عائمة دائمًا فوق كل أقسام التطبيق، يسحبها المستخدم
@@ -16,7 +17,8 @@ class AiAssistantFab extends StatefulWidget {
   State<AiAssistantFab> createState() => _AiAssistantFabState();
 }
 
-class _AiAssistantFabState extends State<AiAssistantFab> {
+class _AiAssistantFabState extends State<AiAssistantFab>
+    with WidgetsBindingObserver {
   static const _size = 54.0;
   static const _pad = 12.0; // مساحة زر الإغلاق حول الأيقونة
   // موضع كنسبة من مساحة الشاشة (يصمد أمام تغيّر الأبعاد).
@@ -27,19 +29,56 @@ class _AiAssistantFabState extends State<AiAssistantFab> {
   bool _closed = false;
   StreamSubscription? _authSub;
 
+  /// هل الخدمة مفعَّلة من المالك؟
+  ///
+  /// تبدأ `false` عمدًا لا `true`: الظهور ثم الاختفاء بعد وصول الحالة
+  /// وميضٌ مزعج، والأسوأ أنّه يَعِد المستخدم بخدمة قد تكون موقوفة. التأخير
+  /// جزء من ثانية، وظهور الزر متأخّرًا أهون من وعدٍ يُخلَف.
+  ///
+  /// الخادم يرفض الاستخدام بـAI_DISABLED على كل حال، فهذا إخفاءُ واجهة لا
+  /// حمايةٌ تُعتمد عليها — ولو زُوّر العميل لما استفاد شيئًا.
+  bool _enabled = false;
+
   @override
   void initState() {
     super.initState();
     _load();
+    _refreshEnabled();
+    WidgetsBinding.instance.addObserver(this);
     _authSub = SupabaseService.auth.onAuthStateChange.listen((s) {
-      if (s.event == AuthChangeEvent.signedIn && _closed && mounted) {
-        setState(() => _closed = false);
+      if (s.event == AuthChangeEvent.signedIn) {
+        if (_closed && mounted) setState(() => _closed = false);
+        _refreshEnabled();
       }
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // عند العودة للتطبيق: يلتقط تفعيل المالك أو إيقافه بلا مؤقّت دائم
+    // يستنزف الشبكة والبطارية.
+    if (state == AppLifecycleState.resumed) _refreshEnabled();
+  }
+
+  Future<void> _refreshEnabled() async {
+    if (SupabaseService.auth.currentSession == null) {
+      if (mounted && _enabled) setState(() => _enabled = false);
+      return;
+    }
+    try {
+      final st = await AiAssistantService.status();
+      if (mounted && st.enabled != _enabled) {
+        setState(() => _enabled = st.enabled);
+      }
+    } catch (_) {
+      // تعذّر الفحص: يبقى الزر مخفيًّا. إظهاره على أمل أنّها مفعَّلة
+      // يفتح ورقةً تفشل عند أول طلب.
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _authSub?.cancel();
     super.dispose();
   }
@@ -72,7 +111,7 @@ class _AiAssistantFabState extends State<AiAssistantFab> {
     return StreamBuilder(
       stream: SupabaseService.auth.onAuthStateChange,
       builder: (context, _) {
-        if (SupabaseService.auth.currentSession == null || _closed) {
+        if (SupabaseService.auth.currentSession == null || _closed || !_enabled) {
           return const SizedBox.shrink();
         }
         final size = MediaQuery.of(context).size;
