@@ -858,6 +858,16 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   // النتيجة تُحسم في الخادم حصرًا (roll_dice_in_room / accept_dice_challenge)
   // ثم تُعرَض الأرقام نفسها في النرد ثلاثي الأبعاد؛ لا يوجد أي رقم محلي.
 
+  /// إعادة بناء قنوات اللعبة بعد انقطاع.
+  ///
+  /// كانت الثلاث تشترك بـ(_, __) {} فتبتلع الخطأ ولا تعود أبدًا: انقطاع
+  /// لحظي يعني ألّا يصل اللاعب تحدٍّ ولا تُفتح له مباراة قُبلت، بلا أي
+  /// أثر ظاهر يفسّر له السبب.
+  void _resubscribeDice() {
+    if (!mounted) return;
+    _subscribeDice();
+  }
+
   void _subscribeDice() {
     final me = _user?.id;
     unawaited(ServerSounds.instance.prefetch());
@@ -873,7 +883,8 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
               value: _roomId),
           callback: (payload) => unawaited(_onDiceEvent(payload.newRecord)),
         )
-        .subscribe((_, __) {});
+        .subscribe(retryOnChannelError(_resubscribeDice,
+            isAlive: () => mounted));
     if (me != null) {
       _challengeChannel = _db
           .channel('dice-challenge-$me-${DateTime.now().millisecondsSinceEpoch}')
@@ -888,7 +899,8 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
             callback: (payload) =>
                 unawaited(_routeGameRequest(payload.newRecord)),
           )
-          .subscribe((_, __) {});
+          .subscribe(retryOnChannelError(_resubscribeDice,
+              isAlive: () => mounted));
       // المرسِل يدخل اللعبة تلقائيًا فور قبول الطرف الآخر (ينشأ صف المباراة).
       _matchChannel = _db
           .channel('game-match-$me-${DateTime.now().millisecondsSinceEpoch}')
@@ -925,7 +937,8 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
               }
             },
           )
-          .subscribe((_, __) {});
+          .subscribe(retryOnChannelError(_resubscribeDice,
+              isAlive: () => mounted));
       unawaited(_checkPendingChallenge(me));
     }
   }

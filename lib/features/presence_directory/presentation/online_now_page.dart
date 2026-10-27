@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../../core/services/resilient_realtime_channel.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../chat/presentation/widgets/mini_profile_popup.dart';
 import '../../rbac/presentation/widgets/server_username_display.dart';
@@ -57,7 +59,11 @@ final onlineNowProvider =
         if (!disposed) unawaited(load());
       },
     )
-    ..subscribe((_, __) {});
+    // كانت (_, __) {} تبتلع الخطأ فتبقى القناة ميتة والقائمة قديمة
+    // حتى يُعاد فتح الشاشة. الاستطلاع كل 20 ثانية شبكة أمان لا بديل.
+    ..subscribe(retryOnChannelError(() {
+      if (!disposed) unawaited(load());
+    }, isAlive: () => !disposed));
 
   // Slow safety net only (covers a dropped socket); the realtime channel is
   // what makes it feel instant.

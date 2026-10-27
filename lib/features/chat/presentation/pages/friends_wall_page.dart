@@ -6,6 +6,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../../../core/services/resilient_realtime_channel.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -53,7 +55,9 @@ final platformWallProductsProvider =
       table: 'platform_wall_products',
       callback: (_) => unawaited(load()),
     )
-    ..subscribe((_, __) {});
+    ..subscribe(retryOnChannelError(() {
+      if (!disposed) unawaited(load());
+    }, isAlive: () => !disposed));
 
   ref.onDispose(() {
     disposed = true;

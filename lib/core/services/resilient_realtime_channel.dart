@@ -65,3 +65,35 @@ class ResilientRealtimeChannel {
     if (ch != null) await _client.removeChannel(ch);
   }
 }
+
+/// مُعين اشتراك بإعادة اتصال، لمواقع النداء التي تبني القناة سطريًّا.
+///
+/// لماذا وُجد: ستّ قنوات في التطبيق كانت تشترك بـ`(_, __) {}` — تبتلع
+/// الخطأ ولا تُعيد الاتصال أبدًا. فإذا انقطعت الشبكة لحظةً أو انتهى
+/// التوكن، تبقى القناة ميتة إلى أن يُعاد فتح الشاشة، والمستخدم يرى بيانات
+/// قديمة ولا يفهم لماذا. وسابعة كانت `..subscribe()` بلا معالج أصلًا،
+/// فيهرب RealtimeSubscribeException إلى المنطقة ويُسجَّل خطأً قاتلًا —
+/// وهو أكثر خطأ تكرارًا في سجلّ المراقبة (38 مرّة على 6 مستخدمين).
+///
+/// [onRetry] تُستدعى لإعادة بناء القناة من الصفر، لأنّ RealtimeChannel
+/// يقبل subscribe() مرّة واحدة في عمره.
+void Function(RealtimeSubscribeStatus, Object?) retryOnChannelError(
+  void Function() onRetry, {
+  Duration delay = const Duration(seconds: 3),
+  bool Function()? isAlive,
+}) {
+  var scheduled = false;
+  return (status, error) {
+    if (status != RealtimeSubscribeStatus.channelError &&
+        status != RealtimeSubscribeStatus.timedOut) {
+      return;
+    }
+    // مرّة واحدة لكل قناة: الحالة قد تتكرّر فلا تُجدوَل محاولات متراكمة.
+    if (scheduled) return;
+    scheduled = true;
+    Timer(delay, () {
+      if (isAlive != null && !isAlive()) return;
+      onRetry();
+    });
+  };
+}

@@ -467,6 +467,33 @@ class _TrixScreenState extends State<TrixScreen> with TickerProviderStateMixin {
     if (mounted) setState(() {});
   }
 
+  /// إعادة بناء قناة اللعبة وحدها عند انقطاعها.
+  ///
+  /// لا تُستدعى _bind لأنّها تُصفّر حالة اللعبة كاملةً (_v والتأثيرات
+  /// والاختيارات) — فانقطاع شبكة لحظي كان سيُفرغ الطاولة أمام اللاعب
+  /// في منتصف يده.
+  void _rebindChannel() {
+    if (!mounted) return;
+    final gid = widget.gameId;
+    final dead = _ch;
+    _ch = null;
+    if (dead != null) unawaited(_tdb.removeChannel(dead));
+    try {
+      _ch = _tdb.channel('trix_game_${gid}_${DateTime.now().millisecondsSinceEpoch}')
+        ..onBroadcast(event: 'trix_react', callback: _onReactBroadcast)
+        ..onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'trix_games',
+          filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq, column: 'id', value: gid),
+          callback: (_) => _refresh(),
+        )
+        ..subscribe(retryOnChannelError(_rebindChannel, isAlive: () => mounted));
+    } catch (_) {}
+    unawaited(_refresh());
+  }
+
   void _bind() {
     _unbind();
     final gid = widget.gameId;
@@ -492,7 +519,12 @@ class _TrixScreenState extends State<TrixScreen> with TickerProviderStateMixin {
           filter: PostgresChangeFilter(type: PostgresChangeFilterType.eq, column: 'id', value: gid),
           callback: (_) => _refresh(),
         )
-        ..subscribe();
+        // بلا معالج كان RealtimeSubscribeException يهرب إلى المنطقة
+        // فيُسجَّل خطأً قاتلًا — أكثر خطأ تكرارًا في سجلّ المراقبة.
+        ..subscribe(retryOnChannelError(
+          _rebindChannel,
+          isAlive: () => mounted,
+        ));
     } catch (_) {}
     _repoll(RealtimeTuning.active);
     unawaited(_refresh());

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/services/resilient_realtime_channel.dart';
+
 import '../../../../core/error/exceptions.dart';
 import '../models/profile_model.dart';
 import '../../domain/entities/profile_entity.dart';
@@ -168,7 +170,15 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
             }
           },
         );
-        channel!.subscribe((_, __) {});
+        // عند الانقطاع يُعاد جلب البروفايل فورًا بدل انتظار تغيّر لا
+        // يصل أبدًا: القناة الميتة تعني بروفايلًا قديمًا على الشاشة
+        // بلا أيّ إشارة للمستخدم.
+        channel!.subscribe(retryOnChannelError(() async {
+          if (controller.isClosed) return;
+          try {
+            controller.add(await getProfile(uid));
+          } catch (_) {}
+        }, isAlive: () => !controller.isClosed));
       } catch (e, st) {
         if (!controller.isClosed) controller.addError(e, st);
       }
