@@ -11,15 +11,17 @@ import 'youtube_origin.dart';
 /// المشغّل لا يرمي أي استثناء حين يفشل العرض — يبقى صامتًا. هذا يُبلِّغ
 /// الخادم (client_error_logs) بما يقوله يوتيوب نفسه:
 ///   • YT_ERROR  — رمز خطأ يوتيوب الحقيقي (2/5/100/101/150/152…).
-///   • YT_STATE  — أول وصول لكل حالة (unStarted/buffering/playing…)،
-///     فنعرف هل بدأ التشغيل فعلًا أم توقّف قبله.
 /// كل رسالة تحمل videoId والـorigin المستعمل، فلا يبقى شيء للتخمين.
+///
+/// أمّا سجلّ الحالات (YT_STATE) فقد أُزيل: أدّى غرضه وأثبت أنّ التشغيل
+/// يبدأ فعلًا، ثم صار يضخّ سجلّ info لكل حالة لكل فيديو لكل مشاهدة —
+/// فيُزاحم الأخطاء الحقيقية في لوحة المراقبة. الخطأ وحده يُبلَّغ،
+/// والحالة تُستخرَج منه عند الحاجة.
 StreamSubscription<YoutubePlayerValue> attachYoutubeDiagnostics(
   YoutubePlayerController controller, {
   required String videoId,
   required String where,
 }) {
-  final seenStates = <PlayerState>{};
   var errorReported = false;
   return controller.stream.listen((v) {
     if (v.hasError && !errorReported) {
@@ -29,14 +31,6 @@ StreamSubscription<YoutubePlayerValue> attachYoutubeDiagnostics(
         'origin=$kYoutubeEmbedOrigin',
         source: 'youtube_player',
         severity: 'warning',
-      ));
-    }
-    if (seenStates.add(v.playerState)) {
-      unawaited(ErrorMonitor.report(
-        'YT_STATE where=$where video=$videoId state=${v.playerState.name} '
-        'origin=$kYoutubeEmbedOrigin',
-        source: 'youtube_player',
-        severity: 'info',
       ));
     }
   }, onError: (Object e, StackTrace st) {

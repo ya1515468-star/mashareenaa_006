@@ -758,18 +758,6 @@ class _PublishServiceAdSheetState
   String? _service;
   late String? _sector = widget.defaultSector;
 
-  /// اسم القطاع المعروض. يُقرأ من الكتالوج لا يُمرَّر: الورقة تُفتَح
-  /// بمفتاح القطاع وحده، والاسم العربي في الخادم.
-  String _sectorName(WidgetRef ref) {
-    final sectors = ref.watch(garmentSectorsProvider).valueOrNull ??
-        const <Map<String, dynamic>>[];
-    for (final e in sectors) {
-      if (e['sector_key']?.toString() == _sector) {
-        return e['name_ar']?.toString() ?? _sector!;
-      }
-    }
-    return _sector ?? '';
-  }
   String _currency = 'points';
   bool _busy = false;
 
@@ -785,13 +773,18 @@ class _PublishServiceAdSheetState
 
   Future<void> _submit() async {
     if (_sector == null) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBarSfx(const SnackBar(
-          content: Text('لم يُحدَّد القطاع — أعد الفتح من شاشة القطاع')));
+      ScaffoldMessenger.maybeOf(context)?.showSnackBarSfx(
+          const SnackBar(content: Text('اختر القطاع من الخطوة الأولى')));
       return;
     }
-    if (_title.text.trim().isEmpty || _service == null) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBarSfx(const SnackBar(
-          content: Text('اختر نوع الخدمة واكتب عنوان الإعلان')));
+    if (_service == null) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBarSfx(
+          const SnackBar(content: Text('اختر نوع الخدمة من الخطوة الثانية')));
+      return;
+    }
+    if (_title.text.trim().isEmpty) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBarSfx(
+          const SnackBar(content: Text('اكتب عنوان الإعلان')));
       return;
     }
     final fees = await ref.read(garmentPublicationFeesProvider.future);
@@ -901,62 +894,94 @@ class _PublishServiceAdSheetState
                         fontSize: 16,
                         fontWeight: FontWeight.w900)),
                 const SizedBox(height: 14),
+
+                // الخطوة ١: القطاع — مُحدَّد مسبقًا من الشاشة التي
+                // فُتحت منها، وقابل للتغيير برقاقة واحدة.
+                //
+                // كان منتقي القطاع قائمةً منسدلة ثم أُزيل كليًّا، فصار
+                // من يفتح الورقة من مسار لا يحمل قطاعًا يُطلَب منه قطاعٌ
+                // لا يجد له مكانًا. والرقاقات تُظهر الخيارات كلّها بلا
+                // فتح قائمة، فلا يبقى خيار مخفيّ.
+                _StepHeader(n: '١', title: 'القطاع'),
+                const SizedBox(height: 7),
                 Builder(builder: (context) {
-                  // الخادم يشترط أن تنتمي الخدمة للقطاع المختار
-                  // (garment_service_catalog.sector_key) وإلا INVALID_SERVICE،
-                  // فتُعرض فقط خدمات القطاع المختار.
-                  final services = (ref.watch(garmentServiceCatalogProvider)
+                  final sectors =
+                      ref.watch(garmentSectorsProvider).valueOrNull ??
+                          const <Map<String, dynamic>>[];
+                  if (sectors.isEmpty) {
+                    return const Text('جارٍ تحميل القطاعات…',
+                        style: TextStyle(color: Colors.white38, fontSize: 12));
+                  }
+                  return Wrap(spacing: 7, runSpacing: 7, children: [
+                    for (final e in sectors)
+                      if ((e['sector_key']?.toString() ?? '').isNotEmpty)
+                        _PickChip(
+                          label: e['name_ar']?.toString() ??
+                              e['sector_key'].toString(),
+                          selected: _sector == e['sector_key'].toString(),
+                          onTap: () => setState(() {
+                            _sector = e['sector_key'].toString();
+                            // الخدمة تتبع القطاع، فتغييره يُلغي اختيارها
+                            _service = null;
+                          }),
+                        ),
+                  ]);
+                }),
+
+                const SizedBox(height: 16),
+
+                // الخطوة ٢: الخدمة — رقاقات لا قائمة منسدلة، وتُختار
+                // وحدها إن كان للقطاع خدمة واحدة (وهو الحال في كل
+                // القطاعات اليوم) فلا يعلَق العضو عند حقل لم يلحظه.
+                _StepHeader(n: '٢', title: 'نوع الخدمة'),
+                const SizedBox(height: 7),
+                Builder(builder: (context) {
+                  final services = (ref
+                              .watch(garmentServiceCatalogProvider)
                               .valueOrNull ??
                           const <Map<String, dynamic>>[])
                       .where((e) =>
-                          _sector == null ||
+                          _sector != null &&
                           e['sector_key']?.toString() == _sector)
                       .toList();
-                  final keys = services
-                      .map((e) => e['service_key']?.toString() ?? '')
-                      .where((k) => k.isNotEmpty)
-                      .toSet();
-                  return DropdownButtonFormField<String>(
-                    // initialValue خارج القائمة يرمي assertion — نتحقق أولًا
-                    initialValue: keys.contains(_service) ? _service : null,
-                    dropdownColor: const Color(0xFF1A0F33),
-                    decoration:
-                        const InputDecoration(labelText: 'نوع الخدمة'),
-                    items: [
-                      for (final e in services)
-                        if ((e['service_key']?.toString() ?? '').isNotEmpty)
-                          DropdownMenuItem(
-                            value: e['service_key'].toString(),
-                            child: Text(e['name_ar']?.toString() ??
-                                e['service_key'].toString()),
-                          ),
-                    ],
-                    onChanged: (v) => setState(() => _service = v),
-                  );
+
+                  if (_sector == null) {
+                    return const Text('اختر القطاع أوّلًا',
+                        style: TextStyle(color: Colors.white38, fontSize: 12));
+                  }
+                  if (services.isEmpty) {
+                    return const Text(
+                        'لا خدمات متاحة في هذا القطاع بعد — اختر قطاعًا آخر',
+                        style: TextStyle(
+                            color: Color(0xFFFFB4A2), fontSize: 12));
+                  }
+                  // الاختيار التلقائي للخدمة الواحدة يحدث بعد البناء:
+                  // setState داخل build يرمي.
+                  if (services.length == 1 && _service == null) {
+                    final only = services.first['service_key']?.toString();
+                    if (only != null && only.isNotEmpty) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted && _service == null) {
+                          setState(() => _service = only);
+                        }
+                      });
+                    }
+                  }
+                  return Wrap(spacing: 7, runSpacing: 7, children: [
+                    for (final e in services)
+                      if ((e['service_key']?.toString() ?? '').isNotEmpty)
+                        _PickChip(
+                          label: e['name_ar']?.toString() ??
+                              e['service_key'].toString(),
+                          selected: _service == e['service_key'].toString(),
+                          onTap: () => setState(
+                              () => _service = e['service_key'].toString()),
+                        ),
+                  ]);
                 }),
-                const SizedBox(height: 10),
-                // أُزيل منتقي القطاع: القطاع مُحدَّد أصلًا من الشاشة التي
-                // فُتحت منها هذه الورقة، فإعادة سؤاله تسمح باختيار قطاع
-                // غير الذي يتصفّحه العضو ثم خدمةٍ لا تتبعه — فيرفض
-                // الخادم بـINVALID_SERVICE ويبدو النشر معطَّلًا.
-                if (_sector != null)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: .05),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white12),
-                    ),
-                    child: Row(children: [
-                      const Icon(Icons.category_rounded,
-                          size: 16, color: Color(0xFFFFD700)),
-                      const SizedBox(width: 8),
-                      Text('القطاع: ${_sectorName(ref)}',
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 12.5)),
-                    ]),
-                  ),
+
+                const SizedBox(height: 16),
+                _StepHeader(n: '٣', title: 'تفاصيل الإعلان'),
                 const SizedBox(height: 10),
                 TextField(
                     controller: _title,
@@ -1476,6 +1501,84 @@ class _PublicationFeesDialogState extends ConsumerState<_PublicationFeesDialog> 
         TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('إلغاء')),
         FilledButton(onPressed: _busy ? null : _save, child: const Text('حفظ')),
       ],
+    );
+  }
+}
+
+/// ترويسة خطوة: رقم في دائرة ذهبية ثم العنوان.
+class _StepHeader extends StatelessWidget {
+  const _StepHeader({required this.n, required this.title});
+  final String n;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        Container(
+          width: 21,
+          height: 21,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+              color: Color(0xFFFFD700), shape: BoxShape.circle),
+          child: Text(n,
+              style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900)),
+        ),
+        const SizedBox(width: 8),
+        Text(title,
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w900)),
+      ]);
+}
+
+/// رقاقة اختيار واحدة.
+///
+/// بديل القائمة المنسدلة: الخيارات كلّها مرئية بلا فتح، والمختار
+/// بيّنٌ بإطاره ولونه — فلا يبقى حقلٌ يظنّ العضو أنّه مُعبّأ وهو فارغ.
+class _PickChip extends StatelessWidget {
+  const _PickChip(
+      {required this.label, required this.selected, required this.onTap});
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          color: selected
+              ? const Color(0xFFFFD700).withValues(alpha: .16)
+              : Colors.white.withValues(alpha: .05),
+          border: Border.all(
+            color: selected
+                ? const Color(0xFFFFD700)
+                : Colors.white.withValues(alpha: .14),
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          if (selected)
+            const Padding(
+              padding: EdgeInsets.only(left: 5),
+              child: Icon(Icons.check_rounded,
+                  size: 13, color: Color(0xFFFFD700)),
+            ),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 12.5,
+                  color: selected ? const Color(0xFFFFD700) : Colors.white70,
+                  fontWeight:
+                      selected ? FontWeight.w900 : FontWeight.w500)),
+        ]),
+      ),
     );
   }
 }

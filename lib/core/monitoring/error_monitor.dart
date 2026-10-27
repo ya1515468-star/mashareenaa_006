@@ -46,6 +46,7 @@ class ErrorMonitor {
     String? screen,
     String? source,
     String severity = 'error',
+    String? details,
   }) async {
     try {
       if (Supabase.instance.client.auth.currentUser == null) return;
@@ -82,7 +83,7 @@ class ErrorMonitor {
         'p_severity': severity,
         'p_screen': scrFinal,
         'p_source': source,
-        'p_details': stack?.toString(),
+        'p_details': details ?? stack?.toString(),
         'p_platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
         'p_app_version': _appVersion,
       });
@@ -139,11 +140,32 @@ class ErrorMonitor {
         return;
       }
 
+      // تجاوز التخطيط (RenderFlex overflowed) لا يُرفق Flutter به
+      // stack يعود إلى شيفرتنا، فكانت ثلاثة تجاوزات في المراقبة بلا
+      // أي دلالة على مكانها — أحدها 325 بكسل، أي محتوى مقطوع فعلًا.
+      // وصف الـcontext وجامع المعلومات يسمّيان الودجت المسؤول.
+      var extra = details.stack?.toString();
+      if (text.contains('overflowed')) {
+        final ctx = details.context?.toDescription();
+        final info = StringBuffer();
+        if (ctx != null && ctx.isNotEmpty) info.writeln('context: $ctx');
+        info.writeln('library: ${details.library ?? '-'}');
+        final collector = details.informationCollector;
+        if (collector != null) {
+          for (final node in collector()) {
+            info.writeln(node.toStringDeep(minLevel: DiagnosticLevel.info));
+          }
+        }
+        if (extra != null) info.writeln(extra);
+        extra = info.toString();
+      }
+
       unawaited(report(
         text,
         stack: details.stack,
         source: 'flutter_error',
         severity: FailureText.isTransient(text) ? 'warning' : 'error',
+        details: extra,
       ));
     };
 
