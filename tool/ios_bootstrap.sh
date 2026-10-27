@@ -13,11 +13,25 @@ set -euo pipefail
 
 BUNDLE_ID="com.mashareena.mashareena"
 APP_NAME="مشاريعنا"
-# 15.0 لا 13.0: حزم حديثة كثيرة (record, file_picker, permission_handler,
-# agora) رفعت حدّها الأدنى، وفشل CocoaPods في إيجاد نسخة متوافقة هو السبب
-# الأشيع لفشل أول بناء iOS. iOS 15 إصدار قديم اليوم فلا يُستثنى به مستخدمون
-# عمليًا، ويريح من مطاردة حدود كل حزمة على حدة.
+# 15.0: حزم حديثة كثيرة (record, file_picker, permission_handler, agora)
+# رفعت حدّها الأدنى فوق 13، ورفعه هنا يريح من مطاردة حدّ كل حزمة على حدة.
+# iOS 15 صدر 2021 فلا يُستثنى به مستخدمون عمليًا.
 MIN_IOS="15.0"
+
+# ── تعطيل Swift Package Manager ────────────────────────────────────────────
+# يجب أن يسبق flutter create: الإعداد يحدّد ما إن كان مشروع Xcode المولَّد
+# يحمل تكامل SPM من أصله.
+#
+# السبب: agora_rtc_engine 6.5.4 اعتمدت تخطيط SPM، وعند البناء عبره لا تُربط
+# رأسيّات AgoraRtcWrapper فيفشل Xcode بـ:
+#   'AgoraRtcWrapper/AgoraPIPController.h' file not found
+# وهو ما يصلحه سجل تغييرات 6.6.4 بـ"link all Apple SwiftPM products".
+#
+# نعطّل SPM بدل ترقية Agora: الترقية تمسّ واجهة الاتصال الصوتي/المرئي في كل
+# التطبيق وبناء أندرويد يعمل على 6.5.4 أصلًا، أمّا CocoaPods فمسار مُثبَت
+# والحزمة تُبقي podspec للتوافق. لا شيء في كود التطبيق يتغيّر.
+flutter config --no-enable-swift-package-manager >/dev/null
+echo "▶ SPM معطّل — البناء عبر CocoaPods."
 
 if [ ! -d ios ]; then
   echo "▶ توليد مشروع iOS…"
