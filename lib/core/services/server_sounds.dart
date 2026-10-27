@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// نغمات التطبيق كلها محفوظة في الخادم (جدول app_sounds) وليست في المشروع.
@@ -17,7 +19,31 @@ class ServerSounds {
   final Map<String, String> _mime = <String, String>{};
   final Map<String, Future<Uint8List?>> _loading = <String, Future<Uint8List?>>{};
   final Map<String, DateTime> _lastPlayed = <String, DateTime>{};
+  final Map<String, String> _files = <String, String>{};
   bool _prefetched = false;
+
+  /// هل فشل التشغيل من البايتات على هذا الجهاز؟
+  ///
+  /// BytesSource يمرّ على أندرويد عبر مصدر بيانات في الذاكرة، وبعض الأجهزة
+  /// وإصدارات النظام ترفضه بصمت لملفات WAV فلا يُسمع شيء ولا يُرمى خطأ
+  /// مفيد. عند أول فشل يُتحوَّل نهائيًّا إلى ملف على القرص — وهو المسار
+  /// الذي يقبله كل جهاز. يُجرَّب مرّة واحدة لا عند كل نغمة.
+  bool _bytesUnsupported = false;
+
+  /// يكتب النغمة ملفًّا مؤقّتًا مرّة واحدة ويعيد مساره.
+  Future<String?> _fileFor(String key, Uint8List bytes) async {
+    final cached = _files[key];
+    if (cached != null && File(cached).existsSync()) return cached;
+    try {
+      final dir = await getTemporaryDirectory();
+      final ext = (_mime[key] ?? 'audio/wav').endsWith('mpeg') ? 'mp3' : 'wav';
+      final f = File('${dir.path}/snd_$key.$ext');
+      await f.writeAsBytes(bytes, flush: true);
+      return _files[key] = f.path;
+    } catch (_) {
+      return null;
+    }
+  }
 
   SupabaseClient get _db => Supabase.instance.client;
 
@@ -137,10 +163,23 @@ class ServerSounds {
       try {
         await player.stop();
       } catch (_) {}
-      await player.play(
-        BytesSource(bytes, mimeType: _mime[key] ?? 'audio/wav'),
-        volume: volume,
-      );
+
+      if (!_bytesUnsupported) {
+        try {
+          await player.play(
+            BytesSource(bytes, mimeType: _mime[key] ?? 'audio/wav'),
+            volume: volume,
+          );
+          return true;
+        } catch (_) {
+          // لا يُعاد المحاولة بالبايتات بعد اليوم على هذا الجهاز.
+          _bytesUnsupported = true;
+        }
+      }
+
+      final path = await _fileFor(key, bytes);
+      if (path == null) return false;
+      await player.play(DeviceFileSource(path), volume: volume);
       return true;
     } catch (_) {
       return false;

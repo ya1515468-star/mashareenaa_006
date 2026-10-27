@@ -2324,16 +2324,29 @@ class _TrixScreenState extends State<TrixScreen> with TickerProviderStateMixin {
               )
             : GestureDetector(
                 onTap: () => setState(() => _reactOpen = true),
-                child: Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: const Color(0xAA140E22),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0x55FFD166)),
+                // ينبض برفق: الدائرة الصغيرة الصامتة في زاوية الطاولة كانت
+                // تمرّ دون أن تُرى، فلا يعرف اللاعب أنّ للسمايلات وجودًا.
+                child: AnimatedBuilder(
+                  animation: _tableGlow,
+                  builder: (_, child) {
+                    final t = _tableGlow.value;
+                    final pulse = 1 + 0.07 * math.sin(t * math.pi * 2);
+                    return Transform.scale(scale: pulse, child: child);
+                  },
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xDD1B1230),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xAAFFD166), width: 1.6),
+                      boxShadow: const [
+                        BoxShadow(color: Color(0x55FFD166), blurRadius: 10, spreadRadius: 1),
+                      ],
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text('😀', style: TextStyle(fontSize: 24)),
                   ),
-                  alignment: Alignment.center,
-                  child: const Text('😀', style: TextStyle(fontSize: 18)),
                 ),
               ),
       ),
