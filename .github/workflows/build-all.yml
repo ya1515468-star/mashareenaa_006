@@ -229,6 +229,43 @@ jobs:
             out/THIRD_PARTY_NOTICES.txt
           generate_release_notes: true
 
+      # نسخ بأسماء ثابتة. السبب: آلية التحديث داخل التطبيق تحتاج رابط
+      # تنزيل لا يتغيّر، وأسماء البناء تحمل اختصار الدفعة فتتبدّل كل مرّة.
+      # رفعها بالاسم نفسه يستبدل القديم بدل أن يتراكم بجانبه.
+      - name: Stable-named copies for permanent download links
+        if: github.ref == 'refs/heads/main'
+        run: |
+          set -e
+          SHORT=$(git rev-parse --short HEAD)
+          cp "out/MASHAREENA-arm64-${SHORT}.apk"     out/MASHAREENA-latest-arm64.apk
+          cp "out/MASHAREENA-universal-${SHORT}.apk" out/MASHAREENA-latest-universal.apk
+          cp "out/MASHAREENA-ANDROID-${SHORT}.zip"   out/MASHAREENA-latest-android.zip
+          (cd out && sha256sum MASHAREENA-latest-*.apk MASHAREENA-latest-*.zip \
+             > SHA256SUMS-latest.txt && cat SHA256SUMS-latest.txt)
+          # يُطبع ليُسجَّل في جدول الإصدارات: الخادم يحمله للعميل فيتحقّق
+          # من سلامة الملف المنزَّل قبل التثبيت.
+          A=$(sha256sum out/MASHAREENA-latest-arm64.apk | cut -d' ' -f1)
+          B=$(stat -c%s out/MASHAREENA-latest-arm64.apk)
+          echo "::warning::ARM64_SHA256=$A"
+          echo "::warning::ARM64_SIZE=$B"
+
+      # إصدار latest-build يتراكم: softprops يضيف ولا يحذف، فبعد عشرين
+      # دفعة صار فيه عشرات الملفات القديمة بأسماء مختلفة. تُحذف كل ما لا
+      # يحمل الاسم الثابت قبل الرفع، فيبقى الإصدار صفحة نظيفة بأحدث نسخة.
+      - name: Prune stale assets on latest-build
+        if: github.ref == 'refs/heads/main'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view latest-build --json assets \
+            --jq '.assets[].name' 2>/dev/null | while read -r n; do
+              case "$n" in
+                MASHAREENA-latest-*|SHA256SUMS-latest.txt|BUILD_INFO.txt) ;;
+                *) echo "حذف قديم: $n"; gh release delete-asset latest-build "$n" -y || true ;;
+              esac
+            done
+
       - name: Publish latest build (pre-release)
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
@@ -238,9 +275,11 @@ jobs:
           prerelease: true
           target_commitish: ${{ github.sha }}
           files: |
-            out/*.aab
-            out/*.apk
-            out/SHA256SUMS.txt
+            out/MASHAREENA-latest-arm64.apk
+            out/MASHAREENA-latest-universal.apk
+            out/MASHAREENA-latest-android.zip
+            out/SHA256SUMS-latest.txt
+            out/BUILD_INFO.txt
 
       - name: Remove temporary signing files
         if: always()

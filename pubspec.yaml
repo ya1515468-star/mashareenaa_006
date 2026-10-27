@@ -98,6 +98,9 @@ dependencies:
 
   permission_handler: ^12.0.3
   url_launcher: ^6.3.1
+  # لقراءة versionCode المثبَّت فعلًا على الجهاز. لا يكشفه Flutter نفسه،
+  # وقراءته من ثابت مولَّد وقت البناء تكذب إن ثبّت المستخدم نسخة أخرى.
+  package_info_plus: ^8.1.1
   record: 6.2.1
   path_provider: ^2.1.4
   geolocator: ^13.0.1
