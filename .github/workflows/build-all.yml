@@ -258,8 +258,15 @@ jobs:
             echo "::group::آخر 80 سطرًا"
             tail -80 ios_build.txt
             echo "::endgroup::"
-            grep -iE "error|fatal|required|minimum deployment|CocoaPods|not compatible|could not find" ios_build.txt \
-              | tail -25 | sed 's/^/::error::/'
+            # ملخّص المهمة يُقرأ عبر الواجهة البرمجية، بخلاف السجل الخام.
+            {
+              echo '## فشل بناء iOS — آخر 200 سطر'
+              echo '```'
+              tail -200 ios_build.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            grep -iE "error:|error \(|minimum deployment|CocoaPods|not compatible|could not find|BUILD FAILED" ios_build.txt \
+              | tail -20 | sed 's/^/::error::/'
             exit 1
           fi
 
