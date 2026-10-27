@@ -1,4 +1,5 @@
 import '../../../../core/data/supabase_document_compat.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/error/exceptions.dart';
 import '../models/comment_model.dart';
 import '../models/post_model.dart';
@@ -47,7 +48,7 @@ class PostRemoteDataSourceImpl implements PostRemoteDataSource {
     try {
       await _posts.add(post.toMap());
     } catch (e) {
-      throw ServerException(message: 'تعذّر نشر المنشور: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -64,7 +65,7 @@ class PostRemoteDataSourceImpl implements PostRemoteDataSource {
         'p_doc_id': postId,
       });
     } catch (e) {
-      throw ServerException(message: 'تعذّر حذف المنشور: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -85,7 +86,7 @@ class PostRemoteDataSourceImpl implements PostRemoteDataSource {
         }
       });
     } catch (e) {
-      throw ServerException(message: 'تعذّر تحديث الإعجاب: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -96,7 +97,7 @@ class PostRemoteDataSourceImpl implements PostRemoteDataSource {
       final doc = await _posts.doc(postId).collection('likes').doc(uid).get();
       return doc.exists;
     } catch (e) {
-      throw ServerException(message: 'تعذّر التحقق من حالة الإعجاب: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -124,7 +125,7 @@ class PostRemoteDataSourceImpl implements PostRemoteDataSource {
       batch.update(postRef, {'commentsCount': FieldValue.increment(1)});
       await batch.commit();
     } catch (e) {
-      throw ServerException(message: 'تعذّر إضافة التعليق: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -140,7 +141,7 @@ class PostRemoteDataSourceImpl implements PostRemoteDataSource {
         'p_doc_id': commentId,
       });
     } catch (e) {
-      throw ServerException(message: 'تعذّر حذف التعليق: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 }

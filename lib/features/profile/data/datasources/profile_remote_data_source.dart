@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -125,7 +126,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     } on ServerException {
       rethrow;
     } catch (e) {
-      throw ServerException(message: 'لم يكتمل إنشاء الملف الشخصي: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -140,7 +141,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     } on ServerException {
       rethrow;
     } catch (e) {
-      throw ServerException(message: 'لم يكتمل تحميل الملف الشخصي: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -286,7 +287,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     } on ServerException {
       rethrow;
     } catch (e) {
-      throw ServerException(message: 'لم يكتمل تحديث الملف الشخصي: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 

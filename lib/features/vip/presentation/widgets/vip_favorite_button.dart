@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -58,7 +59,7 @@ class VipFavoriteButton extends ConsumerWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          SnackBar(content: Text('تعذر تحديث المفضلة: $e')),
+          SnackBar(content: Text(FailureText.of(e))),
         );
       }
     }

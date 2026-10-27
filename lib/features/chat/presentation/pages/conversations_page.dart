@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/widgets/served_ad_slot.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -92,7 +93,7 @@ class ConversationsPage extends ConsumerWidget {
                 const Icon(Icons.error_outline_rounded,
                     size: 40, color: Color(0xFFEF4444)),
                 const SizedBox(height: 10),
-                Text('$e',
+                Text(FailureText.of(e),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                         color: Colors.white54, fontSize: 12.5)),
@@ -158,7 +159,7 @@ class ConversationsPage extends ConsumerWidget {
       ));
     } catch (e) {
       messenger?.showSnackBarSfx(SnackBar(
-          content: Text('تعذّر التغيير: $e'),
+          content: Text(FailureText.action(e, action: 'التغيير')),
           backgroundColor: const Color(0xFFDC2626)));
     }
   }
@@ -196,7 +197,7 @@ class ConversationsPage extends ConsumerWidget {
           backgroundColor: const Color(0xFF16A34A)));
     } catch (e) {
       messenger?.showSnackBarSfx(SnackBar(
-          content: Text('تعذّر المسح: $e'),
+          content: Text(FailureText.of(e)),
           backgroundColor: const Color(0xFFDC2626)));
     }
   }
@@ -409,7 +410,7 @@ class _ThreadTile extends ConsumerWidget {
       onChanged();
     } catch (e) {
       messenger?.showSnackBarSfx(SnackBar(
-          content: Text('تعذّر التنفيذ: $e'),
+          content: Text(FailureText.action(e, action: 'التنفيذ')),
           backgroundColor: const Color(0xFFDC2626)));
     }
   }
@@ -425,7 +426,7 @@ class _ThreadTile extends ConsumerWidget {
           backgroundColor: Color(0xFF16A34A)));
     } catch (e) {
       messenger?.showSnackBarSfx(SnackBar(
-          content: Text('تعذّر الحذف: $e'),
+          content: Text(FailureText.action(e, action: 'الحذف')),
           backgroundColor: const Color(0xFFDC2626)));
     }
   }

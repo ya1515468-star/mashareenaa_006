@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../rbac/presentation/widgets/server_username_display.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/di/injection_container.dart';
@@ -30,7 +31,7 @@ class BlockedUsersPage extends ConsumerWidget {
       appBar: AppBar(title: const Text('المستخدمون المحظورون')),
       body: blockedAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('تعذّر التحميل: $e')),
+        error: (e, _) => Center(child: Text(FailureText.action(e, action: 'التحميل'))),
         data: (uids) {
           if (uids.isEmpty) {
             return Center(

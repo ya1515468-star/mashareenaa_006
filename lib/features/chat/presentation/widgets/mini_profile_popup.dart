@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
@@ -166,7 +167,7 @@ class MiniProfilePopup extends ConsumerWidget {
       unawaited(ErrorMonitor.report(e, screen: 'mini_profile_popup', source: 'admin_set_member_avatar'));
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBarSfx(SnackBar(content: Text('تعذّر تحديث الصورة: $e')));
+          .showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -273,7 +274,7 @@ class MiniProfilePopup extends ConsumerWidget {
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBarSfx(SnackBar(content: Text('تعذر تحميل الرتب: $e')));
+          .showSnackBarSfx(SnackBar(content: Text(FailureText.of(e, subject: 'الرتب'))));
     }
   }
 

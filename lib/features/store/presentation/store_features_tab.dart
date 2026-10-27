@@ -1,4 +1,5 @@
 import '../domain/usecases/store_usecases.dart';
+import '../../../core/error/failure_text.dart';
 import '../../../core/services/snack_sfx.dart';
 // ignore_for_file: prefer_const_declarations
 
@@ -92,7 +93,7 @@ class _StoreFeaturesTabState extends ConsumerState<StoreFeaturesTab> {
 
     return catalogAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('تعذّر تحميل المتجر: $e')),
+      error: (e, _) => Center(child: Text(FailureText.of(e, subject: 'المتجر'))),
       data: (catalog) {
         final type = widget.featureType ?? StoreFeatureType.glow;
         final items = _filterAndGenerate(

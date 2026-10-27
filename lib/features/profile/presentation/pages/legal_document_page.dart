@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -63,7 +64,7 @@ class _LegalDocumentPageState extends State<LegalDocumentPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = FailureText.of(e);
         _loading = false;
       });
     }

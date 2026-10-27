@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -67,7 +68,7 @@ class _AdminReportsTabState extends ConsumerState<AdminReportsTab> {
       messenger?.showSnackBarSfx(SnackBar(
           content: Text(newStatus == 'resolved' ? 'عولج البلاغ' : 'تُجوهل البلاغ')));
     } catch (e) {
-      messenger?.showSnackBarSfx(SnackBar(content: Text('تعذّر التحديث: $e')));
+      messenger?.showSnackBarSfx(SnackBar(content: Text(FailureText.action(e, action: 'التحديث'))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -113,7 +114,7 @@ class _AdminReportsTabState extends ConsumerState<AdminReportsTab> {
         messenger?.showSnackBarSfx(const SnackBar(content: Text('نُشر التحذير')));
       }
     } catch (e) {
-      messenger?.showSnackBarSfx(SnackBar(content: Text('تعذّر النشر: $e')));
+      messenger?.showSnackBarSfx(SnackBar(content: Text(FailureText.action(e, action: 'النشر'))));
     } finally {
       title.dispose();
       details.dispose();
@@ -152,7 +153,7 @@ class _AdminReportsTabState extends ConsumerState<AdminReportsTab> {
               child: Text(
                 e.toString().contains('FORBIDDEN')
                     ? 'عرض البلاغات يتطلب صلاحية الإشراف.'
-                    : 'تعذّر تحميل البلاغات: $e',
+                    : FailureText.of(e, subject: 'البلاغات'),
                 textAlign: TextAlign.center,
               ),
             ),

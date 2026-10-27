@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -101,7 +102,7 @@ class _GarmentContactGateState extends ConsumerState<GarmentContactGate> {
         : t.contains('INSUFFICIENT_POINTS') ? 'رصيدك من النقاط لا يكفي.'
         : t.contains('CANNOT_UNLOCK_OWN') ? 'هذا منشورك أنت.'
         : t.contains('CONTACT_UNLOCK_DISABLED') ? 'التواصل المدفوع متوقف حاليًا.'
-        : 'تعذّر فتح التواصل: $e',
+        : FailureText.of(e),
       )));
     } finally {
       if (mounted) setState(() => _busy = false);

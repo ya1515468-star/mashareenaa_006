@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -49,7 +50,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = FailureText.of(e);
         _loading = false;
       });
     }
@@ -197,7 +198,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
           ? 'لا يمكن أن تكون المدّة بلا سعر — اضبط نقاطًا أو جواهر.'
           : e.toString().contains('INVALID_DAYS')
               ? 'عدد الأيام يجب أن يكون بين 1 و 3650.'
-              : 'تعذّر الحفظ: $e');
+              : FailureText.action(e, action: 'الحفظ'));
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -232,7 +233,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
       await _load();
       _toast('عُطِّلت ✓', ok: true);
     } catch (e) {
-      _toast('تعذّر التعطيل: $e');
+      _toast(FailureText.of(e));
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -289,7 +290,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
       await _load();
       _toast(paused ? 'أُعيد العرض ✓' : 'أُوقف العرض ✓', ok: true);
     } catch (e) {
-      _toast('تعذّر التنفيذ: $e');
+      _toast(FailureText.action(e, action: 'التنفيذ'));
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -368,7 +369,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
       await _load();
       _toast('حُفظ على الخادم ✓', ok: true);
     } catch (e) {
-      _toast('تعذّر الحفظ: $e');
+      _toast(FailureText.action(e, action: 'الحفظ'));
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -515,7 +516,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
           ? 'التردّد يجب أن يكون بين 1 و 100.'
           : e.toString().contains('INVALID_DAILY_CAP')
               ? 'الحدّ اليومي بين 0 و 100.'
-              : 'تعذّر الحفظ: $e');
+              : FailureText.action(e, action: 'الحفظ'));
     } finally {
       if (mounted) setState(() => _busy = null);
     }

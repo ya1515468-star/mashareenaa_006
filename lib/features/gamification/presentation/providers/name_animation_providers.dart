@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../../../core/error/failure_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/name_animation_repository.dart';
@@ -9,7 +10,7 @@ final nameAnimationCatalogProvider = FutureProvider<List<NameAnimation>>((ref) =
 final myNameAnimationOwnershipProvider = FutureProvider<Set<String>>((ref) => ref.read(nameAnimationRepositoryProvider).owned());
 final activeNameAnimationProvider = FutureProvider.family<NameAnimation?, String>((ref, uid) async {
   try { return await ref.read(nameAnimationRepositoryProvider).active(uid); } catch (e, st) {
-    debugPrint('activeNameAnimationProvider[$uid] failed: $e');
+    debugPrint(FailureText.of(e));
     debugPrintStack(stackTrace: st);
     rethrow;
   }
@@ -24,7 +25,7 @@ final nameAnimationAssetBytesProvider = FutureProvider.family<Uint8List?, NameAn
     final bytes = await Supabase.instance.client.storage.from('name-animations').download(path);
     return bytes.isEmpty ? null : bytes;
   } catch (e, st) {
-    debugPrint('nameAnimationAssetBytesProvider[$path] failed: $e');
+    debugPrint(FailureText.of(e));
     debugPrintStack(stackTrace: st);
     rethrow;
   }
@@ -38,7 +39,7 @@ final nameAnimationStorageBytesProvider = FutureProvider.family<Uint8List?, Stri
     final bytes = await Supabase.instance.client.storage.from('name-animations').download(path);
     return bytes.isEmpty ? null : bytes;
   } catch (e, st) {
-    debugPrint('nameAnimationStorageBytesProvider[$path] failed: $e');
+    debugPrint(FailureText.of(e));
     debugPrintStack(stackTrace: st);
     rethrow;
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/di/injection_container.dart';
@@ -71,10 +72,10 @@ class AdminRolesTab extends ConsumerWidget {
 
     return rolesAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('تعذّر تحميل الأدوار: $e')),
+      error: (e, _) => Center(child: Text(FailureText.of(e, subject: 'الأدوار'))),
       data: (roles) => permissionsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('تعذّر تحميل الصلاحيات: $e')),
+        error: (e, _) => Center(child: Text(FailureText.of(e, subject: 'الصلاحيات'))),
         data: (permissionRows) => ListView.builder(
         padding: const EdgeInsets.all(12),
         itemCount: roles.length,

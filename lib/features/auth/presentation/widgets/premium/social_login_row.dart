@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../../../../core/error/failure_text.dart';
 import 'dart:math' as math;
 
 import 'package:crypto/crypto.dart';
@@ -77,7 +78,7 @@ class _SocialLoginRowState extends State<SocialLoginRow> {
         accessToken: googleAuth.accessToken,
       );
     } catch (e) {
-      widget.onError?.call('تعذّر تسجيل الدخول عبر Google: $e');
+      widget.onError?.call(FailureText.of(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -104,7 +105,7 @@ class _SocialLoginRowState extends State<SocialLoginRow> {
         nonce: rawNonce,
       );
     } catch (e) {
-      widget.onError?.call('تعذّر تسجيل الدخول عبر Apple: $e');
+      widget.onError?.call(FailureText.of(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

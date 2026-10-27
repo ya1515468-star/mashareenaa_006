@@ -1,4 +1,5 @@
 import 'package:video_player/video_player.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -119,7 +120,7 @@ class _PublishReelSheetState extends ConsumerState<PublishReelSheet> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _error = 'فشل رفع الفيديو: $e');
+      if (mounted) setState(() => _error = FailureText.of(e));
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
@@ -138,16 +139,16 @@ class _PublishReelSheetState extends ConsumerState<PublishReelSheet> {
     try {
       final uid = Supabase.instance.client.auth.currentUser?.id ?? 'anon';
       final ext = file.name.split('.').last;
-      final path = '$uid/reel_thumbnails/${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final path = FailureText.of(e);
       final url = await MediaUploadService(bucket: 'media').uploadBytesAtPath(
         bytes: file.bytes!,
         fileName: file.name,
         path: path,
-        contentType: 'image/$ext',
+        contentType: FailureText.of(e),
       );
       if (mounted) setState(() => _thumbnailUrl = url);
     } catch (e) {
-      if (mounted) setState(() => _error = 'فشل رفع الصورة: $e');
+      if (mounted) setState(() => _error = FailureText.of(e));
     } finally {
       if (mounted) setState(() => _uploading = false);
     }

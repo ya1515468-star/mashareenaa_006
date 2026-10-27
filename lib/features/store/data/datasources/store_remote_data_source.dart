@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/error/failure_text.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/error/exceptions.dart';
@@ -89,7 +90,7 @@ class StoreRemoteDataSourceImpl implements StoreRemoteDataSource {
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر تحديث عنصر المتجر: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -257,12 +258,12 @@ class StoreRemoteDataSourceImpl implements StoreRemoteDataSource {
       }).toList(growable: false);
     } on PostgrestException catch (e) {
       throw ServerException(
-        message: 'تعذّر جلب كتالوج المتجر: ${e.message}',
+        message: FailureText.of(e),
         code: e.code,
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر جلب كتالوج المتجر: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -333,7 +334,7 @@ class StoreRemoteDataSourceImpl implements StoreRemoteDataSource {
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر شراء عنصر المتجر: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -384,7 +385,7 @@ class StoreRemoteDataSourceImpl implements StoreRemoteDataSource {
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر إنشاء عنصر المتجر: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -425,7 +426,7 @@ class StoreRemoteDataSourceImpl implements StoreRemoteDataSource {
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر إهداء العنصر: $e',
+        message: FailureText.of(e),
       );
     }
   }

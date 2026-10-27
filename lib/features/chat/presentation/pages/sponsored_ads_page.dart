@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import '../../../../core/error/failure_text.dart';
 import 'dart:async';
 import '../../../../core/services/snack_sfx.dart';
 
@@ -68,7 +69,7 @@ class _SponsoredAdsPageState extends ConsumerState<SponsoredAdsPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = FailureText.of(e);
         _loading = false;
       });
     }
@@ -143,7 +144,7 @@ class _SponsoredAdsPageState extends ConsumerState<SponsoredAdsPage> {
                           ? 'هذه المدّة لم تبقَ متاحة — أعد الاختيار.'
                           : t.contains('AD_TEXT_TOO_LONG')
                               ? 'نص الإعلان أطول من 500 حرف.'
-                              : 'تعذّر نشر الإعلان: $e',
+                              : FailureText.of(e),
         ),
       ));
     }
@@ -367,7 +368,7 @@ class _PublishSheetState extends State<_PublishSheet> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _planError = '$e';
+        _planError = FailureText.of(e);
         _loadingPlans = false;
       });
     }
@@ -747,7 +748,7 @@ class _CategoryManagerSheetState extends State<_CategoryManagerSheet> {
         await _load();
         widget.onChanged();
       } catch (e) {
-        m?.showSnackBarSfx(SnackBar(content: Text('تعذّر الحفظ: $e')));
+        m?.showSnackBarSfx(SnackBar(content: Text(FailureText.action(e, action: 'الحفظ'))));
       }
     }
   }
@@ -760,7 +761,7 @@ class _CategoryManagerSheetState extends State<_CategoryManagerSheet> {
       await _load();
       widget.onChanged();
     } catch (e) {
-      m?.showSnackBarSfx(SnackBar(content: Text('تعذّر الحذف: $e')));
+      m?.showSnackBarSfx(SnackBar(content: Text(FailureText.action(e, action: 'الحذف'))));
     }
   }
 

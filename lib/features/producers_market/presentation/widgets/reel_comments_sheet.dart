@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/producers_market_provider.dart';
@@ -93,7 +94,7 @@ class _ReelCommentsSheetState extends ConsumerState<ReelCommentsSheet> {
                   child: CircularProgressIndicator(
                       color: Color(0xFFFFD700))),
               error: (e, _) => Center(
-                  child: Text('خطأ: $e',
+                  child: Text(FailureText.of(e),
                       style: const TextStyle(color: Colors.white38))),
             ),
           ),
@@ -159,7 +160,7 @@ class _ReelCommentsSheetState extends ConsumerState<ReelCommentsSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          SnackBar(content: Text('خطأ: $e')),
+          SnackBar(content: Text(FailureText.of(e))),
         );
       }
     } finally {

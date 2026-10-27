@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -55,7 +56,7 @@ class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
       });
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = FailureText.of(e);
         _loading = false;
       });
     }
@@ -79,7 +80,7 @@ class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('تعذّر الحفظ: $e')));
+          .showSnackBar(SnackBar(content: Text(FailureText.action(e, action: 'الحفظ'))));
     } finally {
       if (mounted) setState(() => _busyType = null);
     }
@@ -169,7 +170,7 @@ class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('تعذّر الحفظ: $e')));
+          .showSnackBar(SnackBar(content: Text(FailureText.action(e, action: 'الحفظ'))));
     }
   }
 

@@ -1,4 +1,5 @@
 import '../../../../core/config/auth_redirect.dart';
+import '../../../../core/error/failure_text.dart';
 import 'dart:async';
 
 import '../../../../core/services/security_risk_probe.dart';
@@ -264,7 +265,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       rethrow;
     } catch (e) {
       throw AuthException(
-        message: 'تعذّر إنشاء الحساب: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -319,7 +320,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       rethrow;
     } catch (e) {
       throw AuthException(
-        message: 'تعذّر تسجيل الدخول: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -336,7 +337,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
     } catch (e) {
       throw AuthException(
-        message: 'تعذّر تسجيل الخروج: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -364,7 +365,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
     } catch (e) {
       throw AuthException(
-        message: 'تعذّر إعادة إرسال رسالة تأكيد البريد: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -382,7 +383,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
     } catch (e) {
       throw AuthException(
-        message: 'تعذّر إرسال رابط إعادة تعيين كلمة المرور: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -440,7 +441,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
     } catch (e) {
       throw AuthException(
-        message: 'تعذّر جلب المستخدم الحالي: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -485,7 +486,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } on sb.AuthException catch (e) {
       throw AuthException(message: _mapAuthError(e), code: e.code);
     } catch (e) {
-      throw AuthException(message: 'تعذّر تحديث البريد الإلكتروني: $e');
+      throw AuthException(message: FailureText.of(e));
     }
   }
 
@@ -496,7 +497,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } on sb.AuthException catch (e) {
       throw AuthException(message: _mapAuthError(e), code: e.code);
     } catch (e) {
-      throw AuthException(message: 'تعذّر تحديث كلمة المرور: $e');
+      throw AuthException(message: FailureText.of(e));
     }
   }
 
@@ -507,7 +508,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } on sb.AuthException catch (e) {
       throw AuthException(message: _mapAuthError(e), code: e.code);
     } catch (e) {
-      throw AuthException(message: 'تعذّر ربط حساب Google: $e');
+      throw AuthException(message: FailureText.of(e));
     }
   }
 
@@ -522,7 +523,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         'deletionRequestedAt': FieldValue.serverTimestamp(),
       }, const SetOptions(merge: true));
     } catch (e) {
-      throw AuthException(message: 'تعذّر تسجيل طلب حذف العضوية: $e');
+      throw AuthException(message: FailureText.of(e));
     }
   }
 

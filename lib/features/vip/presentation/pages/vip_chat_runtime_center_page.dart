@@ -1,4 +1,5 @@
 import 'package:file_picker/file_picker.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -121,7 +122,7 @@ class _VipChatRuntimeCenterPageState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBarSfx(SnackBar(content: Text('تعذر الحفظ: $e')));
+            .showSnackBarSfx(SnackBar(content: Text(FailureText.action(e, action: 'الحفظ'))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -149,7 +150,7 @@ class _VipChatRuntimeCenterPageState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBarSfx(SnackBar(content: Text('تعذر الحفظ: $e')));
+            .showSnackBarSfx(SnackBar(content: Text(FailureText.action(e, action: 'الحفظ'))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);

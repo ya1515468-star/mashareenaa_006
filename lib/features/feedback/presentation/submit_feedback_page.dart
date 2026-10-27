@@ -1,4 +1,5 @@
 import '../../../core/data/supabase_document_compat.dart';
+import '../../../core/error/failure_text.dart';
 import '../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -50,7 +51,7 @@ class _SubmitFeedbackPageState extends ConsumerState<SubmitFeedbackPage> {
       if (!mounted) return;
       setState(() => _sending = false);
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text('تعذر إرسال الاقتراح: $e')),
+        SnackBar(content: Text(FailureText.of(e))),
       );
     }
   }

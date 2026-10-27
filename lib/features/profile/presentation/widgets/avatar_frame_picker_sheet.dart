@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -36,7 +37,7 @@ class AvatarFramePickerSheet extends ConsumerWidget {
         decoration: const BoxDecoration(color: Color(0xFF10131B),borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         child: ref.watch(availableAvatarFramesProvider).when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Padding(padding: const EdgeInsets.all(24),child: Text('تعذر تحميل إطارات الخادم: $e'))),
+          error: (e, _) => Center(child: Padding(padding: const EdgeInsets.all(24),child: Text(FailureText.of(e, subject: 'إطارات الخادم')))),
           data: (frames) {
             if (frames.isEmpty) {
               return const Center(child: Padding(padding: EdgeInsets.all(28),child: Text('لا توجد إطارات متاحة حاليًا.',textAlign: TextAlign.center,style: TextStyle(fontWeight: FontWeight.w800,color: Colors.white70))));
@@ -63,7 +64,7 @@ class AvatarFramePickerSheet extends ConsumerWidget {
                       const SizedBox(height:5),
                       Text(selected?'مُجهز':(unlocked?'تجهيز':'يتطلب شراء'),style:const TextStyle(fontSize:10,color:Colors.white60)),
                       const SizedBox(height:5),
-                      FilledButton(onPressed:unlocked?() async{try{await Supabase.instance.client.rpc('set_avatar_frame',params:{'p_frame_key':f.key});ref.invalidate(currentProfileProvider);ref.invalidate(profileByIdProvider(uid));ref.invalidate(serverUserIdentityProvider);ref.invalidate(serverUserIdentityInRoomProvider);DynamicAvatarFrame.invalidateVisualSizeCache(uid);if(context.mounted){Navigator.pop(context);ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content:Text('تم تجهيز الإطار ✓')));}}catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content:Text('فشل تجهيز الإطار: $e')));}}:null,child:Text(selected?'مُجهز':'تجهيز')),
+                      FilledButton(onPressed:unlocked?() async{try{await Supabase.instance.client.rpc('set_avatar_frame',params:{'p_frame_key':f.key});ref.invalidate(currentProfileProvider);ref.invalidate(profileByIdProvider(uid));ref.invalidate(serverUserIdentityProvider);ref.invalidate(serverUserIdentityInRoomProvider);DynamicAvatarFrame.invalidateVisualSizeCache(uid);if(context.mounted){Navigator.pop(context);ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content:Text('تم تجهيز الإطار ✓')));}}catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content:Text(FailureText.of(e))));}}:null,child:Text(selected?'مُجهز':'تجهيز')),
                     ])));
                   },
                 )),

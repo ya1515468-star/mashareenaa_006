@@ -1,4 +1,5 @@
 import '../../../../core/config/auth_otp.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/config/auth_redirect.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'dart:async';
@@ -137,7 +138,7 @@ class _EmailVerificationCodePageState
     } catch (e) {
       setState(() {
         _loading = false;
-        _error = 'تعذّر التحقق: $e';
+        _error = FailureText.of(e);
       });
     }
   }
@@ -208,7 +209,7 @@ class _EmailVerificationCodePageState
       setState(() {
         _canResend = true;
         _secondsLeft = 0;
-        _error = 'تعذّرت إعادة الإرسال: $e';
+        _error = FailureText.of(e);
       });
     }
   }

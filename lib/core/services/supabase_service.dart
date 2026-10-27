@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../error/failure_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -104,7 +105,7 @@ class SupabaseService {
       debugPrint('[SupabaseService] upload successful, privatePath=$storedPath');
       return storedPath;
     } on StorageException catch (e) {
-      debugPrint('[SupabaseService] storage upload failed: ${e.message}');
+      debugPrint(FailureText.of(e));
       if (currentUploadIdIsActive(uploadId)) {
         await UploadProgressBus.failure(
           id: uploadId,
@@ -116,7 +117,7 @@ class SupabaseService {
       }
       throw StateError(_storageExceptionMessage(e));
     } catch (e) {
-      debugPrint('[SupabaseService] upload exception: ${e.toString()}');
+      debugPrint(FailureText.of(e));
       if (currentUploadIdIsActive(uploadId)) {
         await UploadProgressBus.failure(
           id: uploadId,

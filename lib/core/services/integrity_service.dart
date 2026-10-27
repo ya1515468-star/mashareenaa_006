@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../error/failure_text.dart';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
@@ -70,11 +71,11 @@ class IntegrityService {
     } on PlatformException catch (e) {
       // متوقّع خارج Google Play: نسخة جانبية، محاكٍ، أو خدمات Play غائبة.
       // الخادم يسجّل غياب التصديق ويقرّر بنفسه، فلا نزعج المستخدم بشيء.
-      debugPrint('integrity: ${e.code}');
+      debugPrint(FailureText.of(e));
       _lastRun = DateTime.now();
       return null;
     } catch (e) {
-      debugPrint('integrity: $e');
+      debugPrint(FailureText.of(e));
       return null;
     }
   }

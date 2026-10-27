@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:file_picker/file_picker.dart' as fp;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -147,7 +148,7 @@ class _SectionEditorState extends State<_SectionEditor> {
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = 'تعذر رفع الصورة: $e');
+      setState(() => _error = FailureText.of(e));
     } finally {
       if (mounted) setState(() => _uploadingBg = false);
     }

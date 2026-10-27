@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/widgets/animated_gold.dart';
 import '../../../../core/services/snack_sfx.dart';
 
@@ -156,7 +157,7 @@ class _OwnerUserControlTabState extends ConsumerState<OwnerUserControlTab> {
               error: (e, _) => _ErrorBox(
                 message: e.toString().contains('OWNER_ONLY')
                     ? 'هذه اللوحة للمالك فقط.'
-                    : 'تعذّر تحميل المستخدمين:\n$e',
+                    : FailureText.of(e, subject: 'المستخدمين'),
                 onRetry: () => ref.invalidate(ownerUserSearchProvider(_args)),
               ),
               data: (data) {
@@ -532,7 +533,7 @@ class _UserDetailSheet extends ConsumerWidget {
             loading: () =>
                 const Center(child: CircularProgressIndicator()),
             error: (e, _) => _ErrorBox(
-              message: '$e',
+              message: FailureText.of(e),
               onRetry: () => ref.invalidate(ownerUserDetailProvider(userId)),
             ),
             data: (data) =>
@@ -799,7 +800,7 @@ class _UserDetailSheet extends ConsumerWidget {
     } catch (e) {
       messenger?.hideCurrentSnackBar();
       messenger?.showSnackBarSfx(SnackBar(
-          content: Text('تعذّر الاستنتاج: $e'),
+          content: Text(FailureText.action(e, action: 'الاستنتاج')),
           backgroundColor: const Color(0xFFDC2626)));
     }
   }
@@ -1039,7 +1040,7 @@ class _UserDetailSheet extends ConsumerWidget {
           ? 'لا يمكن تقييد مالك المنصة.'
           : e.toString().contains('OWNER_ONLY')
               ? 'هذا الإجراء للمالك فقط.'
-              : 'فشل الإجراء: $e';
+              : FailureText.of(e);
       messenger?.showSnackBarSfx(SnackBar(
           content: Text(msg), backgroundColor: const Color(0xFFDC2626)));
     }

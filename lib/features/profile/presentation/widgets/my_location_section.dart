@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -115,7 +116,7 @@ class _MyLocationSectionState extends State<MyLocationSection> {
         if (mounted) await _editNeighborhood();
       }
     } catch (e) {
-      _say('تعذّر تحديد الموقع: $e');
+      _say(FailureText.of(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -170,7 +171,7 @@ class _MyLocationSectionState extends State<MyLocationSection> {
       await _load();
       _say('حُفظ على الخادم ✓', ok: true);
     } catch (e) {
-      _say('تعذّر الحفظ: $e');
+      _say(FailureText.action(e, action: 'الحفظ'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -182,7 +183,7 @@ class _MyLocationSectionState extends State<MyLocationSection> {
       await _db.rpc('set_my_location', params: {'p_sharing': v});
       await _load();
     } catch (e) {
-      _say('تعذّر الحفظ: $e');
+      _say(FailureText.action(e, action: 'الحفظ'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

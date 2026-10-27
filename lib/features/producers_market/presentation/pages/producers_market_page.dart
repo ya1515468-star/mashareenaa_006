@@ -1,4 +1,5 @@
 import '../../../rbac/presentation/widgets/server_username_display.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import '../../../chat/presentation/widgets/mini_profile_popup.dart';
 import 'dart:async';
@@ -180,7 +181,7 @@ class _ProducersMarketPageState extends ConsumerState<ProducersMarketPage>
                           color: Color(0xFFFFD700)),
                     ),
                     error: (e, _) => Center(
-                      child: Text('تعذّر تحميل سوق المنتجين: $e',
+                      child: Text(FailureText.of(e, subject: 'سوق المنتجين'),
                           style: const TextStyle(color: Colors.white)),
                     ),
                   ),
@@ -832,7 +833,7 @@ class _SeasonBannerEditorSheetState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          SnackBar(content: Text('خطأ: $e')),
+          SnackBar(content: Text(FailureText.of(e))),
         );
       }
     } finally {
@@ -865,7 +866,7 @@ class _SeasonChip extends StatelessWidget {
               ? Border.all(color: const Color(0xFFFFD700))
               : null,
         ),
-        child: Text('$emoji $label',
+        child: Text(FailureText.of(e),
             style: TextStyle(
                 color: selected ? const Color(0xFFFFD700) : Colors.white70,
                 fontSize: 13)),

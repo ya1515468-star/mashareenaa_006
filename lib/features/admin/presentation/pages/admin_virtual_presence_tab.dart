@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -35,7 +36,7 @@ class _AdminVirtualPresenceTabState extends State<AdminVirtualPresenceTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-            SnackBar(content: Text('تعذر تحديث الحضور الافتراضي: $e')));
+            SnackBar(content: Text(FailureText.of(e))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -53,7 +54,7 @@ class _AdminVirtualPresenceTabState extends State<AdminVirtualPresenceTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBarSfx(SnackBar(content: Text('تعذر تغيير الحالة: $e')));
+            .showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
       }
     }
   }

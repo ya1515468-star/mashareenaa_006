@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/error/exceptions.dart';
@@ -50,10 +51,10 @@ class CallRemoteDataSourceImpl implements CallRemoteDataSource {
       return CallModel.fromMap(data['id'].toString(), data);
     } on PostgrestException catch (e) {
       throw ServerException(
-          message: 'تعذّر بدء الاتصال: ${e.message}', code: e.code);
+          message: FailureText.of(e), code: e.code);
     } catch (e) {
       if (e is ServerException) rethrow;
-      throw ServerException(message: 'تعذّر بدء الاتصال: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -99,10 +100,10 @@ class CallRemoteDataSourceImpl implements CallRemoteDataSource {
       });
     } on PostgrestException catch (e) {
       throw ServerException(
-          message: 'تعذّر تحديث حالة الاتصال: ${e.message}', code: e.code);
+          message: FailureText.of(e), code: e.code);
     } catch (e) {
       if (e is ServerException) rethrow;
-      throw ServerException(message: 'تعذّر تحديث حالة الاتصال: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 }

@@ -1,4 +1,5 @@
 import '../../../rbac/presentation/widgets/server_username_display.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -151,7 +152,7 @@ class _TenderList extends ConsumerWidget {
       loading: () =>
           const Center(child: CircularProgressIndicator(color: Color(0xFFFFD700))),
       error: (e, _) => Center(
-          child: Text('خطأ: $e',
+          child: Text(FailureText.of(e),
               style: const TextStyle(color: Colors.white38))),
     );
   }
@@ -516,7 +517,7 @@ class _SubmitBidSheetState extends ConsumerState<_SubmitBidSheet> {
       );
       if (mounted) setState(() => _attachmentUrl = url);
     } catch (e) {
-      if (mounted) setState(() => _error = 'فشل رفع الملف: $e');
+      if (mounted) setState(() => _error = FailureText.of(e));
     }
   }
 
@@ -547,7 +548,7 @@ class _SubmitBidSheetState extends ConsumerState<_SubmitBidSheet> {
         );
       }
     } catch (e) {
-      if (mounted) setState(() => _error = 'خطأ: $e');
+      if (mounted) setState(() => _error = FailureText.of(e));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -832,7 +833,7 @@ class _PostTenderSheetState extends ConsumerState<_PostTenderSheet> {
         );
       }
     } catch (e) {
-      if (mounted) setState(() => _error = 'خطأ: $e');
+      if (mounted) setState(() => _error = FailureText.of(e));
     } finally {
       if (mounted) setState(() => _posting = false);
     }
@@ -902,7 +903,7 @@ class _MySubmissionsList extends ConsumerWidget {
       loading: () => const Center(
           child: CircularProgressIndicator(color: Color(0xFFFFD700))),
       error: (e, _) => Center(
-          child: Text('خطأ: $e',
+          child: Text(FailureText.of(e),
               style: const TextStyle(color: Colors.white38))),
     );
   }
@@ -1041,7 +1042,7 @@ class _AllSubmissionsAdminPage extends ConsumerWidget {
         loading: () =>
             const Center(child: CircularProgressIndicator(color: Color(0xFFFFD700))),
         error: (e, _) => Center(
-            child: Text('$e', style: const TextStyle(color: Colors.white38))),
+            child: Text(FailureText.of(e), style: const TextStyle(color: Colors.white38))),
       ),
     );
   }

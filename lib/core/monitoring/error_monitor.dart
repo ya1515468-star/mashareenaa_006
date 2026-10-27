@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../error/failure_text.dart';
+
 /// Ships client-side failures to the server so the platform owner can see what
 /// is actually breaking for real users, instead of the problem being invisible
 /// until someone reports it verbally.
@@ -119,16 +121,48 @@ class ErrorMonitor {
           stackText.contains('youtube_player_iframe') &&
               text.contains('unmounted');
       if (isKnownPackageNoise) return;
+
+      // فشل تحميل صورة من الشبكة ليس خطأ برمجيًّا: لكل Image.network
+      // في المشروع errorBuilder يعرض بديلًا، فالمستخدم لا يرى شيئًا
+      // معطوبًا. تسجيله error يجعل رابط أفاتار واحدًا تالفًا يتصدّر
+      // قائمة الأخطاء (10 مرات في الأسبوع الماضي).
+      final isAssetLoad = text.contains('HTTP request failed') ||
+          text.contains('Could not instantiate image codec') ||
+          text.contains('EXCEPTION CAUGHT BY IMAGE RESOURCE SERVICE');
+      if (isAssetLoad) {
+        unawaited(report(
+          text,
+          stack: details.stack,
+          source: 'network_asset',
+          severity: 'warning',
+        ));
+        return;
+      }
+
       unawaited(report(
         text,
         stack: details.stack,
         source: 'flutter_error',
-        severity: 'error',
+        severity: FailureText.isTransient(text) ? 'warning' : 'error',
       ));
     };
 
     PlatformDispatcher.instance.onError = (error, stack) {
-      unawaited(report(error, stack: stack, source: 'uncaught_async', severity: 'fatal'));
+      // أكثر خطأ في المراقبة كان RealtimeSubscribeException مسجَّلًا
+      // fatal من هذا الموضع — 67 مرة على ستة أعضاء. وهو ليس خللًا:
+      // قناة Realtime تُخطئ على اتصال متقطّع، والتطبيق يعيد الاشتراك
+      // تلقائيًّا (retryOnChannelError). تسجيله fatal يُغرق تقرير
+      // الأخطاء الحقيقية بما لا يُصلَح لأنّه ليس عطلًا.
+      //
+      // يبقى مُسجَّلًا — انقطاعٌ متكرّر عند عضو بعينه معلومة تُفيد —
+      // لكن بمصدر وخطورة يقولان ما هو: اتصال، لا انهيار.
+      if (FailureText.isTransient(error)) {
+        unawaited(report(error,
+            stack: stack, source: 'connectivity', severity: 'warning'));
+        return true;
+      }
+      unawaited(report(error,
+          stack: stack, source: 'uncaught_async', severity: 'fatal'));
       return true;
     };
   }

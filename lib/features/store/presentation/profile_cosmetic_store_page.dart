@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../core/error/failure_text.dart';
 // ignore_for_file: prefer_const_constructors
 import 'currency_store/currency_store_tab.dart';
 import '../../../core/services/snack_sfx.dart';
@@ -815,7 +816,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
     final async = ref.watch(messageColorCatalogProvider);
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(child: Text('تعذر تحميل ألوان الرسائل: $error')),
+      error: (error, _) => Center(child: Text(FailureText.of(error, subject: 'ألوان الرسائل'))),
       data: (items) {
         final free = items.where((e) => e.metadata['tier'] == 'free' || e.pricePoints == 0 && e.priceGems == 0).toList();
         final premium = items.where((e) => e.metadata['tier'] == 'premium' || e.pricePoints > 0 || e.priceGems > 0).toList();
@@ -982,7 +983,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       error: (error, _) => Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text('تعذر تحميل إطارات الصور من الخادم: $error'),
+          child: Text(FailureText.of(error, subject: 'إطارات الصور من الخادم')),
         ),
       ),
       data: (frames) {
@@ -1294,7 +1295,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
     const supported = {'gif', 'png', 'jpg', 'jpeg', 'webp', 'bmp'};
     if (!supported.contains(extension)) {
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text('صيغة الإطار غير مدعومة: .$extension')),
+        SnackBar(content: Text(FailureText.of(e))),
       );
       return;
     }
@@ -2534,7 +2535,7 @@ class _MessageTextStyleSectionState
       ref.invalidate(serverUserIdentityInRoomProvider);
       refreshMessageStylePreview(ref);
     } catch (e) {
-      messenger?.showSnackBarSfx(SnackBar(content: Text('تعذّر الحفظ: $e')));
+      messenger?.showSnackBarSfx(SnackBar(content: Text(FailureText.action(e, action: 'الحفظ'))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

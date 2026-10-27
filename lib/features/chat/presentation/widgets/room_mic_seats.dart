@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
@@ -116,7 +117,7 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
         await _voice.setMuted(mine['self_muted'] == true || mine['muted'] == true);
       }
     } catch (e) {
-      _toast('تعذّر الاتصال الصوتي: $e');
+      _toast(FailureText.of(e));
     }
   }
 

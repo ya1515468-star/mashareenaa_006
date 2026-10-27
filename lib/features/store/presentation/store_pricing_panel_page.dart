@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../core/error/failure_text.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -107,7 +108,7 @@ class _StorePricingPanelPageState extends State<StorePricingPanelPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = '$e';
+        _error = FailureText.of(e);
       });
     }
   }
@@ -144,7 +145,7 @@ class _StorePricingPanelPageState extends State<StorePricingPanelPage> {
     } catch (e, st) {
       unawaited(ErrorMonitor.report(e,
           stack: st, screen: 'store_pricing_panel', source: 'save_tier'));
-      _snack('فشل الحفظ: $e', ok: false);
+      _snack(FailureText.action(e, action: 'الحفظ'), ok: false);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -170,7 +171,7 @@ class _StorePricingPanelPageState extends State<StorePricingPanelPage> {
     } catch (e, st) {
       unawaited(ErrorMonitor.report(e,
           stack: st, screen: 'store_pricing_panel', source: 'save_membership'));
-      _snack('فشل الحفظ: $e', ok: false);
+      _snack(FailureText.action(e, action: 'الحفظ'), ok: false);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -214,7 +215,7 @@ class _StorePricingPanelPageState extends State<StorePricingPanelPage> {
     } catch (e, st) {
       unawaited(ErrorMonitor.report(e,
           stack: st, screen: 'store_pricing_panel', source: 'apply_defaults'));
-      _snack('فشل التطبيق: $e', ok: false);
+      _snack(FailureText.of(e), ok: false);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -468,7 +469,7 @@ class _AssignTierSheetState extends State<_AssignTierSheet> {
       if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text('تعذّر جلب العناصر: $e')));
+          SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -494,7 +495,7 @@ class _AssignTierSheetState extends State<_AssignTierSheet> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text('تعذّر الإسناد: $e')));
+          SnackBar(content: Text(FailureText.of(e))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

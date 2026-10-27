@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -225,7 +226,7 @@ class _PackagesGrid extends ConsumerWidget {
         child: CircularProgressIndicator(color: Color(0xFFFFD700)),
       ),
       error: (e, _) =>
-          Center(child: Text('خطأ: $e', style: const TextStyle(color: Colors.red))),
+          Center(child: Text(FailureText.of(e), style: const TextStyle(color: Colors.red))),
     );
   }
 }
@@ -658,7 +659,7 @@ class _PackageEditorSheetState extends ConsumerState<_PackageEditorSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(FailureText.of(e)), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -689,7 +690,7 @@ class _PackageEditorSheetState extends ConsumerState<_PackageEditorSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(FailureText.of(e)), backgroundColor: Colors.red),
         );
       }
     }

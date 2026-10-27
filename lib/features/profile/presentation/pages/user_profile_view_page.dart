@@ -1,4 +1,5 @@
 import 'package:mashareena/core/utils/safe_launch.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/media_upload_service.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:image_picker/image_picker.dart';
@@ -427,7 +428,7 @@ class _LikeButton extends ConsumerWidget {
         } catch (e) {
           if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBarSfx(
-            SnackBar(content: Text('فشل تحديث الإعجاب: $e')),
+            SnackBar(content: Text(FailureText.of(e))),
           );
         }
       },
@@ -614,7 +615,7 @@ class _ProfileVipSurface extends ConsumerWidget {
         ),
       );
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر تحميل الإحصائيات: $e')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e, subject: 'الإحصائيات'))));
     }
   }
   @override
@@ -712,7 +713,7 @@ class _ProfileVipSurface extends ConsumerWidget {
                           final count = raw is List ? raw.length : 0;
                           ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('لديك $count زائرًا مسجلًا.')));
                         } catch (e) {
-                          if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر قراءة تنبيهات الزوار: $e')));
+                          if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
                         }
                       } : null,
                     ),
@@ -824,7 +825,7 @@ class _ProfileVipSurface extends ConsumerWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر إرسال الدعم: $e')));
+        ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
       }
     } finally {
       amount.dispose();
@@ -897,7 +898,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم الشراء وتحويل المقابل لصاحب المتجر ✓')));
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر إتمام الشراء: $e')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -930,7 +931,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
         ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('لا توجد وسائط قابلة للعرض لهذا المنتج.')));
       }
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر فتح المنتج: $e')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -972,7 +973,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
       ref.invalidate(profileVipContentProvider(widget.profileUid));
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم شراء المنتج وتحويل المقابل للبائع ✓')));
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر شراء المنتج: $e')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -1014,7 +1015,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
       ref.invalidate(profileVipContentProvider(widget.profileUid));
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم شراء الباترون ✓')));
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر شراء الباترون: $e')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -1026,7 +1027,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
       final url = await _signedFromServer(raw);
       if (url != null && url.isNotEmpty) await _open(url);
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('يجب شراء الباترون أولًا: $e')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -1038,7 +1039,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
       });
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم تسجيل التصويت ✓')));
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر تسجيل التصويت: $e')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -1616,7 +1617,7 @@ class _AdminEditToolsState extends State<_AdminEditTools> {
     } catch (e) {
       m.showSnackBarSfx(SnackBar(content: Text(e.toString().contains('FORBIDDEN')
           ? 'لا تملك صلاحية تعديل هذا العضو.'
-          : 'تعذّر التعديل: $e')));
+          : FailureText.of(e))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1652,7 +1653,7 @@ class _AdminEditToolsState extends State<_AdminEditTools> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBarSfx(SnackBar(content: Text('تعذّر رفع الصورة: $e')));
+            .showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);

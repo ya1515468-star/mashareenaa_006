@@ -1,4 +1,5 @@
 import 'package:mashareena/core/utils/safe_launch.dart';
+import '../../../../core/error/failure_text.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -79,7 +80,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       if (!mounted) return;
       setState(() => _signingOut = false);
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('تعذّر تسجيل الخروج: $e')));
+          .showSnackBar(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -678,7 +679,7 @@ Future<void> _openSocialLink(BuildContext context, String value) async {
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text('فشل فتح رابط التواصل: $e')),
+        SnackBar(content: Text(FailureText.of(e))),
       );
     }
   }

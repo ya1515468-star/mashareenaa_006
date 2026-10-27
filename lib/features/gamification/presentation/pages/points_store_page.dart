@@ -1,4 +1,5 @@
 import '../../../../core/data/supabase_document_compat.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -481,7 +482,7 @@ class _ProductCardState extends State<_ProductCard> {
 
       ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(
-          content: Text('لم يكتمل الشراء: $e'),
+          content: Text(FailureText.of(e)),
         ),
       );
     } finally {

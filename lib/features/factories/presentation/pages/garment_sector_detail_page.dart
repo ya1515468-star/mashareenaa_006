@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import '../widgets/garment_contact_gate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -76,7 +77,7 @@ class GarmentSectorDetailPage extends ConsumerWidget {
         body: async.when(
           loading: () => const Center(child: CircularProgressIndicator(color: _gold)),
           error: (e, _) => Center(
-              child: Text('تعذّر التحميل: $e',
+              child: Text(FailureText.action(e, action: 'التحميل'),
                   style: const TextStyle(color: Colors.white70))),
           data: (all) {
             // العامة ترى المنشور فقط؛ صاحب المنشأة والمالك يريان المسودّات.
@@ -192,7 +193,7 @@ class _BusinessTile extends StatelessWidget {
       onChanged();
       m?.showSnackBarSfx(const SnackBar(content: Text('تم التنفيذ')));
     } catch (e) {
-      m?.showSnackBarSfx(SnackBar(content: Text('تعذّر: $e')));
+      m?.showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     } finally {
       name.dispose();
       desc.dispose();

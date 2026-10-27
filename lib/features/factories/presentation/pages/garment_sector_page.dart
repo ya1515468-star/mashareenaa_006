@@ -1,4 +1,5 @@
 import '../../../rbac/presentation/widgets/server_username_display.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import '../../../../core/services/media_upload_service.dart';
 import 'package:image_picker/image_picker.dart';
@@ -414,7 +415,7 @@ class _SectorsTab extends ConsumerWidget {
       ref.invalidate(garmentSectorsProvider);
       m?.showSnackBarSfx(const SnackBar(content: Text('تم الحفظ')));
     } catch (e) {
-      m?.showSnackBarSfx(SnackBar(content: Text('تعذّر: $e')));
+      m?.showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     } finally {
       name.dispose();
       emoji.dispose();
@@ -467,7 +468,7 @@ class _SectorsTab extends ConsumerWidget {
     } catch (e) {
       final msg = e.toString().contains('duplicate key') || e.toString().contains('23505')
           ? 'يوجد قطاع بهذا الاسم أو بمعرّف مطابق له فعلًا — جرّب اسمًا مختلفًا.'
-          : 'تعذّر الإنشاء: $e';
+          : FailureText.of(e);
       m?.showSnackBarSfx(SnackBar(content: Text(msg)));
     } finally {
       name.dispose();
@@ -484,7 +485,7 @@ class _SectorsTab extends ConsumerWidget {
       loading: () =>
           const Center(child: CircularProgressIndicator(color: Color(0xFFFFD700))),
       error: (e, _) => _ErrorState(
-          message: '$e',
+          message: FailureText.of(e),
           onRetry: () => ref.invalidate(garmentSectorsProvider)),
       data: (list) {
         final q = search.trim();
@@ -614,7 +615,7 @@ class _ServiceAdsTab extends ConsumerWidget {
           loading: () => const Center(
               child: CircularProgressIndicator(color: Color(0xFFFFD700))),
           error: (e, _) => _ErrorState(
-              message: '$e',
+              message: FailureText.of(e),
               onRetry: () => ref.invalidate(garmentServiceAdsProvider(sector))),
           data: (list) {
             if (list.isEmpty) {
@@ -663,7 +664,7 @@ class _ServiceAdsTab extends ConsumerWidget {
                     ref.invalidate(garmentServiceAdsProvider(sector));
                     m?.showSnackBarSfx(const SnackBar(content: Text('تم التنفيذ')));
                   } catch (e) {
-                    m?.showSnackBarSfx(SnackBar(content: Text('تعذّر: $e')));
+                    m?.showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
                   }
                 },
               );
@@ -749,7 +750,7 @@ class _PublishServiceAdSheetState
       });
       m?.showSnackBarSfx(const SnackBar(content: Text('حُدّد موقعك')));
     } catch (e) {
-      m?.showSnackBarSfx(SnackBar(content: Text('تعذّر تحديد الموقع: $e')));
+      m?.showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     } finally {
       if (mounted) setState(() => _locating = false);
     }
@@ -1411,7 +1412,7 @@ class _PublicationFeesDialogState extends ConsumerState<_PublicationFeesDialog> 
       nav.pop();
       m.showSnackBarSfx(const SnackBar(content: Text('حُفظت أسعار النشر')));
     } catch (e) {
-      m.showSnackBarSfx(SnackBar(content: Text('تعذّر الحفظ: $e')));
+      m.showSnackBarSfx(SnackBar(content: Text(FailureText.action(e, action: 'الحفظ'))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1424,7 +1425,7 @@ class _PublicationFeesDialogState extends ConsumerState<_PublicationFeesDialog> 
       title: const Text('أسعار النشر'),
       content: fees.when(
         loading: () => const SizedBox(height: 80, child: Center(child: CircularProgressIndicator())),
-        error: (e, _) => Text('تعذّر التحميل: $e'),
+        error: (e, _) => Text(FailureText.action(e, action: 'التحميل')),
         data: (rows) {
           for (final r in rows) {
             final k = r['content_type'].toString();

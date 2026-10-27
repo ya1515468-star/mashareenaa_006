@@ -1,4 +1,5 @@
 import 'package:file_picker/file_picker.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -107,7 +108,7 @@ class AttachmentMenu extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          SnackBar(content: Text('فشل رفع المرفق: $e')),
+          SnackBar(content: Text(FailureText.of(e))),
         );
       }
     }
@@ -142,7 +143,7 @@ class AttachmentMenu extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          SnackBar(content: Text('فشل رفع الصورة: $e')),
+          SnackBar(content: Text(FailureText.of(e))),
         );
       }
     }

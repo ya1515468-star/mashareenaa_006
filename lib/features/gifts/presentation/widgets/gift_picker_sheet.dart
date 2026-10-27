@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -84,7 +85,7 @@ class GiftPickerSheet extends ConsumerWidget {
                   error: (e, _) => Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
-                      child: Text('تعذّر تحميل قائمة الهدايا: $e',
+                      child: Text(FailureText.of(e, subject: 'قائمة الهدايا'),
                           textAlign: TextAlign.center,
                           style: TextStyle(color: p.textSecondary, fontSize: 12)),
                     ),

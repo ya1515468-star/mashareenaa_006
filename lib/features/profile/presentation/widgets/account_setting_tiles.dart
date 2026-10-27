@@ -1,4 +1,5 @@
 import '../../../../core/data/supabase_document_compat.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -177,7 +178,7 @@ class _AccountChoiceSettingTileState extends State<AccountChoiceSettingTile> {
       // فشل حفظه يُري العضو خصوصيةً لا وجود لها.
       setState(() => _value = previous);
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text('تعذر حفظ الإعداد: $e')),
+        SnackBar(content: Text(FailureText.of(e))),
       );
     }
   }
@@ -302,7 +303,7 @@ class _AccountSwitchSettingTileState extends State<AccountSwitchSettingTile> {
                 if (!context.mounted) return;
                 setState(() => _value = !v);
                 ScaffoldMessenger.of(context).showSnackBarSfx(
-                  SnackBar(content: Text('تعذر حفظ الإعداد: $e')),
+                  SnackBar(content: Text(FailureText.of(e))),
                 );
               }
             },

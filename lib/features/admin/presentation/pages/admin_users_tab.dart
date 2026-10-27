@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -82,7 +83,7 @@ class _AdminUsersTabState extends ConsumerState<AdminUsersTab> {
               : resultsAsync.when(
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Padding(padding: const EdgeInsets.all(16), child: Text('تعذّر البحث: $e', textAlign: TextAlign.center))),
+                  error: (e, _) => Center(child: Padding(padding: const EdgeInsets.all(16), child: Text(FailureText.action(e, action: 'البحث'), textAlign: TextAlign.center))),
                   data: (profiles) {
                     if (profiles.isEmpty) {
                       return const Center(child: Text('لا نتائج'));

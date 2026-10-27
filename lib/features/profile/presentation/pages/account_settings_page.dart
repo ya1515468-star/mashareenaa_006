@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../rbac/presentation/widgets/server_user_identity_badges.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../core/services/snack_sfx.dart';
@@ -783,7 +784,7 @@ class _ProfileMusicTileState extends State<ProfileMusicTile> {
           ? 'المقطع يجب ألا يتجاوز 15 ثانية.'
           : t.contains('PROFILE_MUSIC_UNREADABLE')
               ? 'تعذّرت قراءة مدة الملف. جرّب ملف MP3 أو WAV.'
-              : 'فشل رفع موسيقى البروفايل: $e');
+              : FailureText.of(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -830,7 +831,7 @@ class _ProfileMusicTileState extends State<ProfileMusicTile> {
       } catch (_) {}
       _show('تم حذف موسيقى البروفايل.');
     } catch (e) {
-      _show('فشل حذف موسيقى البروفايل: $e');
+      _show(FailureText.of(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1215,7 +1216,7 @@ class _AnimatedAvatarTileState extends State<_AnimatedAvatarTile> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-            SnackBar(content: Text('فشل رفع GIF المتحرك: $e')));
+            SnackBar(content: Text(FailureText.of(e))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -1239,7 +1240,7 @@ class _AnimatedAvatarTileState extends State<_AnimatedAvatarTile> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          SnackBar(content: Text('فشل إزالة GIF المتحرك: $e')),
+          SnackBar(content: Text(FailureText.of(e))),
         );
       }
     } finally {

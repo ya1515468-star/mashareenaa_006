@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../error/failure_text.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SecurityRiskProbe {
@@ -22,7 +23,7 @@ class SecurityRiskProbe {
       );
     } catch (e) {
       debugPrint(
-        'SECURITY_RISK_PROBE: ERROR=$e',
+        FailureText.of(e),
       );
     }
   }

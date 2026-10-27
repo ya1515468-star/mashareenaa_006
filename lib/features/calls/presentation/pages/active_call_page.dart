@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
@@ -112,8 +113,8 @@ class _ActiveCallPageState extends ConsumerState<ActiveCallPage> {
         throw StateError(
           kIsWeb
               ? 'مكتبة Agora للويب غير محمّلة. أضف سكربت iris-web-rtc إلى '
-                  'web/index.html ليعمل الاتصال على المتصفح. (التفاصيل: $e)'
-              : 'تعذّر تهيئة محرك الاتصال: $e',
+                  FailureText.of(e)
+              : FailureText.of(e),
         );
       }
       _engine = engine;
@@ -242,7 +243,7 @@ class _ActiveCallPageState extends ConsumerState<ActiveCallPage> {
               publishMicrophoneTrack: true,
               publishCameraTrack: widget.type == CallType.video));
     } catch (e, st) {
-      unawaited(ErrorMonitor.report('CALL_SETUP_FAILED: $e',
+      unawaited(ErrorMonitor.report(FailureText.of(e),
           stack: st,
           screen: 'active_call',
           source: 'bootstrap_${widget.isCaller ? 'caller' : 'callee'}_${widget.type.wire}'));
@@ -272,7 +273,7 @@ class _ActiveCallPageState extends ConsumerState<ActiveCallPage> {
       if (mounted) {
         setState(() => _error = e.toString().contains('INSUFFICIENT_BALANCE_FOR_CALL')
             ? 'رصيدك لا يكفي لبدء هذه المكالمة.'
-            : 'تعذّر بدء المكالمة: $e');
+            : FailureText.of(e));
       }
       await _hangup();
     }

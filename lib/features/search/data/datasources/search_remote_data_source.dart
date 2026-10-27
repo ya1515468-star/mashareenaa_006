@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/data/supabase_document_compat.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../posts/data/models/post_model.dart';
@@ -31,7 +32,7 @@ class SearchRemoteDataSourceImpl implements SearchRemoteDataSource {
         row['id'].toString(), Map<String, dynamic>.from(row),
       )).toList(growable: false);
     } catch (e) {
-      throw ServerException(message: 'تعذّر البحث عن المستخدمين: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -72,7 +73,7 @@ class SearchRemoteDataSourceImpl implements SearchRemoteDataSource {
               PostModel.fromMap(d.id, Map<String, dynamic>.from(d.data())))
           .toList();
     } catch (e) {
-      throw ServerException(message: 'تعذّر البحث عن المنشورات: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 }

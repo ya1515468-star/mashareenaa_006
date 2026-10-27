@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -142,7 +143,7 @@ class _FriendsWallPageState extends ConsumerState<FriendsWallPage> {
                       m?.showSnackBarSfx(const SnackBar(content: Text('مُنحت الصلاحية')));
                       uidCtrl.clear();
                     } catch (e) {
-                      m?.showSnackBarSfx(SnackBar(content: Text('تعذّر: $e')));
+                      m?.showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
                     }
                   },
                   child: const Text('منح'),
@@ -156,7 +157,7 @@ class _FriendsWallPageState extends ConsumerState<FriendsWallPage> {
                       m?.showSnackBarSfx(const SnackBar(content: Text('سُحبت الصلاحية')));
                       uidCtrl.clear();
                     } catch (e) {
-                      m?.showSnackBarSfx(SnackBar(content: Text('تعذّر: $e')));
+                      m?.showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
                     }
                   },
                   child: const Text('سحب', style: TextStyle(color: Colors.redAccent)),
@@ -178,7 +179,7 @@ class _FriendsWallPageState extends ConsumerState<FriendsWallPage> {
                   if (d.mounted) Navigator.pop(d);
                   await _loadOwnerState();
                 } catch (e) {
-                  m?.showSnackBarSfx(SnackBar(content: Text('تعذّر الحفظ: $e')));
+                  m?.showSnackBarSfx(SnackBar(content: Text(FailureText.action(e, action: 'الحفظ'))));
                 }
               },
               child: const Text('حفظ'),
@@ -411,7 +412,7 @@ class _FriendsWallPageState extends ConsumerState<FriendsWallPage> {
                 } catch (e) {
                   setDialogState(() => saving = false);
                   if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('فشل الحفظ الخادمي: $e')));
+                  ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
                 }
               },
               icon: saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.save_rounded),
@@ -442,7 +443,7 @@ class _FriendsWallPageState extends ConsumerState<FriendsWallPage> {
       await Supabase.instance.client.rpc('platform_wall_delete_product', params: {'p_id': product['id']});
       if (mounted) ref.invalidate(platformWallProductsProvider);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('فشل الحذف الخادمي: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -571,7 +572,7 @@ class _ProductCardState extends ConsumerState<_ProductCard> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text('تعذر تحديث الإعجاب: $e')),
+        SnackBar(content: Text(FailureText.of(e))),
       );
     }
   }
@@ -612,7 +613,7 @@ class _ProductCardState extends ConsumerState<_ProductCard> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text('تعذر نشر التعليق: $e')),
+        SnackBar(content: Text(FailureText.of(e))),
       );
     }
   }

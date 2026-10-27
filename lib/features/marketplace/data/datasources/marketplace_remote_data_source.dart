@@ -1,4 +1,5 @@
 import '../../../../core/data/supabase_document_compat.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../domain/entities/order_entity.dart';
 import '../models/listing_model.dart';
@@ -46,7 +47,7 @@ class MarketplaceRemoteDataSourceImpl implements MarketplaceRemoteDataSource {
     try {
       await _listings.add(listing.toMap());
     } catch (e) {
-      throw ServerException(message: 'تعذّر نشر الإعلان: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -61,7 +62,7 @@ class MarketplaceRemoteDataSourceImpl implements MarketplaceRemoteDataSource {
         'p_doc_id': listingId,
       });
     } catch (e) {
-      throw ServerException(message: 'تعذّر حذف الإعلان: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -76,7 +77,7 @@ class MarketplaceRemoteDataSourceImpl implements MarketplaceRemoteDataSource {
     } on ServerException {
       rethrow;
     } catch (e) {
-      throw ServerException(message: 'تعذّر جلب الإعلان: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -85,7 +86,7 @@ class MarketplaceRemoteDataSourceImpl implements MarketplaceRemoteDataSource {
     try {
       await _orders.add(order.toMap());
     } catch (e) {
-      throw ServerException(message: 'تعذّر تسجيل الطلب: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -119,7 +120,7 @@ class MarketplaceRemoteDataSourceImpl implements MarketplaceRemoteDataSource {
     try {
       await _orders.doc(orderId).update({'status': status.wire});
     } catch (e) {
-      throw ServerException(message: 'تعذّر تحديث حالة الطلب: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 }

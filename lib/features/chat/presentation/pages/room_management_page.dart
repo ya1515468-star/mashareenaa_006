@@ -1,4 +1,5 @@
 import 'dart:ui' as ui;
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 
 import 'package:file_picker/file_picker.dart';
@@ -183,7 +184,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _message = 'تعذر تحميل صلاحيات الغرفة: $e');
+      setState(() => _message = FailureText.of(e, subject: 'صلاحيات الغرفة'));
     }
   }
 
@@ -248,7 +249,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
       if (!mounted) return;
       setState(() {
         _adminContext = const <String, dynamic>{};
-        _adminContextError = 'تعذر تحميل حالة العضو: $e';
+        _adminContextError = FailureText.of(e, subject: 'حالة العضو');
       });
     } finally {
       if (mounted) setState(() => _adminContextBusy = false);
@@ -899,12 +900,12 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
 
       setState(() => _busy = true);
       final ext = file.name.contains('.') ? file.name.split('.').last : 'jpg';
-      final path = '$myUid/room_backgrounds/${widget.roomId}/${const Uuid().v4()}.$ext';
+      final path = FailureText.of(e);
       final url = await MediaUploadService(bucket: 'media').uploadBytesAtPath(
         bytes: bytes,
         fileName: file.name,
         path: path,
-        contentType: 'image/$ext',
+        contentType: FailureText.of(e),
       );
       await _sb.rpc('set_room_background',
           params: {'p_room_id': widget.roomId, 'p_background_url': url});
@@ -1091,7 +1092,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
                                   } catch (_) {}
                                   if (sheetContext.mounted) {
                                     ScaffoldMessenger.of(sheetContext).showSnackBarSfx(
-                                      SnackBar(content: Text('فشل رفع صورة الترحيب: $e')),
+                                      SnackBar(content: Text(FailureText.of(e))),
                                     );
                                   }
                                 } finally {
@@ -1120,7 +1121,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
                                 } catch (e) {
                                   if (sheetContext.mounted) {
                                     ScaffoldMessenger.of(sheetContext).showSnackBarSfx(
-                                      SnackBar(content: Text('تعذر حفظ بوت الترحيب: $e')),
+                                      SnackBar(content: Text(FailureText.of(e))),
                                     );
                                   }
                                 } finally {
@@ -1160,7 +1161,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
         _publishCommandResult('حفظ إعدادات بوت الترحيب', success: true);
       }
     } catch (e) {
-      if (mounted) setState(() => _message = 'تعذر فتح إعدادات بوت الترحيب: $e');
+      if (mounted) setState(() => _message = FailureText.of(e));
     }
   }
 
@@ -1297,7 +1298,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _message = 'تعذر تحميل الصلاحيات: $e');
+      setState(() => _message = FailureText.of(e, subject: 'الصلاحيات'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1361,7 +1362,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
           'p_room_id': widget.roomId,
           'p_user_id': uid,
           for (final entry in _permissions.entries)
-            'p_${entry.key}': entry.value,
+            FailureText.of(e): entry.value,
         },
       );
       if (!mounted) return;
@@ -1438,10 +1439,10 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
       );
       if (mounted) {
         setState(() => _roomSounds[event] = sound);
-        _publishCommandResult('تعيين صوت $event', success: true);
+        _publishCommandResult(FailureText.of(e), success: true);
       }
     } catch (e) {
-      if (mounted) _publishCommandResult('تعيين صوت $event', success: false, detail: _commandError(e));
+      if (mounted) _publishCommandResult(FailureText.of(e), success: false, detail: _commandError(e));
     }
   }
 
@@ -1484,7 +1485,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
     });
     try {
       final path =
-          'room_sounds/${widget.roomId}/${const Uuid().v4()}/$event.$ext';
+          FailureText.of(e);
       var uploaded = false;
       try {
         await MediaUploadService(bucket: 'chat-sounds').uploadBytesAtPath(
@@ -1504,7 +1505,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
             debugPrint('[RoomManagement] sound cleanup failed: $cleanupError');
           }
         }
-        debugPrint('[RoomManagement] upload sound failed: $e');
+        debugPrint(FailureText.of(e));
         debugPrint(st.toString());
         rethrow;
       }

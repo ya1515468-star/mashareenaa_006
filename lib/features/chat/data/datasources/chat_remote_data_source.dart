@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 import '../../domain/repositories/chat_repository.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -207,7 +208,7 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
       throw ServerException(message: _chatError(e), code: e.code);
     } catch (e) {
       if (e is ServerException) rethrow;
-      throw ServerException(message: 'تعذّر إرسال الرسالة: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 

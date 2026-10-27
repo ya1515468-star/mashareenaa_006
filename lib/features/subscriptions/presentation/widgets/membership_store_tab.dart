@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -342,7 +343,7 @@ class MembershipStoreTab extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(
           content: Text(e.message.contains('NO_ACTIVE_MEMBERSHIP')
               ? 'لا توجد عضوية فعّالة لهذا المستخدم.'
-              : 'تعذّر الإيقاف: ${e.message}')));
+              : FailureText.of(e))));
     }
   }
 
@@ -500,7 +501,7 @@ class MembershipStoreTab extends ConsumerWidget {
       messenger?.showSnackBarSfx(SnackBar(
           content: Text(e.toString().contains('OWNER_ONLY')
               ? 'هذا الإجراء للمالك فقط.'
-              : 'تعذّر تحديث الشارة: $e'),
+              : FailureText.of(e)),
           backgroundColor: const Color(0xFFDC2626)));
     }
   }
@@ -533,7 +534,7 @@ class MembershipStoreTab extends ConsumerWidget {
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBarSfx(SnackBar(content: Text('تعذّر الحذف: $e')));
+          .showSnackBarSfx(SnackBar(content: Text(FailureText.action(e, action: 'الحذف'))));
     }
   }
 
@@ -1013,7 +1014,7 @@ class MembershipStoreTab extends ConsumerWidget {
           screen: 'membership_full_editor', source: 'save'));
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBarSfx(SnackBar(content: Text('تعذّر الحفظ: $e')));
+          .showSnackBarSfx(SnackBar(content: Text(FailureText.action(e, action: 'الحفظ'))));
     }
   }
 }

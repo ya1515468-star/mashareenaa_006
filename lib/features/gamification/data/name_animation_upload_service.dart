@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../../core/error/failure_text.dart';
 
 import 'package:flutter/foundation.dart';
 
@@ -110,7 +111,7 @@ class NameAnimationUploadService {
       try {
         response = await send(token).timeout(const Duration(seconds: 45));
       } catch (e2) {
-        throw StateError('NETWORK_ERROR: $e2');
+        throw StateError(FailureText.of(e));
       }
     }
     if (response.statusCode == 401) {
