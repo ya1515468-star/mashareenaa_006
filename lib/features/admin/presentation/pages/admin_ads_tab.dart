@@ -290,7 +290,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
                   onPressed: () => Navigator.pop(d, n),
                   child: Text(n == 0
                       ? 'بلا نهاية (ظهور دائم)'
-                      : '\$n يومًا من الآن'),
+                      : '$n يومًا من الآن'),
                 ),
             ],
           ),
@@ -298,14 +298,14 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
       );
       if (days == null) return;
       patch = {'extend_days': days};
-      okMsg = days == 0 ? 'صار الظهور دائمًا ✓' : 'صارت المدّة \$days يومًا ✓';
+      okMsg = days == 0 ? 'صار الظهور دائمًا ✓' : 'صارت المدّة $days يومًا ✓';
     } else if (what == 'visible') {
       final show = ad['active'] != true;
       patch = {'is_active': show};
       okMsg = show ? 'أُظهر الإعلان ✓' : 'أُخفي الإعلان ✓';
     }
 
-    setState(() => _busy = '\${ad['id']}');
+    setState(() => _busy = '${ad['id']}');
     try {
       if (what == 'delete') {
         final go = await showDialog<bool>(

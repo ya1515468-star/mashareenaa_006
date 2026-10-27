@@ -32,6 +32,7 @@ import '../providers/profile_provider.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/manual_avatar_cropper.dart';
 import 'account_settings_page.dart';
+import '../widgets/vip_active_benefits_section.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -533,6 +534,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                               .toList(),
                         ),
                       ],
+                      // البند ٩: مزايا VIP المفعّلة في بروفايل العضو
+                      // نفسه، يتحكّم بها هو.
+                      VipActiveBenefitsSection(userId: profile.uid),
                       const SizedBox(height: 16),
                       AppearOfflineToggle(uid: profile.uid),
                       const SizedBox(height: 12),

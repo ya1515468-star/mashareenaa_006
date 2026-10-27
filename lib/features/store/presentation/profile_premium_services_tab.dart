@@ -15,6 +15,8 @@ import '../../profile/presentation/providers/profile_provider.dart';
 import '../../rbac/presentation/widgets/server_username_display.dart';
 import '../../rbac/presentation/widgets/server_user_identity_badges.dart';
 import '../../admin/presentation/widgets/admin_gift_dialog.dart';
+import 'chat_wallpaper_page.dart';
+import 'social_links_page.dart';
 
 class ProfilePremiumServiceItem {
   final String key;
@@ -472,8 +474,23 @@ class _ProfilePremiumServicesTabState
         case 'achievement_badges':
           await _showBadges();
           break;
-        case 'profile_music':
+        // البند ١٠: chat_wallpaper لم يكن له فرعٌ هنا إطلاقًا، فالضغط
+        // عليه يسقط في `default: return;` — خدمة مدفوعة لا تفتح شيئًا
+        // ولا تقول شيئًا.
+        case 'chat_wallpaper':
+          await Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => const ChatWallpaperPage(),
+          ));
+          break;
+        // روابط التواصل كانت تفتح «تعديل البروفايل»، وهي صفحة لا تحتوي
+        // محرّرًا للروابط إطلاقًا — فيعود العضو منها بلا شيء. لها الآن
+        // محرّرها.
         case 'social_links':
+          await Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => const SocialLinksPage(),
+          ));
+          break;
+        case 'profile_music':
           final profile = ref.read(currentProfileProvider).valueOrNull;
           if (!mounted || profile == null) return;
           await Navigator.push<void>(
@@ -1244,43 +1261,218 @@ class _ProfilePremiumServicesTabState
     }
   }
 
+  /// المتجر المصغر كمعرض منتجات حقيقي (البند ١٠).
+  ///
+  /// كان النموذج أربعة حقول نصّية: عنوان ووصف ونقاط وجواهر — ولا صورة
+  /// ولا فيديو، مع أنّ الجدول والدالة يقبلان media_url وmedia_type
+  /// أصلًا. فيعرض العضو «منتجًا» لا يراه أحد، ولا شيء يُغري زائرًا
+  /// بالسؤال عنه. ولا زرّ إلغاء في النموذج إطلاقًا.
+  ///
+  /// الآن: صورة أو فيديو من الجهاز يُرفَع إلى Storage، ويُعرَض في
+  /// بروفايله ليراه الزوّار ويتواصلوا معه.
   Future<void> _createMiniStoreItemDialog() async {
     final title = TextEditingController();
     final desc = TextEditingController();
     final points = TextEditingController(text: '0');
     final gems = TextEditingController(text: '0');
+    String? mediaUrl;
+    String mediaType = 'image';
+    var uploading = false;
+    var saving = false;
+
     try {
       await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('عنصر المتجر المصغر'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: title, decoration: const InputDecoration(labelText: 'العنوان')),
-          TextField(controller: desc, decoration: const InputDecoration(labelText: 'الوصف')),
-          TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'النقاط')),
-          TextField(controller: gems, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'الجواهر')),
-        ]),
-        actions: [
-          FilledButton(
-            onPressed: () async {
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setD) {
+            // FilePicker لا ImagePicker: هو المستعمل في بقية هذا الملف
+            // (ولا حاجة لحزمة جديدة)، ويقبل الصور والفيديو معًا.
+            Future<void> pick(bool video) async {
+              final picked = await FilePicker.pickFiles(
+                type: FileType.custom,
+                allowedExtensions: video
+                    ? const ['mp4', 'webm', 'mov']
+                    : const ['png', 'jpg', 'jpeg', 'webp', 'gif'],
+                withData: true,
+              );
+              if (picked == null || picked.files.isEmpty) return;
+              final file = picked.files.single;
+              final bytes = file.bytes;
+              if (bytes == null || bytes.isEmpty) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBarSfx(
+                      const SnackBar(content: Text('تعذّر قراءة الملف.')));
+                }
+                return;
+              }
+              setD(() => uploading = true);
               try {
-                await Supabase.instance.client.rpc('create_profile_mini_store_item', params: {
-                  'p_title': title.text,
-                  'p_description': desc.text,
-                  'p_price_points': int.tryParse(points.text) ?? 0,
-                  'p_price_gems': int.tryParse(gems.text) ?? 0,
+                final uid = Supabase.instance.client.auth.currentUser!.id;
+                final url =
+                    await MediaUploadService(bucket: 'profile-products')
+                        .uploadBytes(
+                  bytes: bytes,
+                  fileName: file.name,
+                  folder: 'mini-store',
+                  uid: uid,
+                );
+                setD(() {
+                  mediaUrl = url;
+                  mediaType = video ? 'video' : 'image';
                 });
-                if (dialogContext.mounted) Navigator.pop(dialogContext);
               } catch (e) {
                 if (dialogContext.mounted) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
+                  ScaffoldMessenger.of(dialogContext).showSnackBarSfx(
+                      SnackBar(content: Text(_friendly(e))));
                 }
+              } finally {
+                setD(() => uploading = false);
               }
-            },
-            child: const Text('حفظ'),
-          ),
-        ],
-      ),
+            }
+
+            return AlertDialog(
+              title: const Text('منتج في متجرك المصغر'),
+              content: SizedBox(
+                width: 460,
+                child: SingleChildScrollView(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    TextField(
+                        controller: title,
+                        decoration: const InputDecoration(
+                            labelText: 'اسم المنتج',
+                            hintText: 'مثال: عبايات تطريز يدوي')),
+                    TextField(
+                        controller: desc,
+                        maxLines: 3,
+                        decoration:
+                            const InputDecoration(labelText: 'الوصف')),
+                    const SizedBox(height: 12),
+                    if (mediaUrl != null)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: mediaType == 'video'
+                            ? Container(
+                                height: 110,
+                                width: double.infinity,
+                                color: Colors.black26,
+                                child: const Center(
+                                    child: Icon(Icons.play_circle_fill_rounded,
+                                        size: 38)),
+                              )
+                            : Image.network(mediaUrl!,
+                                height: 110,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                    height: 110, color: Colors.white10)),
+                      ),
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: uploading ? null : () => pick(false),
+                          icon: uploading
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2))
+                              : const Icon(Icons.image_outlined, size: 17),
+                          label: const Text('صورة'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: uploading ? null : () => pick(true),
+                          icon: const Icon(Icons.videocam_outlined, size: 17),
+                          label: const Text('فيديو'),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Expanded(
+                        child: TextField(
+                            controller: points,
+                            keyboardType: TextInputType.number,
+                            decoration:
+                                const InputDecoration(labelText: 'النقاط ⭐')),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                            controller: gems,
+                            keyboardType: TextInputType.number,
+                            decoration:
+                                const InputDecoration(labelText: 'الجواهر 💎')),
+                      ),
+                    ]),
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'يظهر في بروفايلك ليراه الزوّار، ويتواصلون معك عليه.',
+                        style: TextStyle(fontSize: 11, color: Colors.white54),
+                      ),
+                    ),
+                  ]),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed:
+                      saving ? null : () => Navigator.pop(dialogContext),
+                  child: const Text('إلغاء'),
+                ),
+                FilledButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          if (title.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(dialogContext).showSnackBarSfx(
+                                const SnackBar(
+                                    content: Text('اكتب اسم المنتج.')));
+                            return;
+                          }
+                          if (mediaUrl == null) {
+                            ScaffoldMessenger.of(dialogContext).showSnackBarSfx(
+                                const SnackBar(
+                                    content: Text(
+                                        'أضف صورة أو فيديو — المنتج بلا صورة لا يراه أحد.')));
+                            return;
+                          }
+                          setD(() => saving = true);
+                          try {
+                            await Supabase.instance.client.rpc(
+                                'create_profile_mini_store_item',
+                                params: {
+                                  'p_title': title.text.trim(),
+                                  'p_description': desc.text.trim(),
+                                  'p_price_points':
+                                      int.tryParse(points.text.trim()) ?? 0,
+                                  'p_price_gems':
+                                      int.tryParse(gems.text.trim()) ?? 0,
+                                  'p_media_url': mediaUrl,
+                                  'p_media_type': mediaType,
+                                });
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                            }
+                          } catch (e) {
+                            setD(() => saving = false);
+                            if (dialogContext.mounted) {
+                              ScaffoldMessenger.of(dialogContext)
+                                  .showSnackBarSfx(
+                                      SnackBar(content: Text(_friendly(e))));
+                            }
+                          }
+                        },
+                  child: Text(saving ? 'جارٍ الحفظ' : 'نشر'),
+                ),
+              ],
+            );
+          },
+        ),
       );
     } finally {
       title.dispose();
