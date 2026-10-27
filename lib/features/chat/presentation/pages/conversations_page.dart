@@ -290,12 +290,30 @@ class _ThreadTile extends ConsumerWidget {
         child: SafeArea(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             const SizedBox(height: 10),
+            // ثلاثة أفعال مختلفة كان اسمٌ واحد يغطّيها، فكان الزرّ يَعِد
+            // بما لا يفعل: «مسح محتوى المحادثة» كان يمسح من عندك وحدك.
             ListTile(
               leading: const Icon(Icons.cleaning_services_rounded,
                   color: Color(0xFFF59E0B)),
-              title: const Text('مسح محتوى المحادثة'),
-
+              title: const Text('مسح المحادثة من عندي'),
+              subtitle: const Text('تبقى كما هي عند الطرف الآخر',
+                  style: TextStyle(fontSize: 11, color: Colors.white54)),
               onTap: () => Navigator.pop(ctx, 'clear'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.undo_rounded, color: Color(0xFF38BDF8)),
+              title: const Text('حذف رسائلي من الطرفين'),
+              subtitle: const Text('رسائلك أنت فقط — تختفي من عنده أيضًا',
+                  style: TextStyle(fontSize: 11, color: Colors.white54)),
+              onTap: () => Navigator.pop(ctx, 'clear_mine_both'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_forever_rounded,
+                  color: Colors.redAccent),
+              title: const Text('مسح المحادثة من الطرفين'),
+              subtitle: const Text('تمسح رسائله هو أيضًا من جهازه',
+                  style: TextStyle(fontSize: 11, color: Colors.white54)),
+              onTap: () => Navigator.pop(ctx, 'clear_both'),
             ),
             ListTile(
               leading: const Icon(Icons.close_rounded, color: Colors.redAccent),
@@ -323,7 +341,45 @@ class _ThreadTile extends ConsumerWidget {
           await _db.rpc('clear_my_thread',
               params: {'p_thread_id': thread['id'].toString()});
           messenger?.showSnackBarSfx(const SnackBar(
-              content: Text('مُسح محتوى المحادثة'),
+              content: Text('مُسحت من عندك'),
+              backgroundColor: Color(0xFF16A34A)));
+        case 'clear_mine_both':
+          await _db.rpc('clear_my_sent_messages_for_both',
+              params: {'p_thread_id': thread['id'].toString()});
+          messenger?.showSnackBarSfx(const SnackBar(
+              content: Text('حُذفت رسائلك من الطرفين'),
+              backgroundColor: Color(0xFF16A34A)));
+        case 'clear_both':
+          // تأكيد صريح: هذا الفعل يمسّ جهاز شخص آخر ولا رجعة فيه.
+          if (!context.mounted) return;
+          final sure = await showDialog<bool>(
+                context: context,
+                builder: (c) => Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: AlertDialog(
+                    title: const Text('مسح من الطرفين؟'),
+                    content: const Text(
+                        'ستختفي كل الرسائل عندك وعند الطرف الآخر، بما فيها '
+                        'رسائلُه هو. لا يمكن التراجع، ويُسجَّل الإجراء باسمك.'),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(c, false),
+                          child: const Text('إلغاء')),
+                      FilledButton(
+                          style: FilledButton.styleFrom(
+                              backgroundColor: Colors.red.shade700),
+                          onPressed: () => Navigator.pop(c, true),
+                          child: const Text('مسح من الطرفين')),
+                    ],
+                  ),
+                ),
+              ) ??
+              false;
+          if (!sure) return;
+          await _db.rpc('clear_thread_for_both',
+              params: {'p_thread_id': thread['id'].toString()});
+          messenger?.showSnackBarSfx(const SnackBar(
+              content: Text('مُسحت من الطرفين'),
               backgroundColor: Color(0xFF16A34A)));
         case 'hide':
           await _db.rpc('hide_my_thread',
