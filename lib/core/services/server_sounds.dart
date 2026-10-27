@@ -7,6 +7,8 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'sound_preferences.dart';
+
 /// نغمات التطبيق كلها محفوظة في الخادم (جدول app_sounds) وليست في المشروع.
 /// تُنزَّل عند أول استخدام (أو مسبقًا عبر [prefetch]) وتُخزَّن في الذاكرة،
 /// ثم تُشغَّل من البايتات مباشرة. أي فشل (بلا اتصال/غير مسجّل) صامت ولا
@@ -143,8 +145,16 @@ class ServerSounds {
   }
 
   /// يشغّل نغمة بمفتاحها. يعيد true إن بدأ التشغيل فعلًا.
-  Future<bool> play(String key, {double volume = 0.85}) async {
+  Future<bool> play(String key,
+      {double volume = 0.85, bool bypassPreferences = false}) async {
     try {
+      // بوّابة التفضيلات في نقطة واحدة: كل نغمة في التطبيق تمرّ من هنا،
+      // ففرضها هنا يعني أنّ أي نداء جديد يحترمها بلا أن يتذكّرها كاتبه.
+      // (كانت مفاتيح البروفايل تُحفَظ في مكان لا يقرأه أحد، فالإطفاء
+      // ينجح والأصوات تبقى.) تمريرة تجاوز للمعاينة في شاشة الأصوات.
+      if (!bypassPreferences && !SoundPreferences.instance.allows(key)) {
+        return false;
+      }
       // منع التكرار المتزاحم لنفس النغمة خلال 120ms
       final now = DateTime.now();
       final last = _lastPlayed[key];

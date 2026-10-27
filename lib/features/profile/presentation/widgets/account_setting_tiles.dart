@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/sound_preferences.dart';
 
 enum VisibilityChoice { everyone, friendsOnly, nobody }
 
@@ -193,6 +194,13 @@ class AccountSwitchSettingTile extends StatefulWidget {
   final String? subtitle;
   final bool defaultValue;
 
+  /// مفتاح التفضيل على الخادم في `chat_notification_preferences`.
+  ///
+  /// مفاتيح الأصوات كانت تُكتَب في مجموعة `accounts` التي لا يقرأها
+  /// أيّ شيء، فيبدو الإطفاء ناجحًا وتبقى الأصوات تُشتغل. تمريره هنا
+  /// يحوّل المفتاح إلى الجدول الخادمي الذي يقرأه مشغّل الأصوات فعلًا.
+  final String? soundPrefKey;
+
   const AccountSwitchSettingTile({
     super.key,
     required this.uid,
@@ -201,6 +209,7 @@ class AccountSwitchSettingTile extends StatefulWidget {
     required this.title,
     this.subtitle,
     this.defaultValue = false,
+    this.soundPrefKey,
   });
 
   @override
@@ -218,6 +227,14 @@ class _AccountSwitchSettingTileState extends State<AccountSwitchSettingTile> {
   }
 
   Future<void> _load() async {
+    final key = widget.soundPrefKey;
+    if (key != null) {
+      final v = await SoundPreferences.instance
+          .flag(key, defaultValue: widget.defaultValue);
+      if (!mounted) return;
+      setState(() => _value = v);
+      return;
+    }
     final raw = await AccountSettingsStore.readField(
       widget.uid,
       widget.field,
@@ -254,11 +271,16 @@ class _AccountSwitchSettingTileState extends State<AccountSwitchSettingTile> {
               });
 
               try {
-                await AccountSettingsStore.writeField(
-                  widget.uid,
-                  widget.field,
-                  v,
-                );
+                final key = widget.soundPrefKey;
+                if (key != null) {
+                  await SoundPreferences.instance.setFlag(key, v);
+                } else {
+                  await AccountSettingsStore.writeField(
+                    widget.uid,
+                    widget.field,
+                    v,
+                  );
+                }
               } catch (e) {
                 if (!context.mounted) return;
                 setState(() => _value = !v);

@@ -65,13 +65,19 @@ class AccountSettingsContent extends ConsumerWidget {
         ref.watch(currentProfileProvider).valueOrNull ?? profile;
     final uid = liveProfile.uid;
 
+    // كان الفشل يُعرَض دائمًا بـ«فشل حفظ التعديل» بلا سبب، والسبب
+    // مخزَّن فعلًا في حالة المتحكّم. ولذلك كان رفضٌ مشروع (خصوصية
+    // «خاص» خدمة مدفوعة) يبدو عطلًا في التطبيق: يختار العضو فلا يتغيّر
+    // شيء ولا يعرف لماذا.
     Future<bool> save(ProfileEntity updated) async {
       final ok = await ref
           .read(profileControllerProvider.notifier)
           .updateProfile(updated);
       if (!ok && context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBarSfx(const SnackBar(content: Text('فشل حفظ التعديل')));
+        final reason =
+            ref.read(profileControllerProvider).error?.toString() ?? '';
+        ScaffoldMessenger.of(context).showSnackBarSfx(
+            SnackBar(content: Text(_saveFailureMessage(reason))));
       }
       return ok;
     }
@@ -246,8 +252,12 @@ class AccountSettingsContent extends ConsumerWidget {
         onTap: () async {
           final selected =
               await _chooseProfileVisibility(context, liveProfile.visibility);
-          if (selected != null) {
-            await save(liveProfile.copyWith(visibility: selected));
+          if (selected == null || selected == liveProfile.visibility) return;
+          final ok = await save(liveProfile.copyWith(visibility: selected));
+          if (ok && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(
+                content: Text('حُفظت الخصوصية على الخادم ✓'),
+                backgroundColor: Color(0xFF16A34A)));
           }
         },
       ),
@@ -336,19 +346,58 @@ class AccountSettingsContent extends ConsumerWidget {
         onTap: () => Navigator.of(context)
             .push(MaterialPageRoute(builder: (_) => const BlockedUsersPage())),
       ),
+      // المفاتيح الثلاثة تكتب في chat_notification_preferences الخادمي
+      // الذي يقرأه مشغّل الأصوات، لا في مجموعة accounts التي لم يقرأها
+      // شيء قطّ — وهو سبب «الإطفاء لا يعمل».
+      AccountSwitchSettingTile(
+        uid: uid,
+        field: 'masterChatSound',
+        soundPrefKey: 'master_chat_sound',
+        icon: Icons.volume_off_outlined,
+        title: 'كتم كل أصوات التطبيق',
+        subtitle: 'يُسكت الرسائل والإشعارات والمكالمات معًا',
+        defaultValue: true,
+      ),
       AccountSwitchSettingTile(
         uid: uid,
         field: 'messageSoundEnabled',
+        soundPrefKey: 'private_message_sound',
         icon: Icons.volume_up_outlined,
         title: 'صوت الرسائل',
+        subtitle: 'المراسلة الخاصة',
+        defaultValue: true,
+      ),
+      AccountSwitchSettingTile(
+        uid: uid,
+        field: 'publicMessageSoundEnabled',
+        soundPrefKey: 'public_message_sound',
+        icon: Icons.forum_outlined,
+        title: 'صوت رسائل الغرف',
         defaultValue: true,
       ),
       AccountSwitchSettingTile(
         uid: uid,
         field: 'notificationSoundEnabled',
+        soundPrefKey: 'notifications_sound',
         icon: Icons.notifications_active_outlined,
         title: 'صوت الإشعارات',
         subtitle: 'تنبيه صوتي للإشعارات العامة',
+        defaultValue: true,
+      ),
+      AccountSwitchSettingTile(
+        uid: uid,
+        field: 'mentionSoundEnabled',
+        soundPrefKey: 'mention_sound',
+        icon: Icons.alternate_email_rounded,
+        title: 'صوت الإشارة (المنشن)',
+        defaultValue: true,
+      ),
+      AccountSwitchSettingTile(
+        uid: uid,
+        field: 'callsSoundEnabled',
+        soundPrefKey: 'calls_sound',
+        icon: Icons.ring_volume_outlined,
+        title: 'صوت المكالمات',
         defaultValue: true,
       ),
       ListTile(
@@ -502,6 +551,22 @@ class AccountSettingsContent extends ConsumerWidget {
   }
 }
 
+/// ترجمة أخطاء الخادم إلى سبب يفهمه العضو.
+///
+/// بلا هذا كان كل رفض — مدفوعًا أو تحقّقًا — يظهر رسالة واحدة لا تدلّ
+/// على شيء، فيُبلَّغ عنه كعطل.
+String _saveFailureMessage(String raw) {
+  if (raw.contains('FEATURE_REQUIRED_HIDE_PROFILE')) {
+    return 'الخصوصية «خاص» تحتاج خدمة «إخفاء الملف» — اشترِها من متجر '
+        'الخدمات ثم أعد المحاولة.';
+  }
+  if (raw.contains('AUTH_REQUIRED')) return 'انتهت الجلسة — أعد تسجيل الدخول.';
+  if (raw.contains('PROFILE_NOT_FOUND')) return 'لم يُعثر على ملفك الشخصي.';
+  if (raw.contains('USERNAME_TAKEN')) return 'هذا الاسم مستخدم بالفعل.';
+  if (raw.trim().isEmpty) return 'فشل حفظ التعديل';
+  return 'تعذّر الحفظ: $raw';
+}
+
 Future<ProfileVisibility?> _chooseProfileVisibility(
   BuildContext context,
   ProfileVisibility current,
@@ -510,24 +575,34 @@ Future<ProfileVisibility?> _chooseProfileVisibility(
     context: context,
     builder: (_) => AlertDialog(
       title: const Text('خصوصية الحساب'),
-      content: SegmentedButton<ProfileVisibility>(
-        segments: const [
-          ButtonSegment(
-              value: ProfileVisibility.public,
-              label: Text('عام'),
-              icon: Icon(Icons.public)),
-          ButtonSegment(
-              value: ProfileVisibility.friends,
-              label: Text('الأصدقاء'),
-              icon: Icon(Icons.people_outline)),
-          ButtonSegment(
-              value: ProfileVisibility.private,
-              label: Text('خاص'),
-              icon: Icon(Icons.lock_outline)),
-        ],
-        selected: {current},
-        onSelectionChanged: (value) => Navigator.of(context).pop(value.first),
-      ),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        SegmentedButton<ProfileVisibility>(
+          segments: const [
+            ButtonSegment(
+                value: ProfileVisibility.public,
+                label: Text('عام'),
+                icon: Icon(Icons.public)),
+            ButtonSegment(
+                value: ProfileVisibility.friends,
+                label: Text('الأصدقاء'),
+                icon: Icon(Icons.people_outline)),
+            ButtonSegment(
+                value: ProfileVisibility.private,
+                label: Text('خاص'),
+                icon: Icon(Icons.lock_outline)),
+          ],
+          selected: {current},
+          onSelectionChanged: (value) => Navigator.of(context).pop(value.first),
+        ),
+        const SizedBox(height: 10),
+        // الحجب الكامل خدمة مدفوعة على الخادم. ذكره هنا قبل المحاولة
+        // يمنع أن يبدو الرفض عطلًا.
+        const Text(
+          '🔒 «خاص» خدمة مدفوعة (إخفاء الملف) تُشترى من متجر الخدمات. '
+          '«عام» و«الأصدقاء» متاحان للجميع.',
+          style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+        ),
+      ]),
     ),
   );
 }
