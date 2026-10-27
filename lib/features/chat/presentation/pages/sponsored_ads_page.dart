@@ -12,6 +12,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/media_upload_service.dart';
 import '../../../rbac/presentation/widgets/server_username_display.dart';
+import '../../../../core/content/content_interaction_bar.dart';
+import '../../../../core/content/filtered_image_picker.dart';
+import '../../../../core/content/media_viewer.dart';
 
 /// الإعلانات الممولة.
 ///
@@ -244,18 +247,64 @@ class _SponsoredAdsPageState extends ConsumerState<SponsoredAdsPage> {
                 compactBadges: true,
               ),
             ),
+          // الصورة كاملة لا مقصوصة، وتُفتَح بالضغط.
+          //
+          // كانت بارتفاع ثابت 150 وBoxFit.cover، أي مقصوصة من أعلى
+          // وأسفل ولا تُفتَح — فمن يريد رؤية قماش أو تفصيل خياطة لا
+          // يستطيع، وهو جوهر المنصّة.
           if ((ad['image_url']?.toString() ?? '').isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.network(ad['image_url'].toString(),
-                    height: 150, width: double.infinity, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+              child: GestureDetector(
+                onTap: () => MediaViewer.open(
+                  context,
+                  items: [ad['image_url'].toString()],
+                  title: 'إعلان ممول',
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Stack(children: [
+                    ConstrainedBox(
+                      // حدّ أقصى لا ارتفاع ثابت: الطويلة لا تأكل
+                      // الشاشة والعريضة لا تُقصّ.
+                      constraints: const BoxConstraints(maxHeight: 420),
+                      child: Image.network(
+                        ad['image_url'].toString(),
+                        width: double.infinity,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                    ),
+                    const Positioned(
+                      left: 8,
+                      top: 8,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.black45,
+                          borderRadius:
+                              BorderRadius.all(Radius.circular(20)),
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(5),
+                          child: Icon(Icons.open_in_full_rounded,
+                              size: 14, color: Colors.white70),
+                        ),
+                      ),
+                    ),
+                  ]),
+                ),
               ),
             ),
           Text(ad['text']?.toString() ?? '',
               style: const TextStyle(color: Colors.white)),
+          const SizedBox(height: 8),
+          const Divider(height: 1, color: Colors.white12),
+          ContentInteractionBar(
+            targetType: 'ad',
+            targetId: ad['id'].toString(),
+            shareText: ad['text']?.toString(),
+            compact: true,
+          ),
           // صاحب الإعلان وحده يرى أداءه وحالته — لا الآخرون.
           if (mine) ...[
             const SizedBox(height: 8),
@@ -524,14 +573,20 @@ class _PublishSheetState extends State<_PublishSheet> {
                       if (picked == null) return;
                       final b = await picked.readAsBytes();
                       if (!mounted) return;
+                      // الفلتر يُخبَز في البايتات قبل الرفع، فالصورة
+                      // المحفوظة تحمل ما رآه الناشر بالضبط — لا تعريفًا
+                      // يُعاد تطبيقه فيختلف بين الأجهزة.
+                      final edited = await FilteredImagePicker.edit(context, b,
+                          title: 'فلاتر صورة الإعلان');
+                      if (!mounted) return;
                       setState(() {
-                        _bytes = b;
+                        _bytes = edited ?? b;
                         _name = picked.name;
                       });
                     },
                     icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
                     label: Text(
-                        _bytes == null ? 'إضافة صورة (اختياري)' : 'تغيير الصورة'),
+                        _bytes == null ? 'إضافة صورة + فلاتر' : 'تغيير الصورة أو فلترها'),
                   ),
                 ]),
 
