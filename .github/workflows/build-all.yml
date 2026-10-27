@@ -142,8 +142,16 @@ jobs:
       # تقارير الأعطال غير قابلة للقراءة، لذا تُرفع كأثر بناء محفوظ.
       - name: Build Google Play bundle (AAB)
         run: |
-          flutter build appbundle --release \
-            --obfuscate --split-debug-info=build/symbols/aab
+          set -o pipefail
+          # السجلّ الخام غير قابل للتنزيل من بيئة الوكيل، والتعليقات هي
+          # القناة الوحيدة المقروءة عبر الواجهة البرمجية — فتُبَثّ آخر
+          # الأسطر كتعليقات بلا تصفية مهما كان شكل الخطأ.
+          if ! flutter build appbundle --release \
+                 --obfuscate --split-debug-info=build/symbols/aab 2>&1 | tee aab.txt; then
+            echo "::group::آخر 120 سطرًا"; tail -120 aab.txt; echo "::endgroup::"
+            tail -12 aab.txt | sed 's/^/::error::/'
+            exit 1
+          fi
 
       # ② arm64 فقط — أصغر حجمًا لأجهزة 64-bit الحديثة (نفس بناء السابق).
       - name: Build signed ARM64 APK
