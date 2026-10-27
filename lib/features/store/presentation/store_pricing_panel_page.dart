@@ -235,6 +235,24 @@ class _StorePricingPanelPageState extends State<StorePricingPanelPage> {
         ),
       );
 
+  Future<void> _openAssign(String section) async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0E1628),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(18))),
+      builder: (_) => _AssignTierSheet(
+        section: section,
+        sectionLabel: _sectionLabels[section] ?? section,
+      ),
+    );
+    if (changed == true) {
+      _changed = true;
+      await _load(); // عدّاد "كم عنصرًا في الشريحة" يتغيّر بعد الإسناد
+    }
+  }
+
   Widget _sectionCard(String section) {
     final rows = _tiers.where((t) => t['section'] == section).toList();
     if (rows.isEmpty) return const SizedBox.shrink();
@@ -245,8 +263,20 @@ class _StorePricingPanelPageState extends State<StorePricingPanelPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(_sectionLabels[section] ?? section,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+            Row(children: [
+              Expanded(
+                child: Text(_sectionLabels[section] ?? section,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w900)),
+              ),
+              // بلا هذا الزرّ تبقى اللوحة بلا أثر: تعديل سعر شريحة لا
+              // يمسّ شيئًا ما دام لا عنصر مُسنَدًا إليها.
+              TextButton.icon(
+                onPressed: _busy ? null : () => _openAssign(section),
+                icon: const Icon(Icons.playlist_add_check_rounded, size: 18),
+                label: const Text('إسناد العناصر'),
+              ),
+            ]),
             const SizedBox(height: 8),
             for (final t in rows)
               Padding(
@@ -383,6 +413,235 @@ class _StorePricingPanelPageState extends State<StorePricingPanelPage> {
                       ],
                     ),
         ),
+      ),
+    );
+  }
+}
+
+/// ورقة إسناد عناصر قسم إلى شريحة سعر.
+///
+/// لماذا هي ضرورية: لوحة الشرائح بلا إسناد بلا أثر — تعدّل سعر شريحة فلا
+/// يتغيّر شيء، لأنّ كل عناصر المتجر (456 عنصرًا) بلا شريحة. وبقيت كذلك
+/// لأنّ دالّة الإسناد كانت موجودة في الخادم ولا واجهة تناديها.
+///
+/// الإسناد **لا يُفرَض** على كل العناصر: ما تختاره أنت وحده يُسنَد، فتسعيرك
+/// الحالي المتنوّع لا يُطمَس.
+class _AssignTierSheet extends StatefulWidget {
+  const _AssignTierSheet({required this.section, required this.sectionLabel});
+
+  final String section;
+  final String sectionLabel;
+
+  @override
+  State<_AssignTierSheet> createState() => _AssignTierSheetState();
+}
+
+class _AssignTierSheetState extends State<_AssignTierSheet> {
+  final _db = Supabase.instance.client;
+  List<Map<String, dynamic>> _items = const [];
+  final Set<String> _picked = <String>{};
+  bool _loading = true;
+  bool _busy = false;
+  bool _changed = false;
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final raw = await _db.rpc('admin_list_section_items',
+          params: {'p_section': widget.section});
+      final list = raw is List ? raw : const <dynamic>[];
+      setState(() {
+        _items = list
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList(growable: false);
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text('تعذّر جلب العناصر: $e')));
+    }
+  }
+
+  Future<void> _apply(String? tier) async {
+    if (_picked.isEmpty) return;
+    setState(() => _busy = true);
+    try {
+      final res = await _db.rpc('admin_set_items_price_tier', params: {
+        'p_section': widget.section,
+        'p_item_keys': _picked.toList(),
+        'p_tier': tier,
+      });
+      _changed = true;
+      final n = (res is Map ? res['updated'] : null) ?? _picked.length;
+      _picked.clear();
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+          content: Text(tier == null
+              ? 'فُكّ إسناد $n عنصرًا'
+              : 'أُسند $n عنصرًا إلى ${_tierLabels[tier] ?? tier}'),
+          backgroundColor: const Color(0xFF16A34A)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text('تعذّر الإسناد: $e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final q = _query.trim();
+    final shown = q.isEmpty
+        ? _items
+        : _items
+            .where((i) => '${i['name'] ?? ''}${i['key'] ?? ''}'.contains(q))
+            .toList(growable: false);
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (_, controller) => Column(children: [
+          const SizedBox(height: 10),
+          Text('إسناد شريحة — ${widget.sectionLabel}',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+            child: TextField(
+              onChanged: (v) => setState(() => _query = v),
+              decoration: const InputDecoration(
+                isDense: true,
+                prefixIcon: Icon(Icons.search_rounded, size: 20),
+                hintText: 'بحث بالاسم',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+          Row(children: [
+            const SizedBox(width: 12),
+            Text('محدَّد: ${_picked.length}',
+                style: const TextStyle(color: Colors.white70)),
+            const Spacer(),
+            TextButton(
+              onPressed: shown.isEmpty
+                  ? null
+                  : () => setState(() {
+                        for (final i in shown) {
+                          _picked.add('${i['key']}');
+                        }
+                      }),
+              child: const Text('تحديد الظاهر'),
+            ),
+            TextButton(
+              onPressed:
+                  _picked.isEmpty ? null : () => setState(_picked.clear),
+              child: const Text('إلغاء التحديد'),
+            ),
+            const SizedBox(width: 6),
+          ]),
+          const Divider(height: 1),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    controller: controller,
+                    itemCount: shown.length,
+                    itemBuilder: (_, i) {
+                      final it = shown[i];
+                      final key = '${it['key']}';
+                      final tier = it['tier']?.toString();
+                      return CheckboxListTile(
+                        dense: true,
+                        value: _picked.contains(key),
+                        onChanged: _busy
+                            ? null
+                            : (v) => setState(() {
+                                  if (v == true) {
+                                    _picked.add(key);
+                                  } else {
+                                    _picked.remove(key);
+                                  }
+                                }),
+                        title: Text('${it['name'] ?? key}',
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        subtitle: Text(
+                          it['points'] == null
+                              ? (tier == null ? 'بلا شريحة' : '')
+                              : '${it['points']} نقطة · ${it['gems']} جوهرة',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        secondary: tier == null
+                            ? const Text('—',
+                                style: TextStyle(color: Colors.white38))
+                            : Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  color: (_tierColors[tier] ?? Colors.grey)
+                                      .withValues(alpha: .18),
+                                  border: Border.all(
+                                      color: _tierColors[tier] ?? Colors.grey),
+                                ),
+                                child: Text(_tierLabels[tier] ?? tier,
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: _tierColors[tier])),
+                              ),
+                      );
+                    },
+                  ),
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Row(children: [
+                for (final t in const ['normal', 'premium', 'rare'])
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                            backgroundColor: _tierColors[t]),
+                        onPressed:
+                            _busy || _picked.isEmpty ? null : () => _apply(t),
+                        child: Text(_tierLabels[t] ?? t,
+                            style: const TextStyle(fontWeight: FontWeight.w900)),
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 4),
+                OutlinedButton(
+                  onPressed: _busy || _picked.isEmpty ? null : () => _apply(null),
+                  child: const Text('فكّ'),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  tooltip: 'إغلاق',
+                  onPressed: () => Navigator.pop(context, _changed),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ]),
+            ),
+          ),
+        ]),
       ),
     );
   }
