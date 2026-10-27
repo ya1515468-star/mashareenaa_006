@@ -23,6 +23,7 @@ class AdminNotificationsTab extends StatefulWidget {
 class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
   final _db = Supabase.instance.client;
   List<Map<String, dynamic>> _rows = const [];
+  Map<String, dynamic> _grant = const {};
   bool _loading = true;
   String? _busyType;
   String? _error;
@@ -41,6 +42,10 @@ class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
     try {
       final raw = await _db.rpc('owner_get_notification_settings');
       final list = raw is List ? raw : const <dynamic>[];
+      try {
+        final g = await _db.rpc('owner_get_signup_grant');
+        if (g is Map) _grant = Map<String, dynamic>.from(g);
+      } catch (_) {}
       setState(() {
         _rows = list
             .whereType<Map>()
@@ -124,6 +129,117 @@ class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
         maxPerHour: isCap ? v : null, dedupeMinutes: isCap ? null : v);
   }
 
+  Future<void> _editGrant(String field, String title, String hint) async {
+    final c = TextEditingController(text: '${_grant[field] ?? 0}');
+    final v = await showDialog<int>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text(title),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(
+                controller: c,
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                decoration: const InputDecoration(border: OutlineInputBorder())),
+            const SizedBox(height: 8),
+            Text(hint,
+                style: const TextStyle(fontSize: 11, color: Colors.white60)),
+          ]),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            FilledButton(
+                onPressed: () =>
+                    Navigator.pop(ctx, int.tryParse(c.text.trim()) ?? 0),
+                child: const Text('حفظ')),
+          ],
+        ),
+      ),
+    );
+    if (v == null) return;
+    try {
+      await _db.rpc('owner_set_signup_grant', params: {
+        'p_points': field == 'points' ? v : null,
+        'p_gems': field == 'gems' ? v : null,
+        'p_xp': field == 'xp' ? v : null,
+      });
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('تعذّر الحفظ: $e')));
+    }
+  }
+
+  Widget _signupGrantCard() {
+    return Card(
+      color: const Color(0xFF14233A),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            const Expanded(
+              child: Text('🎁 منحة التسجيل',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
+            ),
+            Switch(
+              value: _grant['enabled'] == true,
+              onChanged: (v) async {
+                try {
+                  await _db.rpc('owner_set_signup_grant',
+                      params: {'p_enabled': v});
+                  await _load();
+                } catch (_) {}
+              },
+            ),
+          ]),
+          const Text(
+            'ما يأخذه العضو فور تسجيله. تُمنح مرّة واحدة لكل حساب ولا تتكرّر '
+            'مهما أُعيد إنشاء الصفّ.',
+            style: TextStyle(fontSize: 11, color: Colors.white60),
+          ),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => _editGrant('points', 'نقاط التسجيل',
+                    'رصيد النقاط الذي يبدأ به العضو الجديد.'),
+                child: Text('${_grant['points'] ?? 0} نقطة',
+                    style: const TextStyle(fontSize: 12)),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => _editGrant('gems', 'جواهر التسجيل',
+                    'الجواهر عملة الشراء الأغلى — ابدأ بعدد صغير.'),
+                child: Text('${_grant['gems'] ?? 0} جوهرة',
+                    style: const TextStyle(fontSize: 12)),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => _editGrant('xp', 'خبرة التسجيل',
+                    'نقاط الخبرة تحدّد رتبة العضو وتقدّمه.'),
+                child: Text('${_grant['xp'] ?? 0} خبرة',
+                    style: const TextStyle(fontSize: 12)),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 6),
+          Text(
+            'مُنحت لـ${_grant['issued_total'] ?? 0} عضوًا '
+            '(${_grant['issued_7d'] ?? 0} في آخر 7 أيام)',
+            style: const TextStyle(fontSize: 11, color: Colors.white54),
+          ),
+        ]),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
@@ -156,6 +272,8 @@ class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
                 ),
               ),
             ),
+            const SizedBox(height: 6),
+            _signupGrantCard(),
             const SizedBox(height: 6),
             for (final r in _rows)
               Card(

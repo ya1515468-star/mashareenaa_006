@@ -64,7 +64,7 @@ class AdminDashboardPage extends ConsumerWidget {
                 Tab(text: '🎬 سوق المنتجين'),
                 Tab(text: '🎞️ تحكّم الريلز'),
                 Tab(text: '🤖 بوت المحتوى'),
-                Tab(text: '🔔 الإشعارات'),
+                Tab(text: '🔔 الإشعارات والمنح'),
               ],
             ),
           ),
