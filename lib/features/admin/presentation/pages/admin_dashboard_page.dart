@@ -21,6 +21,7 @@ import 'admin_content_bot_tab.dart';
 import 'admin_notifications_tab.dart';
 import 'admin_calls_tab.dart';
 import 'admin_ads_tab.dart';
+import '../../../chat/presentation/pages/owner_content_control_page.dart';
 
 /// لوحة الإدارة — يجب ألا يصل إليها المستخدم إطلاقًا إلا عبر
 /// [PermissionGate] الذي يغلّف زر الوصول إليها (انظر HomeDashboardPage)؛
@@ -40,7 +41,7 @@ class AdminDashboardPage extends ConsumerWidget {
         ),
       ),
       child: DefaultTabController(
-        length: 19,
+        length: 20,
         child: Scaffold(
           appBar: AppBar(
             title: const Text('لوحة الإدارة'),
@@ -69,6 +70,7 @@ class AdminDashboardPage extends ConsumerWidget {
                 Tab(text: '🔔 الإشعارات والمنح'),
                 Tab(text: '📞 المكالمات'),
                 Tab(text: '📣 الإعلانات'),
+                Tab(text: '🛒 المنتجات و VIP'),
               ],
             ),
           ),
@@ -97,6 +99,7 @@ class AdminDashboardPage extends ConsumerWidget {
               _LazyTab(builder: () => const AdminNotificationsTab()),
               _LazyTab(builder: () => const AdminCallsTab()),
               _LazyTab(builder: () => const AdminAdsTab()),
+              _LazyTab(builder: () => const OwnerContentControlPage()),
             ],
           ),
         ),

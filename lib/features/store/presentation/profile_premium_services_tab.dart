@@ -594,8 +594,8 @@ class _ProfilePremiumServicesTabState
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text('المكان: ${item.usageHintAr}', style: const TextStyle(color: Colors.cyanAccent, fontSize: 12, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 2),
-                      Text('الإجراء: ${item.actionKey}', style: const TextStyle(color: Colors.white38, fontSize: 9)),
+                      // كان هنا «الإجراء: profile_music_v2» — مفتاح داخليّ
+                      // لا يعني للعضو شيئًا (البند ٨). أُزيل.
                     ],
                   ),
                   const SizedBox(height: 8),

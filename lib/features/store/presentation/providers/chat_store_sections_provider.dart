@@ -42,3 +42,59 @@ final chatStoreSectionsProvider = FutureProvider<Map<String, ChatStoreSection>>(
   }
   return map;
 });
+
+/// أحجام الخطّ والسمايلات لكل قسم من أقسام متجر الشات (البند ٧).
+///
+/// كانت الأحجام أرقامًا ثابتة في الشيفرة، فلا يملك المالك تكبير اسم
+/// طويل يُقصّ ولا سعرًا لا يكاد يُقرأ إلّا بإصدار جديد. الآن تُقرأ من
+/// الخادم فتسري على كل الأعضاء.
+class ChatStoreSectionStyle {
+  const ChatStoreSectionStyle({
+    this.title = 15,
+    this.item = 12,
+    this.price = 10,
+    this.emoji = 20,
+  });
+
+  final double title;
+  final double item;
+  final double price;
+  final double emoji;
+
+  factory ChatStoreSectionStyle.fromMap(Map<String, dynamic> m) =>
+      ChatStoreSectionStyle(
+        title: (m['title'] as num?)?.toDouble() ?? 15,
+        item: (m['item'] as num?)?.toDouble() ?? 12,
+        price: (m['price'] as num?)?.toDouble() ?? 10,
+        emoji: (m['emoji'] as num?)?.toDouble() ?? 20,
+      );
+
+  static const fallback = ChatStoreSectionStyle();
+}
+
+final chatStoreSectionStylesProvider =
+    FutureProvider<Map<String, ChatStoreSectionStyle>>((ref) async {
+  try {
+    final raw =
+        await Supabase.instance.client.rpc('get_chat_store_section_styles');
+    if (raw is! Map) return const {};
+    final out = <String, ChatStoreSectionStyle>{};
+    raw.forEach((k, v) {
+      if (v is Map) {
+        out[k.toString()] =
+            ChatStoreSectionStyle.fromMap(Map<String, dynamic>.from(v));
+      }
+    });
+    return out;
+  } catch (_) {
+    // الأحجام تحسين لا شرط: فشل قراءتها يُبقي الافتراضي ولا يُفرِغ المتجر.
+    return const {};
+  }
+});
+
+/// حجم قسمٍ بعينه، أو الافتراضي إن لم يُضبَط بعد.
+ChatStoreSectionStyle chatStoreStyleOf(
+  Map<String, ChatStoreSectionStyle>? all,
+  String sectionKey,
+) =>
+    all?[sectionKey] ?? ChatStoreSectionStyle.fallback;

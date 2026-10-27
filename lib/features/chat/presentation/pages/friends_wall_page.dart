@@ -14,6 +14,9 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/embedded_media_player.dart';
 import '../../../../core/services/media_upload_service.dart';
+import '../../../../core/content/content_interaction_bar.dart';
+import '../../../../core/content/filtered_image_picker.dart';
+import '../../../../core/content/media_viewer.dart';
 import '../widgets/mini_chat_overlay.dart';
 import '../../../rbac/presentation/widgets/server_username_display.dart';
 
@@ -216,213 +219,467 @@ class _FriendsWallPageState extends ConsumerState<FriendsWallPage> {
     await _openEditor();
   }
 
+  /// محرّر المنتج.
+  ///
+  /// كان نموذجًا واحدًا بأحد عشر حقلًا مفتوحًا: SKU يُكتب يدويًّا،
+  /// وتاريخا البداية والنهاية نصًّا بصيغة ISO، وترتيب عرض، ومخزون —
+  /// كلّها مطلوبة بصريًّا على قدم المساواة مع اسم المنتج وسعره. فمن
+  /// يريد عرض ثوبٍ للبيع يواجه استمارة مستودع.
+  ///
+  /// الآن: ثلاثة أشياء فقط ظاهرة (الاسم، السعر، الصور)، وما بقي تحت
+  /// «خيارات متقدّمة» مطويّة. وSKU يُولَّد تلقائيًّا لأن الخادم يطلبه
+  /// ولا سبب ليكتبه البائع، والتاريخان بمنتقي تاريخ لا بنصّ ISO.
   Future<void> _openEditor([Map<String, dynamic>? product]) async {
     final name = TextEditingController(text: product?['name']?.toString() ?? '');
     final sku = TextEditingController(text: product?['sku']?.toString() ?? '');
-    final details = TextEditingController(text: product?['details']?.toString() ?? '');
-    final description = TextEditingController(text: product?['description']?.toString() ?? '');
-    final quantity = TextEditingController(text: '${product?['quantity'] ?? 0}');
+    final details =
+        TextEditingController(text: product?['details']?.toString() ?? '');
+    final description =
+        TextEditingController(text: product?['description']?.toString() ?? '');
+    final quantity = TextEditingController(text: '${product?['quantity'] ?? 1}');
     // المنتج سلعة حقيقية (ثوب، قماش...)، لا يُسعَّر بالذهب أو النقاط
     // الداخلية — سعر القطعة بالدولار و/أو الليرة السورية.
-    final priceUsd = TextEditingController(text: '${product?['price_usd'] ?? ''}');
-    final priceSyp = TextEditingController(text: '${product?['price_syp'] ?? ''}');
-    // الروابط المكتوبة يدويًا استُبدلت برفع حقيقي من معرض الهاتف، يُخزَّن
-    // خادميًا في Storage — لا روابط خارجية بعد الآن.
+    final priceUsd =
+        TextEditingController(text: '${product?['price_usd'] ?? ''}');
+    final priceSyp =
+        TextEditingController(text: '${product?['price_syp'] ?? ''}');
     final images = <_PickedImage>[
-      for (final u in (product?['image_urls'] is List ? List.from(product!['image_urls']) : const []))
+      for (final u in (product?['image_urls'] is List
+          ? List.from(product!['image_urls'])
+          : const []))
         _PickedImage.existing(u.toString()),
     ];
-    final video = TextEditingController(text: product?['video_url']?.toString() ?? '');
+    var videoUrl = product?['video_url']?.toString() ?? '';
     final sort = TextEditingController(text: '${product?['sort_order'] ?? 0}');
-    final starts = TextEditingController(text: product?['starts_at']?.toString() ?? '');
-    final ends = TextEditingController(text: product?['ends_at']?.toString() ?? '');
+    DateTime? startsAt =
+        DateTime.tryParse('${product?['starts_at'] ?? ''}')?.toLocal();
+    DateTime? endsAt =
+        DateTime.tryParse('${product?['ends_at'] ?? ''}')?.toLocal();
     bool active = product?['is_active'] != false;
     bool likesOn = product?['likes_enabled'] != false;
     bool commentsOn = product?['comments_enabled'] != false;
     bool saving = false;
-    bool uploadingImage = false;
+    bool busyMedia = false;
+    bool advanced = false;
+
+    String fmt(DateTime? d) => d == null
+        ? 'غير محدّد'
+        : '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
 
     final saved = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(product == null ? 'إضافة منتج إلى حائط المنتجات' : 'تعديل المنتج'),
-          content: SizedBox(
-            width: 560,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(controller: name, decoration: const InputDecoration(labelText: 'اسم المنتج')),
-                  TextField(controller: sku, decoration: const InputDecoration(labelText: 'SKU')),
-                  TextField(controller: details, decoration: const InputDecoration(labelText: 'التفاصيل')),
-                  TextField(controller: description, maxLines: 3, decoration: const InputDecoration(labelText: 'الوصف')),
-                  TextField(controller: quantity, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'المخزون')),
-                  Row(children: [
-                    Expanded(child: TextField(controller: priceUsd, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'سعر القطعة بالدولار \$'))),
-                    const SizedBox(width: 10),
-                    Expanded(child: TextField(controller: priceSyp, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'سعر القطعة بالليرة السورية'))),
-                  ]),
-                  const SizedBox(height: 10),
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: Text('صور المنتج (${images.length}) — من الهاتف فقط',
-                        style: const TextStyle(fontWeight: FontWeight.w700)),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(spacing: 8, runSpacing: 8, children: [
-                    for (var i = 0; i < images.length; i++)
-                      Stack(clipBehavior: Clip.none, children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: SizedBox(
-                            width: 72, height: 72,
-                            child: images[i].bytes != null
-                                ? Image.memory(images[i].bytes!, fit: BoxFit.cover)
-                                : Image.network(images[i].url!, fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(color: Colors.white10)),
-                          ),
-                        ),
-                        Positioned(
-                          top: -6, right: -6,
-                          child: GestureDetector(
-                            onTap: () => setDialogState(() => images.removeAt(i)),
-                            child: const CircleAvatar(
-                                radius: 11, backgroundColor: Colors.redAccent,
-                                child: Icon(Icons.close, size: 13, color: Colors.white)),
-                          ),
-                        ),
-                      ]),
-                    if (images.length < 12)
-                      InkWell(
-                        // uploadingImage كانت مُعلنة ولا تُغيَّر أبدًا (bool
-                        // ميت فعليًا، وهذا ما رصده التحليل الساكن كـdead_code
-                        // على فرع null) — فلا كان ثمة ما يمنع ضغطًا مزدوجًا
-                        // أثناء قراءة صورة كبيرة، ولا مؤشر تحميل أثناء ذلك.
-                        onTap: uploadingImage
-                            ? null
-                            : () async {
-                                final picked = await ImagePicker().pickImage(
-                                    source: ImageSource.gallery, imageQuality: 85);
-                                if (picked == null) return;
-                                setDialogState(() => uploadingImage = true);
-                                try {
-                                  final bytes = await picked.readAsBytes();
-                                  setDialogState(() {
-                                    images.add(_PickedImage.local(bytes, picked.name));
-                                  });
-                                } finally {
-                                  setDialogState(() => uploadingImage = false);
-                                }
-                              },
-                        child: Container(
-                          width: 72, height: 72,
-                          decoration: BoxDecoration(
-                              border: Border.all(color: Colors.white30),
-                              borderRadius: BorderRadius.circular(10)),
-                          child: uploadingImage
-                              ? const Padding(
-                                  padding: EdgeInsets.all(22),
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.add_a_photo_outlined, color: Colors.white54),
+        builder: (context, setDialogState) {
+          Future<void> addImage() async {
+            final picked = await ImagePicker()
+                .pickImage(source: ImageSource.gallery, imageQuality: 92);
+            if (picked == null) return;
+            setDialogState(() => busyMedia = true);
+            try {
+              var bytes = await picked.readAsBytes();
+              if (!context.mounted) return;
+              // الفلاتر التجميلية تُطبَّق قبل الرفع، فما يُخزَّن هو
+              // الصورة كما اختارها صاحبها لا الأصل الخام.
+              final edited = await FilteredImagePicker.edit(context, bytes,
+                  title: 'تجميل صورة المنتج');
+              if (edited != null) bytes = edited;
+              setDialogState(
+                  () => images.add(_PickedImage.local(bytes, picked.name)));
+            } finally {
+              setDialogState(() => busyMedia = false);
+            }
+          }
+
+          Future<void> pickVideo() async {
+            final picked =
+                await ImagePicker().pickVideo(source: ImageSource.gallery);
+            if (picked == null) return;
+            setDialogState(() => busyMedia = true);
+            try {
+              final uid = Supabase.instance.client.auth.currentUser!.id;
+              final url = await MediaUploadService(bucket: 'media').uploadBytes(
+                bytes: await picked.readAsBytes(),
+                fileName: picked.name,
+                folder: 'wall/products',
+                uid: uid,
+              );
+              setDialogState(() => videoUrl = url);
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context)
+                    .showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
+              }
+            } finally {
+              setDialogState(() => busyMedia = false);
+            }
+          }
+
+          return AlertDialog(
+            title: Text(product == null ? 'منتج جديد' : 'تعديل المنتج'),
+            content: SizedBox(
+              width: 560,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: name,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'ما تبيعه',
+                        hintText: 'مثال: قميص قطن رجالي',
+                        prefixIcon: Icon(Icons.label_outline_rounded),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(children: [
+                      Expanded(
+                        child: TextField(
+                          controller: priceUsd,
+                          keyboardType:
+                              const TextInputType.numberWithOptions(decimal: true),
+                          decoration: const InputDecoration(
+                              labelText: 'بالدولار',
+                              prefixText: '\$ ',
+                              hintText: '0'),
                         ),
                       ),
-                  ]),
-                  TextField(controller: video, decoration: const InputDecoration(labelText: 'رابط الفيديو (اختياري)')),
-                  Row(children: [
-                    Expanded(child: TextField(controller: starts, decoration: const InputDecoration(labelText: 'يبدأ في ISO (اختياري)'))),
-                    const SizedBox(width: 10),
-                    Expanded(child: TextField(controller: ends, decoration: const InputDecoration(labelText: 'ينتهي في ISO (اختياري)'))),
-                  ]),
-                  TextField(controller: sort, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'ترتيب العرض')),
-                  SwitchListTile(value: active, onChanged: (v) => setDialogState(() => active = v), title: const Text('منشور ونشط')),
-                  if (product != null) ...[
-                    // الإظهار/الإخفاء يضبطه "منشور ونشط" أعلاه؛ هذان تحكّم
-                    // إضافي بالتفاعل على هذا المنتج تحديدًا (المالك فقط يعدّل).
-                    SwitchListTile(value: likesOn, onChanged: (v) => setDialogState(() => likesOn = v), title: const Text('الإعجابات مفعّلة')),
-                    SwitchListTile(value: commentsOn, onChanged: (v) => setDialogState(() => commentsOn = v), title: const Text('التعليقات مفعّلة')),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: priceSyp,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                              labelText: 'بالليرة', suffixText: 'ل.س'),
+                        ),
+                      ),
+                    ]),
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Text('اكتب سعرًا واحدًا على الأقل',
+                          style: TextStyle(fontSize: 11, color: Colors.white54)),
+                    ),
+                    const SizedBox(height: 14),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text('الصور (${images.length})',
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      for (var i = 0; i < images.length; i++)
+                        Stack(clipBehavior: Clip.none, children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: SizedBox(
+                              width: 72,
+                              height: 72,
+                              child: images[i].bytes != null
+                                  ? Image.memory(images[i].bytes!,
+                                      fit: BoxFit.cover)
+                                  : Image.network(images[i].url!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) =>
+                                          Container(color: Colors.white10)),
+                            ),
+                          ),
+                          Positioned(
+                            top: -6,
+                            right: -6,
+                            child: GestureDetector(
+                              onTap: () =>
+                                  setDialogState(() => images.removeAt(i)),
+                              child: const CircleAvatar(
+                                  radius: 11,
+                                  backgroundColor: Colors.redAccent,
+                                  child: Icon(Icons.close,
+                                      size: 13, color: Colors.white)),
+                            ),
+                          ),
+                        ]),
+                      if (images.length < 12)
+                        InkWell(
+                          onTap: busyMedia ? null : addImage,
+                          child: Container(
+                            width: 72,
+                            height: 72,
+                            decoration: BoxDecoration(
+                                border: Border.all(color: Colors.white30),
+                                borderRadius: BorderRadius.circular(10)),
+                            child: busyMedia
+                                ? const Padding(
+                                    padding: EdgeInsets.all(22),
+                                    child:
+                                        CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.add_a_photo_outlined,
+                                    color: Colors.white54),
+                          ),
+                        ),
+                    ]),
+                    const SizedBox(height: 14),
+                    Row(children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: busyMedia ? null : pickVideo,
+                          icon: Icon(videoUrl.isEmpty
+                              ? Icons.videocam_outlined
+                              : Icons.check_circle_rounded),
+                          label: Text(videoUrl.isEmpty
+                              ? 'فيديو (اختياري)'
+                              : 'فيديو مرفوع'),
+                        ),
+                      ),
+                      if (videoUrl.isNotEmpty)
+                        IconButton(
+                          tooltip: 'إزالة الفيديو',
+                          onPressed: () => setDialogState(() => videoUrl = ''),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                    ]),
+                    const SizedBox(height: 6),
+                    // كل ما لا يحتاجه بائعٌ عادي يُطوى هنا؛ القيم
+                    // الافتراضية صالحة للنشر دون فتحه إطلاقًا.
+                    Theme(
+                      data: Theme.of(context)
+                          .copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        tilePadding: EdgeInsets.zero,
+                        initiallyExpanded: advanced,
+                        onExpansionChanged: (v) =>
+                            setDialogState(() => advanced = v),
+                        title: const Text('خيارات متقدّمة',
+                            style: TextStyle(fontSize: 13)),
+                        childrenPadding: const EdgeInsets.only(bottom: 8),
+                        children: [
+                          TextField(
+                              controller: details,
+                              decoration: const InputDecoration(
+                                  labelText: 'سطر تفاصيل قصير')),
+                          TextField(
+                              controller: description,
+                              maxLines: 3,
+                              decoration:
+                                  const InputDecoration(labelText: 'الوصف')),
+                          TextField(
+                              controller: quantity,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                  labelText: 'الكمية المتوفّرة')),
+                          const SizedBox(height: 6),
+                          Row(children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  final d = await showDatePicker(
+                                    context: context,
+                                    initialDate: startsAt ?? DateTime.now(),
+                                    firstDate: DateTime.now()
+                                        .subtract(const Duration(days: 1)),
+                                    lastDate: DateTime.now()
+                                        .add(const Duration(days: 730)),
+                                  );
+                                  if (d != null) {
+                                    setDialogState(() => startsAt = d);
+                                  }
+                                },
+                                icon: const Icon(Icons.play_arrow_rounded,
+                                    size: 18),
+                                label: Text('يبدأ: ${fmt(startsAt)}',
+                                    style: const TextStyle(fontSize: 12)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  final d = await showDatePicker(
+                                    context: context,
+                                    initialDate: endsAt ??
+                                        DateTime.now()
+                                            .add(const Duration(days: 7)),
+                                    firstDate: DateTime.now(),
+                                    lastDate: DateTime.now()
+                                        .add(const Duration(days: 730)),
+                                  );
+                                  if (d != null) setDialogState(() => endsAt = d);
+                                },
+                                icon: const Icon(Icons.stop_rounded, size: 18),
+                                label: Text('ينتهي: ${fmt(endsAt)}',
+                                    style: const TextStyle(fontSize: 12)),
+                              ),
+                            ),
+                          ]),
+                          if (startsAt != null || endsAt != null)
+                            Align(
+                              alignment: AlignmentDirectional.centerStart,
+                              child: TextButton.icon(
+                                onPressed: () => setDialogState(() {
+                                  startsAt = null;
+                                  endsAt = null;
+                                }),
+                                icon: const Icon(Icons.clear_rounded, size: 16),
+                                label: const Text('بلا توقيت',
+                                    style: TextStyle(fontSize: 12)),
+                              ),
+                            ),
+                          TextField(
+                              controller: sort,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                  labelText: 'ترتيب العرض')),
+                          TextField(
+                              controller: sku,
+                              decoration: const InputDecoration(
+                                  labelText: 'رمز المنتج SKU',
+                                  hintText: 'يُولَّد تلقائيًّا إن تُرك فارغًا')),
+                          SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              value: active,
+                              onChanged: (v) =>
+                                  setDialogState(() => active = v),
+                              title: const Text('منشور ونشط')),
+                          if (product != null) ...[
+                            SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                value: likesOn,
+                                onChanged: (v) =>
+                                    setDialogState(() => likesOn = v),
+                                title: const Text('التفاعلات مفعّلة')),
+                            SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                value: commentsOn,
+                                onChanged: (v) =>
+                                    setDialogState(() => commentsOn = v),
+                                title: const Text('التعليقات مفعّلة')),
+                          ],
+                        ],
+                      ),
+                    ),
                   ],
-                ],
+                ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: saving ? null : () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
-            FilledButton.icon(
-              onPressed: saving ? null : () async {
-                final n = int.tryParse(quantity.text.trim());
-                final usd = double.tryParse(priceUsd.text.trim().isEmpty ? '0' : priceUsd.text.trim());
-                final syp = int.tryParse(priceSyp.text.trim().isEmpty ? '0' : priceSyp.text.trim());
-                final so = int.tryParse(sort.text.trim());
-                if (name.text.trim().isEmpty || sku.text.trim().isEmpty || n == null || usd == null || syp == null ||
-                    so == null || (usd <= 0 && syp <= 0) || n < 0 || usd < 0 || syp < 0) {
-                  ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(
-                      content: Text('تحقق من الاسم وSKU والمخزون، واكتب سعرًا بالدولار أو الليرة.')));
-                  return;
-                }
-                if (images.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBarSfx(
-                      const SnackBar(content: Text('أضف صورة واحدة على الأقل من الهاتف.')));
-                  return;
-                }
-                setDialogState(() => saving = true);
-                try {
-                  final uid = Supabase.instance.client.auth.currentUser!.id;
-                  // الصور المحلية (المختارة من المعرض) تُرفع إلى Storage أولًا؛
-                  // الموجودة سلفًا (عند التعديل) تبقى كما هي بروابطها.
-                  final urls = <String>[];
-                  for (final img in images) {
-                    if (img.url != null) {
-                      urls.add(img.url!);
-                    } else {
-                      final uploaded = await MediaUploadService(bucket: 'media').uploadBytes(
-                        bytes: img.bytes!,
-                        fileName: img.name ?? 'product.jpg',
-                        folder: 'wall/products',
-                        uid: uid,
-                      );
-                      urls.add(uploaded);
-                    }
-                  }
-                  final params = {
-                    if (product != null) 'p_id': product['id'],
-                    'p_name': name.text.trim(),
-                    'p_sku': sku.text.trim(),
-                    'p_details': details.text.trim(),
-                    'p_description': description.text.trim(),
-                    'p_quantity': n,
-                    'p_price_usd': usd,
-                    'p_price_syp': syp,
-                    'p_image_urls': urls,
-                    'p_video_url': video.text.trim(),
-                    'p_starts_at': starts.text.trim().isEmpty ? null : starts.text.trim(),
-                    'p_ends_at': ends.text.trim().isEmpty ? null : ends.text.trim(),
-                    'p_is_active': active,
-                    'p_sort_order': so,
-                    if (product != null) 'p_likes_enabled': likesOn,
-                    if (product != null) 'p_comments_enabled': commentsOn,
-                  };
-                  if (product == null) {
-                    await Supabase.instance.client.rpc('platform_wall_create_product', params: params);
-                  } else {
-                    await Supabase.instance.client.rpc('platform_wall_update_product', params: params);
-                  }
-                  if (dialogContext.mounted) Navigator.pop(dialogContext, true);
-                } catch (e) {
-                  setDialogState(() => saving = false);
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
-                }
-              },
-              icon: saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.save_rounded),
-              label: Text(saving ? 'جارٍ الحفظ' : 'حفظ'),
-            ),
-          ],
-        ),
+            actions: [
+              TextButton(
+                  onPressed:
+                      saving ? null : () => Navigator.pop(dialogContext, false),
+                  child: const Text('إلغاء')),
+              FilledButton.icon(
+                onPressed: saving
+                    ? null
+                    : () async {
+                        final usd = double.tryParse(priceUsd.text.trim().isEmpty
+                                ? '0'
+                                : priceUsd.text.trim()) ??
+                            -1;
+                        final syp = int.tryParse(priceSyp.text.trim().isEmpty
+                                ? '0'
+                                : priceSyp.text.trim()) ??
+                            -1;
+                        if (name.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBarSfx(
+                              const SnackBar(
+                                  content: Text('اكتب اسم المنتج.')));
+                          return;
+                        }
+                        if (usd < 0 || syp < 0 || (usd <= 0 && syp <= 0)) {
+                          ScaffoldMessenger.of(context).showSnackBarSfx(
+                              const SnackBar(
+                                  content: Text(
+                                      'اكتب سعرًا صحيحًا بالدولار أو بالليرة.')));
+                          return;
+                        }
+                        if (images.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBarSfx(
+                              const SnackBar(
+                                  content: Text(
+                                      'أضف صورة واحدة على الأقل من الهاتف.')));
+                          return;
+                        }
+                        setDialogState(() => saving = true);
+                        try {
+                          final uid =
+                              Supabase.instance.client.auth.currentUser!.id;
+                          final urls = <String>[];
+                          for (final img in images) {
+                            if (img.url != null) {
+                              urls.add(img.url!);
+                            } else {
+                              urls.add(await MediaUploadService(bucket: 'media')
+                                  .uploadBytes(
+                                bytes: img.bytes!,
+                                fileName: img.name ?? 'product.jpg',
+                                folder: 'wall/products',
+                                uid: uid,
+                              ));
+                            }
+                          }
+                          // SKU مطلوب خادميًّا؛ لا سبب ليكتبه البائع.
+                          var skuText = sku.text.trim();
+                          if (skuText.isEmpty) {
+                            skuText = 'P${DateTime.now().millisecondsSinceEpoch}';
+                          }
+                          final params = {
+                            if (product != null) 'p_id': product['id'],
+                            'p_name': name.text.trim(),
+                            'p_sku': skuText,
+                            'p_details': details.text.trim(),
+                            'p_description': description.text.trim(),
+                            'p_quantity':
+                                int.tryParse(quantity.text.trim()) ?? 1,
+                            'p_price_usd': usd,
+                            'p_price_syp': syp,
+                            'p_image_urls': urls,
+                            'p_video_url': videoUrl,
+                            'p_starts_at': startsAt?.toUtc().toIso8601String(),
+                            'p_ends_at': endsAt?.toUtc().toIso8601String(),
+                            'p_is_active': active,
+                            'p_sort_order':
+                                int.tryParse(sort.text.trim()) ?? 0,
+                            if (product != null) 'p_likes_enabled': likesOn,
+                            if (product != null)
+                              'p_comments_enabled': commentsOn,
+                          };
+                          if (product == null) {
+                            await Supabase.instance.client.rpc(
+                                'platform_wall_create_product', params: params);
+                          } else {
+                            await Supabase.instance.client.rpc(
+                                'platform_wall_update_product', params: params);
+                          }
+                          if (dialogContext.mounted) {
+                            Navigator.pop(dialogContext, true);
+                          }
+                        } catch (e) {
+                          setDialogState(() => saving = false);
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBarSfx(
+                              SnackBar(content: Text(FailureText.of(e))));
+                        }
+                      },
+                icon: saving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.save_rounded),
+                label: Text(saving ? 'جارٍ الحفظ' : 'حفظ'),
+              ),
+            ],
+          );
+        },
       ),
     );
-    name.dispose(); sku.dispose(); details.dispose(); description.dispose(); quantity.dispose(); priceUsd.dispose(); priceSyp.dispose(); video.dispose(); sort.dispose(); starts.dispose(); ends.dispose();
+    name.dispose();
+    sku.dispose();
+    details.dispose();
+    description.dispose();
+    quantity.dispose();
+    priceUsd.dispose();
+    priceSyp.dispose();
+    sort.dispose();
     if (saved == true && mounted) ref.invalidate(platformWallProductsProvider);
   }
 
@@ -505,10 +762,6 @@ class _ProductCard extends ConsumerStatefulWidget {
 
 class _ProductCardState extends ConsumerState<_ProductCard> {
   final _client = Supabase.instance.client;
-  bool _liked = false;
-  int _likes = 0;
-  int _comments = 0;
-  bool _loading = true;
 
   String get _id => widget.product['id']?.toString() ?? '';
   String get _name => widget.product['name']?.toString() ?? 'منتج';
@@ -524,104 +777,11 @@ class _ProductCardState extends ConsumerState<_ProductCard> {
     return '\$${usd.toStringAsFixed(2)}';
   }
 
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_loadEngagement());
-  }
+  // العدّ والإعجاب والتعليق كانت ثلاث دوال محلّية تقرأ الجدولين مباشرة
+  // وتزيد عدّادًا في الذاكرة بتفاؤل؛ صارت كلّها في ContentInteractionBar
+  // التي تقرأ من الخادم وتكتب فيه، فينضمّ المنتج إلى نفس محرّك
+  // التفاعلات والتعليقات الجاهزة والمشاركة الذي تستعمله الإعلانات.
 
-  Future<void> _loadEngagement() async {
-    final uid = _client.auth.currentUser?.id;
-    try {
-      final likes = await _client
-          .from('platform_wall_product_likes')
-          .select('user_id')
-          .eq('product_id', _id);
-      final comments = await _client
-          .from('platform_wall_product_comments')
-          .select('id')
-          .eq('product_id', _id);
-      if (!mounted) return;
-      setState(() {
-        _likes = likes.length;
-        _comments = comments.length;
-        _liked = uid != null &&
-            likes.any((row) => row['user_id']?.toString() == uid);
-        _loading = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _toggleLike() async {
-    final uid = _client.auth.currentUser?.id;
-    if (uid == null || _id.isEmpty) return;
-    try {
-      final result = await _client.rpc('platform_wall_toggle_like', params: {
-        'p_product_id': _id,
-      });
-      if (!mounted) return;
-      final oldLiked = _liked;
-      final next = result == true;
-      setState(() {
-        _liked = next;
-        _likes += next == oldLiked ? 0 : (next ? 1 : -1);
-      });
-      await _loadEngagement();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text(FailureText.of(e))),
-      );
-    }
-  }
-
-  Future<void> _comment() async {
-    final uid = _client.auth.currentUser?.id;
-    if (uid == null || _id.isEmpty) return;
-    final controller = TextEditingController();
-    final value = await showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('تعليق على المنتج'),
-        content: TextField(
-          controller: controller,
-          maxLines: 4,
-          maxLength: 500,
-          decoration: const InputDecoration(hintText: 'اكتب تعليقك...'),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('إلغاء')),
-          FilledButton(
-              onPressed: () => Navigator.pop(context, controller.text.trim()),
-              child: const Text('نشر')),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (value == null || value.isEmpty) return;
-    try {
-      await _client.from('platform_wall_product_comments').insert({
-        'product_id': _id,
-        'user_id': uid,
-        'body': value,
-      });
-      if (mounted) setState(() => _comments += 1);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text(FailureText.of(e))),
-      );
-    }
-  }
-
-  // السعر صار بعملة حقيقية (دولار/ليرة) لا يملك التطبيق بوابة دفع فعلية
-  // لها؛ "شراء" كان يخصم جواهر فعليًا رغم أن السعر المعروض دولارات —
-  // عطل منطقي حقيقي. التواصل المباشر مع البائع (محادثة خاصة) هو السلوك
-  // الصحيح لسلعة حقيقية تُباع وتُسلَّم خارج التطبيق.
   Future<void> _contactSeller() async {
     final myUid = _client.auth.currentUser?.id;
     final sellerUid = widget.product['owner_id']?.toString();
@@ -635,6 +795,12 @@ class _ProductCardState extends ConsumerState<_ProductCard> {
       peerUid: sellerUid,
       peerName: 'صاحب المنتج',
     );
+  }
+
+  /// الصور ثم الفيديو في قائمة واحدة، فالعارض يتنقّل بينها بالسحب.
+  List<String> _viewerItems() {
+    final v = widget.product['video_url']?.toString() ?? '';
+    return [..._images(), if (v.isNotEmpty) v];
   }
 
   List<String> _images() {
@@ -655,8 +821,36 @@ class _ProductCardState extends ConsumerState<_ProductCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // الضغط على الصورة كان لا يفعل شيئًا: تُعرض مقصوصة في ١٩٠
+          // بكسل ولا طريق لرؤية التفاصيل. الآن تُفتح بالحجم الكامل مع
+          // التكبير والتحميل والمشاركة، والفيديو معها في نفس العارض.
           if (images.isNotEmpty)
-            _AnimatedProductHero(images: images, title: _name)
+            Stack(children: [
+              GestureDetector(
+                onTap: () => MediaViewer.open(context,
+                    items: _viewerItems(), title: _name),
+                child: _AnimatedProductHero(images: images, title: _name),
+              ),
+              Positioned(
+                top: 10,
+                left: 10,
+                child: IgnorePointer(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.open_in_full_rounded, size: 13, color: Colors.white),
+                      SizedBox(width: 4),
+                      Text('اضغط للعرض الكامل',
+                          style: TextStyle(fontSize: 10, color: Colors.white)),
+                    ]),
+                  ),
+                ),
+              ),
+            ])
           else
             Container(
                 height: 190,
@@ -722,26 +916,29 @@ class _ProductCardState extends ConsumerState<_ProductCard> {
                         endsAt: DateTime.tryParse('${widget.product['ends_at'] ?? ''}'),
                       ),
                   ]),
-              const SizedBox(height: 8),
-              Row(children: [
-                Text('$_likes إعجاب • $_comments تعليق',
-                    style: TextStyle(color: p.textMuted, fontSize: 12)),
-                const Spacer(),
-                IconButton(
-                    onPressed: _loading ? null : _toggleLike,
-                    icon: Icon(_liked ? Icons.favorite : Icons.favorite_border,
-                        color: _liked ? p.accent : p.textSecondary)),
-                IconButton(
-                    onPressed: _comment,
-                    icon: const Icon(Icons.mode_comment_outlined)),
-                // "isOwner" هنا تعني مالك المنصة لا بائع هذا المنتج تحديدًا؛
-                // زر التواصل يُخفى فقط عمّن يبيع هذا المنتج هو نفسه.
-                if (_client.auth.currentUser?.id != widget.product['owner_id']?.toString())
-                  FilledButton.icon(
+              const SizedBox(height: 4),
+              // مفتاحا المالك (التفاعلات/التعليقات) يُحترمان: إن أطفأ
+              // أحدهما فلا يُبنى الشريط لهذا المنتج.
+              if (widget.product['likes_enabled'] != false ||
+                  widget.product['comments_enabled'] != false)
+                ContentInteractionBar(
+                  // 'wall_product' لا 'product': الخادم يرفض ما عداه
+                  // (ad / wall_product / showcase) بـINVALID_TARGET_TYPE.
+                  targetType: 'wall_product',
+                  targetId: _id,
+                  shareText: '$_name — $_currencyLabel',
+                ),
+              // "isOwner" هنا تعني مالك المنصة لا بائع هذا المنتج تحديدًا؛
+              // زر التواصل يُخفى فقط عمّن يبيع هذا المنتج هو نفسه.
+              if (_client.auth.currentUser?.id !=
+                  widget.product['owner_id']?.toString())
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: FilledButton.icon(
                       onPressed: _contactSeller,
                       icon: const Icon(Icons.chat_bubble_outline_rounded),
                       label: const Text('تواصل مع البائع')),
-              ]),
+                ),
             ]),
           ),
         ],

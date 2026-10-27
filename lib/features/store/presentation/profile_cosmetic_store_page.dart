@@ -27,6 +27,7 @@ import '../../admin/presentation/widgets/admin_gift_dialog.dart';
 import 'providers/chat_store_sections_provider.dart';
 import '../domain/chat_store_section_icons.dart';
 import 'widgets/message_style_preview_bar.dart';
+import 'staff_gift_page.dart';
 import 'widgets/chat_store_sections_settings_dialog.dart';
 import 'widgets/name_background_picker_dialog.dart';
 import '../../subscriptions/presentation/widgets/membership_store_tab.dart';
@@ -102,6 +103,14 @@ final nameTemplateCatalogProvider = FutureProvider<List<ProfileCosmeticItem>>((r
       .where((item) => item.category == 'name_template' && NameTemplateRegistry.get(item.key) != null)
       .toList(growable: false);
 });
+
+/// حجم خطّ القسم المعروض حاليًا (البند ٧).
+///
+/// تُقرأ مرّة من مزوّد واحد وتُستعمل في بطاقات المواد والأسعار
+/// والسمايلات، فتسري أرقام المالك على المتجر كلّه بلا إصدار جديد.
+ChatStoreSectionStyle _styleFor(WidgetRef ref, String sectionKey) =>
+    chatStoreStyleOf(
+        ref.watch(chatStoreSectionStylesProvider).valueOrNull, sectionKey);
 
 final chatStoreOwnerProvider = FutureProvider<bool>((ref) async {
   try { return await Supabase.instance.client.rpc('is_my_platform_owner') == true; } catch (_) { return false; }
@@ -532,6 +541,18 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                 }
               },
             ),
+          // البند ١٣: الإهداء للمالك وللسوبر أدمن معًا — والسوبر أدمن
+          // لا يرى لوحة الإدارة (لا يملك view_admin_dashboard)، فمدخله
+          // من المتجر نفسه. الصلاحية من الخادم لا من إخفاء الزر.
+          if (ref.watch(salesStaffProvider).valueOrNull == true)
+            IconButton(
+              tooltip: 'الإهداء من المتجر',
+              icon: const Icon(Icons.card_giftcard_rounded,
+                  color: Color(0xFF34D399)),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const StaffGiftPage()),
+              ),
+            ),
           if (owner)
             IconButton(
               tooltip: 'تخصيص الأقسام',
@@ -872,9 +893,9 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                 MessageColorSwatch(item: item),
                 const SizedBox(width: 10),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Text(item.nameAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900)),
+                  Text(item.nameAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: _styleFor(ref, 'message_colors').item, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 3),
-                  Text(item.pricePoints == 0 && item.priceGems == 0 ? 'مجاني' : '${item.pricePoints} نقطة • ${item.priceGems} جوهرة', style: const TextStyle(fontSize: 9, color: Colors.white60)),
+                  Text(item.pricePoints == 0 && item.priceGems == 0 ? 'مجاني' : '${item.pricePoints} نقطة • ${item.priceGems} جوهرة', style: TextStyle(fontSize: _styleFor(ref, 'message_colors').price, color: Colors.white60)),
                 ])),
                 if (owner) _profileCosmeticOwnerMenu(item),
                 Icon(owned ? Icons.check_circle : Icons.lock_outline, size: 18),
@@ -930,9 +951,13 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
               children: [
                 SizedBox(width: 62, height: 62, child: FittedBox(child: frame)),
                 Text(item.nameAr, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+                    style: TextStyle(
+                        fontSize: _styleFor(ref, 'frames').item,
+                        fontWeight: FontWeight.w800)),
                 Text(price <= 0 ? 'مجاني' : '$price نقطة',
-                    style: const TextStyle(fontSize: 9, color: Colors.white60)),
+                    style: TextStyle(
+                        fontSize: _styleFor(ref, 'frames').price,
+                        color: Colors.white60)),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -1722,7 +1747,8 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                     Center(child: SizedBox(width: 170, height: 50, child: FittedBox(fit: BoxFit.contain, child: NameTemplateHost(templateKey: item.key, name: _previewName, width: 145, height: 44, fontSize: 15)))),
                     const SizedBox(height: 2),
                     Text(item.nameAr, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900)),
-                    Text('${item.key} • قالب مستقل', textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: Colors.white54)),
+                    // كان يطبع المفتاح الخام («namebg_...») تحت الاسم.
+                    const Text('قالب مستقل', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: Colors.white54)),
                     const SizedBox(height: 3),
                     Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.star, size: 14, color: Colors.amber), Text(' ${item.pricePoints}  '), const Icon(Icons.diamond, size: 14, color: Colors.cyan), Text(' ${item.priceGems}')]),
                     const SizedBox(height: 5),

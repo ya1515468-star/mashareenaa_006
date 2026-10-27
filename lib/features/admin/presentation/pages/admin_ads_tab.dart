@@ -240,6 +240,113 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
   }
 
   // ── إيقاف إعلان ──────────────────────────────────────────────────
+  /// تحكّم المالك الكامل بإعلان أي عضو: النصّ، المدّة، الظهور، الحذف.
+  ///
+  /// كل إجراء يمرّ بدالة الخادم التي تتحقّق من الملكية بنفسها وتكتب
+  /// في سجلّ التدقيق، فلا يكفي إخفاء القائمة لمنعه ولا يضيع أثره.
+  Future<void> _ownerAdAction(Map<String, dynamic> ad, String what) async {
+    final id = ad['id'];
+    Map<String, dynamic>? patch;
+    String okMsg = 'تمّ ✓';
+
+    if (what == 'text') {
+      final c = TextEditingController(text: ad['text']?.toString() ?? '');
+      final v = await showDialog<String>(
+        context: context,
+        builder: (d) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('تعديل نصّ الإعلان'),
+            content: TextField(
+                controller: c,
+                maxLines: 5,
+                maxLength: 500,
+                decoration: const InputDecoration(border: OutlineInputBorder())),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(d),
+                  child: const Text('إلغاء')),
+              FilledButton(
+                  onPressed: () => Navigator.pop(d, c.text.trim()),
+                  child: const Text('حفظ')),
+            ],
+          ),
+        ),
+      );
+      c.dispose();
+      if (v == null || v.isEmpty) return;
+      patch = {'text': v};
+      okMsg = 'حُدِّث النصّ ✓';
+    } else if (what == 'days') {
+      final days = await showDialog<int>(
+        context: context,
+        builder: (d) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: SimpleDialog(
+            title: const Text('مدّة ظهور الإعلان'),
+            children: [
+              for (final n in const [0, 3, 7, 15, 30, 90, 365])
+                SimpleDialogOption(
+                  onPressed: () => Navigator.pop(d, n),
+                  child: Text(n == 0
+                      ? 'بلا نهاية (ظهور دائم)'
+                      : '\$n يومًا من الآن'),
+                ),
+            ],
+          ),
+        ),
+      );
+      if (days == null) return;
+      patch = {'extend_days': days};
+      okMsg = days == 0 ? 'صار الظهور دائمًا ✓' : 'صارت المدّة \$days يومًا ✓';
+    } else if (what == 'visible') {
+      final show = ad['active'] != true;
+      patch = {'is_active': show};
+      okMsg = show ? 'أُظهر الإعلان ✓' : 'أُخفي الإعلان ✓';
+    }
+
+    setState(() => _busy = '\${ad['id']}');
+    try {
+      if (what == 'delete') {
+        final go = await showDialog<bool>(
+          context: context,
+          builder: (d) => Directionality(
+            textDirection: TextDirection.rtl,
+            child: AlertDialog(
+              title: const Text('حذف الإعلان نهائيًّا'),
+              content: const Text(
+                  'سيُحذف الإعلان وتفاعلاته وتعليقاته من الخادم. لا رجوع.'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(d, false),
+                    child: const Text('إلغاء')),
+                FilledButton(
+                    onPressed: () => Navigator.pop(d, true),
+                    child: const Text('حذف')),
+              ],
+            ),
+          ),
+        );
+        if (go != true) {
+          if (mounted) setState(() => _busy = null);
+          return;
+        }
+        await _db.rpc('owner_delete_ad',
+            params: {'p_ad_id': id, 'p_reason': 'حذف من لوحة المالك'});
+        okMsg = 'حُذف الإعلان ✓';
+      } else {
+        await _db.rpc('owner_update_ad',
+            params: {'p_ad_id': id, 'p_patch': patch});
+      }
+      await _load();
+      _toast(okMsg, ok: true);
+    } catch (e) {
+      _toast(FailureText.action(e, action: 'التنفيذ'));
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
+  }
+
   Future<void> _togglePause(Map<String, dynamic> ad) async {
     final paused = ad['paused'] == true;
     String reason = '';
@@ -700,26 +807,55 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
                     ].join('  ·  '),
                     style: const TextStyle(fontSize: 11),
                   ),
+                  // كان الإيقاف هو الإجراء الوحيد المتاح على إعلان
+                  // عضو: لا تعديل نصٍّ مخالف، ولا تمديد لمن دفع
+                  // وانقطع ظهوره، ولا حذف. الثلاثة موجودة خادميًّا
+                  // (owner_update_ad / owner_delete_ad) ولم يكن لها
+                  // زرّ واحد في التطبيق.
                   trailing: _busy == '${ad['id']}'
                       ? const SizedBox(
                           width: 18,
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2))
-                      : IconButton(
-                          tooltip: ad['paused'] == true
-                              ? 'إعادة العرض'
-                              : 'إيقاف العرض',
-                          icon: Icon(
-                            ad['paused'] == true
-                                ? Icons.play_circle_outline
-                                : Icons.pause_circle_outline,
-                            color: ad['paused'] == true
-                                ? const Color(0xFF16A34A)
-                                : Colors.orangeAccent,
+                      : Row(mainAxisSize: MainAxisSize.min, children: [
+                          IconButton(
+                            tooltip: ad['paused'] == true
+                                ? 'إعادة العرض'
+                                : 'إيقاف العرض',
+                            icon: Icon(
+                              ad['paused'] == true
+                                  ? Icons.play_circle_outline
+                                  : Icons.pause_circle_outline,
+                              color: ad['paused'] == true
+                                  ? const Color(0xFF16A34A)
+                                  : Colors.orangeAccent,
+                            ),
+                            onPressed:
+                                _busy != null ? null : () => _togglePause(ad),
                           ),
-                          onPressed:
-                              _busy != null ? null : () => _togglePause(ad),
-                        ),
+                          PopupMenuButton<String>(
+                            tooltip: 'تحكّم المالك',
+                            enabled: _busy == null,
+                            onSelected: (v) => _ownerAdAction(ad, v),
+                            itemBuilder: (_) => [
+                              const PopupMenuItem(
+                                  value: 'text',
+                                  child: Text('تعديل النصّ')),
+                              const PopupMenuItem(
+                                  value: 'days', child: Text('تعديل المدّة')),
+                              PopupMenuItem(
+                                  value: 'visible',
+                                  child: Text(ad['active'] == true
+                                      ? 'إخفاء الإعلان'
+                                      : 'إظهار الإعلان')),
+                              const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text('حذف نهائي',
+                                      style: TextStyle(
+                                          color: Colors.redAccent))),
+                            ],
+                          ),
+                        ]),
                 ),
               ),
           ],

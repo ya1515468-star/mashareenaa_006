@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
@@ -92,6 +94,45 @@ class _SectionEditorState extends State<_SectionEditor> {
   bool _uploadingBg = false;
   String? _error;
 
+  // البند ٧: أحجام الخطّ والسمايلات لهذا القسم. تُحمَّل من الخادم
+  // وتُحفَظ فيه (owner_set_chat_store_section_style)، فتظهر لكل
+  // الأعضاء لا على جهاز المالك وحده.
+  double _titleSize = 15;
+  double _itemSize = 12;
+  double _priceSize = 10;
+  double _emojiSize = 20;
+  bool _applyToAll = false;
+  bool _stylesLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadStyles());
+  }
+
+  Future<void> _loadStyles() async {
+    try {
+      final r = await Supabase.instance.client
+          .rpc('get_chat_store_section_styles');
+      if (!mounted || r is! Map) return;
+      final mine = r[widget.section.key];
+      if (mine is Map) {
+        setState(() {
+          _titleSize = (mine['title'] as num?)?.toDouble() ?? 15;
+          _itemSize = (mine['item'] as num?)?.toDouble() ?? 12;
+          _priceSize = (mine['price'] as num?)?.toDouble() ?? 10;
+          _emojiSize = (mine['emoji'] as num?)?.toDouble() ?? 20;
+          _stylesLoaded = true;
+        });
+      } else if (mounted) {
+        setState(() => _stylesLoaded = true);
+      }
+    } catch (_) {
+      // الأحجام ليست شرطًا لتعديل بقية الإعدادات؛ تبقى الافتراضية.
+      if (mounted) setState(() => _stylesLoaded = true);
+    }
+  }
+
   @override
   void dispose() {
     _name.dispose();
@@ -171,6 +212,28 @@ class _SectionEditorState extends State<_SectionEditor> {
         'p_is_active': true,
         'p_request_id': const Uuid().v4(),
       });
+      // الأحجام تُحفَظ بدالتها الخاصّة: إمّا لهذا القسم وحده أو لكل
+      // الأقسام إن طلب المالك ذلك.
+      if (_stylesLoaded) {
+        if (_applyToAll) {
+          await Supabase.instance.client
+              .rpc('owner_set_all_store_section_styles', params: {
+            'p_title_font_size': _titleSize,
+            'p_item_font_size': _itemSize,
+            'p_price_font_size': _priceSize,
+            'p_emoji_size': _emojiSize,
+          });
+        } else {
+          await Supabase.instance.client
+              .rpc('owner_set_chat_store_section_style', params: {
+            'p_section_key': widget.section.key,
+            'p_title_font_size': _titleSize,
+            'p_item_font_size': _itemSize,
+            'p_price_font_size': _priceSize,
+            'p_emoji_size': _emojiSize,
+          });
+        }
+      }
       widget.onDone();
     } catch (e) {
       final s = e.toString();
@@ -257,6 +320,86 @@ class _SectionEditorState extends State<_SectionEditor> {
                 RadioListTile<String>(value: 'large_icons', title: Text('رموز كبيرة (أقل كثافة، أوضح)'), contentPadding: EdgeInsets.zero, dense: true),
               ]),
             ),
+            const SizedBox(height: 14),
+            const Divider(height: 1),
+            const SizedBox(height: 10),
+            // البند ٧: أحجام الخطّ والسمايلات داخل تخصيص أقسام المتجر.
+            // كان حجم كل شيء ثابتًا في الشيفرة، فالأسماء الطويلة تُقصّ
+            // والأسعار تكاد لا تُقرأ، ولا سبيل لتغيير ذلك إلا بإصدار
+            // جديد. الآن يضبطه المالك ويُحفَظ خادميًّا فيراه الجميع.
+            const Align(
+              alignment: Alignment.centerRight,
+              child: Text('أحجام الخطّ والسمايلات في هذا القسم',
+                  style: TextStyle(fontSize: 12, color: Colors.white70)),
+            ),
+            _SizeRow(
+              label: 'عنوان القسم',
+              value: _titleSize,
+              min: 10,
+              max: 26,
+              onChanged: (v) => setState(() => _titleSize = v),
+            ),
+            _SizeRow(
+              label: 'اسم المادة',
+              value: _itemSize,
+              min: 8,
+              max: 22,
+              onChanged: (v) => setState(() => _itemSize = v),
+            ),
+            _SizeRow(
+              label: 'السعر',
+              value: _priceSize,
+              min: 8,
+              max: 20,
+              onChanged: (v) => setState(() => _priceSize = v),
+            ),
+            _SizeRow(
+              label: 'السمايلات والرموز',
+              value: _emojiSize,
+              min: 12,
+              max: 40,
+              onChanged: (v) => setState(() => _emojiSize = v),
+            ),
+            // معاينة حقيقية بالأحجام المختارة: بلا هذا يحفظ المالك
+            // ثم يخرج ليرى، فيعود ليعدّل.
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white10,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(children: [
+                Text('🛍️', style: TextStyle(fontSize: _emojiSize)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_name.text.trim().isEmpty
+                                ? widget.section.nameAr
+                                : _name.text.trim(),
+                            style: TextStyle(
+                                fontSize: _titleSize,
+                                fontWeight: FontWeight.w900)),
+                        Text('مادة نموذجية',
+                            style: TextStyle(fontSize: _itemSize)),
+                        Text('⭐ 1200',
+                            style: TextStyle(
+                                fontSize: _priceSize,
+                                color: Colors.amberAccent)),
+                      ]),
+                ),
+              ]),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              value: _applyToAll,
+              onChanged: (v) => setState(() => _applyToAll = v),
+              title: const Text('طبّق هذه الأحجام على كل أقسام المتجر',
+                  style: TextStyle(fontSize: 12)),
+            ),
             if (_error != null) Padding(padding: const EdgeInsets.only(top: 10), child: Text(_error!, style: const TextStyle(color: Colors.redAccent))),
           ]),
         ),
@@ -266,5 +409,47 @@ class _SectionEditorState extends State<_SectionEditor> {
         FilledButton(onPressed: _busy ? null : _save, child: _busy ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('حفظ')),
       ],
     );
+  }
+}
+
+/// سطر حجم واحد: المنزلق ورقمه الحالي.
+class _SizeRow extends StatelessWidget {
+  const _SizeRow({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.onChanged,
+  });
+
+  final String label;
+  final double value;
+  final double min;
+  final double max;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      SizedBox(
+        width: 110,
+        child: Text(label, style: const TextStyle(fontSize: 11)),
+      ),
+      Expanded(
+        child: Slider(
+          value: value.clamp(min, max),
+          min: min,
+          max: max,
+          divisions: ((max - min) * 2).round(),
+          label: value.toStringAsFixed(1),
+          onChanged: onChanged,
+        ),
+      ),
+      SizedBox(
+        width: 34,
+        child: Text(value.toStringAsFixed(1),
+            style: const TextStyle(fontSize: 11), textAlign: TextAlign.end),
+      ),
+    ]);
   }
 }

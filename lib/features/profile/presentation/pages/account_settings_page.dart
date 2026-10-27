@@ -23,6 +23,7 @@ import '../../domain/profile_storage_cleanup.dart';
 import '../providers/profile_provider.dart';
 import '../widgets/account_setting_tiles.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/avatar_frame_picker_sheet.dart';
 import '../../../rbac/presentation/widgets/server_username_display.dart';
 import '../widgets/avatar_frame_picker_sheet.dart';
 import '../widgets/arabic_font_catalog.dart';
@@ -225,16 +226,11 @@ class AccountSettingsContent extends ConsumerWidget {
         onChanged: (v) => save(liveProfile.copyWith(statusFontSize: v)),
       ),
       _AnimatedAvatarTile(profile: liveProfile, onSave: save),
-      ListTile(
-        leading: const Icon(Icons.filter_frames_rounded, color: AppColors.gold),
-        title: const Text('إطار الصورة المتحرك'),
-        subtitle: Text(
-          liveProfile.avatarFrameKey == null ? 'اختر إطارًا فاخرًا متحركًا' : 'الإطار الحالي: ${liveProfile.avatarFrameKey}',
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-        ),
-        trailing: const Icon(Icons.chevron_left, color: AppColors.textMuted),
-        onTap: () => AvatarFramePickerSheet.show(context, uid),
-      ),
+      // البند ٨: كان هذا يطبع المفتاح الخام
+      // («الإطار الحالي: frame_static6679334219754457b») — اسمٌ داخليّ
+      // لا يعني للعضو شيئًا ولا يدلّه على ما اختاره. الآن: صورة الإطار
+      // نفسه مصغّرة واسمه العربي من الفهرس، فما يراه هو ما جهّزه.
+      _ActiveFrameTile(frameKey: liveProfile.avatarFrameKey, uid: uid),
       ProfileMusicTile(
         profile: liveProfile,
         onSave: save,
@@ -1277,6 +1273,51 @@ class _AnimatedAvatarTileState extends State<_AnimatedAvatarTile> {
               ],
             ),
       onTap: _busy ? null : _pickAndUpload,
+    );
+  }
+}
+
+/// سطر الإطار المُجهَّز: معاينة مرئية بدل المفتاح الخام.
+///
+/// يقرأ الفهرس نفسه الذي يقرأه المنتقي، فإن تعذّر تحميله (أو كان
+/// المفتاح لإطار حُذف) يُكتب نصّ محايد ولا يظهر المفتاح إطلاقًا.
+class _ActiveFrameTile extends ConsumerWidget {
+  const _ActiveFrameTile({required this.frameKey, required this.uid});
+  final String? frameKey;
+  final String uid;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final key = frameKey?.trim();
+    final has = key != null && key.isNotEmpty;
+    final frames = has
+        ? ref.watch(availableAvatarFramesProvider).valueOrNull
+        : null;
+    final def = frames?.where((f) => f.key == key).firstOrNull;
+
+    return ListTile(
+      leading: has && def?.assetUrl != null
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                def!.assetUrl!,
+                width: 38,
+                height: 38,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                    Icons.filter_frames_rounded, color: AppColors.gold),
+              ),
+            )
+          : const Icon(Icons.filter_frames_rounded, color: AppColors.gold),
+      title: const Text('إطار الصورة المتحرك'),
+      subtitle: Text(
+        !has
+            ? 'اختر إطارًا فاخرًا متحركًا'
+            : (def != null ? def.nameAr : 'إطارك مُجهَّز'),
+        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+      ),
+      trailing: const Icon(Icons.chevron_left, color: AppColors.textMuted),
+      onTap: () => AvatarFramePickerSheet.show(context, uid),
     );
   }
 }

@@ -243,6 +243,10 @@ class MembershipStoreTab extends ConsumerWidget {
           const SnackBar(content: Text('سعر هذه العضوية غير محدّد بعد.')));
       return;
     }
+    // البند ١٣: كان الخيار نقاطًا أو جواهر فقط — ومن لا رصيد له لا طريق
+    // له إلى العضوية إطلاقًا. أُضيف «الكاش»، ويُوصِل الطلب إلى المالك
+    // والسوبر أدمن في اللحظة نفسها (request_membership_cash تُشعِر
+    // كليهما خادميًّا).
     final currency = await showModalBottomSheet<String>(
       context: context,
       builder: (ctx) => Directionality(
@@ -264,11 +268,23 @@ class MembershipStoreTab extends ConsumerWidget {
                 title: Text('الدفع بالجواهر ($gems)'),
                 onTap: () => Navigator.pop(ctx, 'gems'),
               ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Text('💵', style: TextStyle(fontSize: 22)),
+              title: const Text('الدفع بالكاش'),
+              subtitle: const Text('يصل طلبك إلى المالك والسوبر أدمن معًا',
+                  style: TextStyle(fontSize: 11)),
+              onTap: () => Navigator.pop(ctx, 'cash'),
+            ),
           ]),
         ),
       ),
     );
     if (currency == null || !context.mounted) return;
+    if (currency == 'cash') {
+      await _requestCash(context, ref, tier);
+      return;
+    }
     try {
       final callable =
           SupabaseFunctionsCompat.instance.httpsCallable('purchaseMembership');
@@ -290,6 +306,67 @@ class MembershipStoreTab extends ConsumerWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBarSfx(SnackBar(content: Text(_membershipError(e.message))));
+    }
+  }
+
+  /// طلب عضوية بالكاش: لا خصم من المحفظة، بل طلبٌ مسجَّل خادميًّا
+  /// يراه المالك والسوبر أدمن في لوحتهما ويصلهما إشعاره فورًا.
+  Future<void> _requestCash(BuildContext context, WidgetRef ref,
+      SubscriptionTierEntity tier) async {
+    final note = TextEditingController();
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (d) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text('طلب ${tier.name} بالكاش'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text(
+                'سيصل طلبك إلى المالك والسوبر أدمن معًا، ويتواصل معك أوّل '
+                'من يراه لإتمام الدفع.',
+                style: TextStyle(fontSize: 12, color: Colors.white60)),
+            const SizedBox(height: 10),
+            TextField(
+              controller: note,
+              maxLength: 300,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                  labelText: 'ملاحظة (اختياري)',
+                  hintText: 'مثال: أدفع كاش في حلب',
+                  border: OutlineInputBorder()),
+            ),
+          ]),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(d, false),
+                child: const Text('إلغاء')),
+            FilledButton.icon(
+                onPressed: () => Navigator.pop(d, true),
+                icon: const Icon(Icons.send_rounded, size: 18),
+                label: const Text('إرسال الطلب')),
+          ],
+        ),
+      ),
+    );
+    final text = note.text.trim();
+    note.dispose();
+    if (go != true || !context.mounted) return;
+    try {
+      await Supabase.instance.client.rpc('request_membership_cash', params: {
+        'p_tier_id': tier.id,
+        'p_note': text.isEmpty ? null : text,
+      });
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(
+          content: Text('وصل طلبك إلى الإدارة ✓ سيتواصلون معك قريبًا.')));
+    } catch (e) {
+      if (!context.mounted) return;
+      final msg = e is PostgrestException &&
+              (e.message).contains('REQUEST_ALREADY_PENDING')
+          ? 'لديك طلب كاش قيد المعالجة بالفعل.'
+          : FailureText.action(e, action: 'إرسال الطلب');
+      ScaffoldMessenger.of(context)
+          .showSnackBarSfx(SnackBar(content: Text(msg)));
     }
   }
 
