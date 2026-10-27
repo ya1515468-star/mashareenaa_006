@@ -4,6 +4,7 @@ import '../../features/auth/presentation/pages/email_verification_code_page.dart
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/auth/presentation/widgets/pin_lock_gate.dart';
+import '../../features/auth/presentation/widgets/must_change_password_gate.dart';
 import '../../features/home/presentation/pages/home_shell.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/sewing_machine_splash.dart';
@@ -40,9 +41,14 @@ class AppRouter extends ConsumerWidget {
           if (!user.emailVerified) {
             return EmailVerificationCodePage(uid: user.uid, email: user.email);
           }
-          return PinLockGate(
-            uid: user.uid,
-            child: const LoginAnnouncementGate(child: HomeShell()),
+          // بوّابة الكلمة المؤقّتة تسبق كل شيء بعد المصادقة: كلمة
+          // أعدّتها الإدارة يعرفها غير صاحبها، فلا يصحّ أن يستعمل
+          // التطبيق قبل أن يضع كلمته هو.
+          return MustChangePasswordGate(
+            child: PinLockGate(
+              uid: user.uid,
+              child: const LoginAnnouncementGate(child: HomeShell()),
+            ),
           );
         },
       ),
