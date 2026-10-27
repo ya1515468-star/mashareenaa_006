@@ -1445,7 +1445,13 @@ class GameMatchDialog extends StatefulWidget {
 class _GameMatchDialogState extends State<GameMatchDialog> {
   final Map<String, String> _names = {};
   bool _namesLoaded = false;
-  bool _coinDone = false;
+  /// معرّف المباراة التي انتهت حركة عملتها.
+  ///
+  /// كان عَلَمًا منطقيًّا واحدًا مشتركًا لا يُربط بمباراة: فإذا عُرضت مباراة
+  /// عملة ثانية في الجلسة نفسها بقي مرفوعًا من الأولى، فتظهر النتيجة فورًا
+  /// بلا رمي العملة؛ أو بقي مخفوضًا فلا تظهر النتيجة إطلاقًا. الربط
+  /// بالمعرّف يجعل كل مباراة مستقلّة.
+  String? _coinDoneFor;
   bool _resultSoundPlayed = false;
 
   void _playResultSound(Map<String, dynamic> row, {int delayMs = 700}) {
@@ -1611,11 +1617,13 @@ class _GameMatchDialogState extends State<GameMatchDialog> {
                 key: ValueKey('coin-${row['id']}'),
                 resultSide: side,
                 onDone: () {
-                  if (mounted) setState(() => _coinDone = true);
+                  if (mounted) {
+                    setState(() => _coinDoneFor = row['id']?.toString());
+                  }
                   _playResultSound(row, delayMs: 500);
                 }),
             AnimatedOpacity(
-              opacity: _coinDone ? 1 : 0,
+              opacity: _coinDoneFor == row['id']?.toString() ? 1 : 0,
               duration: const Duration(milliseconds: 300),
               child: Text(_resultLine(row),
                   style: const TextStyle(
@@ -1627,7 +1635,8 @@ class _GameMatchDialogState extends State<GameMatchDialog> {
           ]);
         }
         final prize = state['prize'] is Map ? Map<String, dynamic>.from(state['prize'] as Map) : null;
-        if (status == 'finished' && (type != 'coin' || _coinDone)) {
+        if (status == 'finished' &&
+            (type != 'coin' || _coinDoneFor == row['id']?.toString())) {
           final winner = row['winner']?.toString();
           final res = (winner == null || winner == 'null') ? 'draw' : (winner == _me ? 'win' : 'lose');
           body = Column(mainAxisSize: MainAxisSize.min, children: [
