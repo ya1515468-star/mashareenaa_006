@@ -14,6 +14,7 @@ import 'server_user_identity_badges.dart';
 import '../../../chat/presentation/widgets/chat_mention_badge.dart';
 import 'dart:async';
 import '../../../../core/services/server_fonts.dart';
+import '../../../../core/chat/message_text_style.dart';
 
 class ServerChatInlineMessage extends ConsumerWidget {
   final String uid;
@@ -55,15 +56,6 @@ class ServerChatInlineMessage extends ConsumerWidget {
   /// "يمكن رؤية الرسائل" on a themed room. This keeps the user's chosen hue
   /// but flips it to a readable tone whenever contrast against the actual
   /// bubble is too low, rather than silently discarding their choice.
-  /// يحوّل "#RRGGBB" القادم من كتالوج الألوان الخادمي إلى Color، ويتجاهل
-  /// بأمان أي قيمة فارغة أو غير صالحة بدل الانهيار.
-  static Color? _hexColor(String? v) {
-    final s = (v ?? '').replaceAll('#', '').trim();
-    if (s.length != 6) return null;
-    final n = int.tryParse('FF$s', radix: 16);
-    return n == null ? null : Color(n);
-  }
-
   static Color _readableOn(Color text, Color? background) {
     if (background == null) return text;
     // كان هنا عطلان حقيقيان جعلا ألوان المستخدم تُرفض وتُستبدل بالأبيض/
@@ -122,22 +114,20 @@ class ServerChatInlineMessage extends ConsumerWidget {
         if (serverFontKey != null && serverFontKey.isNotEmpty) {
           unawaited(ServerFonts.ensure(serverFontKey));
         }
-        final messageFont = (serverFontKey != null && ServerFonts.isLoaded(serverFontKey))
-            ? ServerFonts.family(serverFontKey)
-            : localArabicFontFamily(identity['message_font_family']?.toString());
-        final identityMessageColor = int.tryParse(identity['message_color']?.toString() ?? '');
-        // الخادم يوفّر نظام ألوان أحدث وأكمل لم يكن يُقرأ إطلاقًا:
-        // message_color_1/message_color_2 بصيغة hex (ولون ثانٍ يعني لونًا
-        // مدمجًا متدرّجًا)، إضافة إلى message_color_key من كتالوج الألوان
-        // الخادمي. هذه لها الأولوية على الحقل الرقمي القديم لأنها هي ما
-        // تكتبه set_my_message_color فعليًا عند اختيار المستخدم أي لون.
-        final hex1 = _hexColor(identity['message_color_1']?.toString());
-        final hex2 = _hexColor(identity['message_color_2']?.toString());
-        final rawMessageColor = hex1 ??
-            (identityMessageColor == null ? messageColor : Color(identityMessageColor));
-        final effectiveMessageColor = _readableOn(rawMessageColor, backgroundColor);
-        // اللون المدمج: تدرّج حقيقي يُرسم على النص نفسه عبر ShaderMask.
-        final blendSecond = hex2 == null ? null : _readableOn(hex2, backgroundColor);
+        // التنسيق كاملًا من المُفسِّر المشترك: اللون ومتدرّجه، والغامق
+        // والمائل وتحته خط والتعريض والمقياس. كان هذا الموضع يقرأ اللون
+        // وحده، فتُحفَظ بقية التنسيقات على الخادم ولا تظهر في الخاص.
+        final resolved = MessageTextStyle.fromIdentity(
+          identity,
+          fallbackColor: messageColor,
+        );
+        final messageFont = resolved.fontFamily ??
+            localArabicFontFamily(identity['message_font_family']?.toString());
+        final effectiveMessageColor =
+            _readableOn(resolved.color, backgroundColor);
+        final blendSecond = resolved.gradientTo == null
+            ? null
+            : _readableOn(resolved.gradientTo!, backgroundColor);
         final vip = ref.watch(profilePublicVipEffectsProvider(uid)).valueOrNull ?? const <String, dynamic>{};
         final gradientEnabled = (vip['chat_name_gradient'] as Map?)?['enabled'] == true;
         final glowEnabled = (vip['chat_message_glow'] as Map?)?['enabled'] == true;
@@ -203,20 +193,25 @@ class ServerChatInlineMessage extends ConsumerWidget {
                 alignment: PlaceholderAlignment.middle,
                 child: Row(mainAxisSize: MainAxisSize.min, children: [priorityBadge, const SizedBox(width: 3), inlineName]),
               ),
-              _messageSpan(text, effectiveMessageColor, messageFont, messageFontSize, showMentionBadge ? effectiveMentionColor : null, mentionNames, showMentionBadge),
+              _messageSpan(
+                text,
+                effectiveMessageColor,
+                messageFont,
+                messageFontSize,
+                showMentionBadge ? effectiveMentionColor : null,
+                mentionNames,
+                showMentionBadge,
+                resolved,
+                blendSecond,
+              ),
             ]),
           ),
         );
-        // لون مدمج (تدرّج): يُرسم التدرّج على النص نفسه. بلا لون ثانٍ يُعاد
-        // النص كما هو تمامًا، فلا أثر إطلاقًا على الألوان العادية.
-        if (blendSecond == null) return body;
-        return ShaderMask(
-          blendMode: BlendMode.srcIn,
-          shaderCallback: (bounds) => LinearGradient(
-            colors: [effectiveMessageColor, blendSecond],
-          ).createShader(bounds),
-          child: body,
-        );
+        // التدرّج صار على مقطع الرسالة وحده عبر foreground shader، لا
+        // بـShaderMask فوق body: الـbody يحوي اسم المُرسِل أيضًا، فكان
+        // أيّ لون مدمج يُعيد تلوين الاسم ويطمس تأثيره وقالبه — أي أنّ
+        // شراء لون رسالة كان يفسد اسمه.
+        return body;
       },
     ),
     );
@@ -236,8 +231,29 @@ class ServerChatInlineMessage extends ConsumerWidget {
     Color? mention,
     Set<String> mentionNames,
     bool showMentionBadge,
+    MessageTextStyle style,
+    Color? gradientTo,
   ) {
-    final base = TextStyle(fontSize: size, color: color, fontFamily: family, height: 1.15);
+    var base = style
+        .copyWith(color: color, clearGradient: true, clearFontFamily: true)
+        .toTextStyle(baseFontSize: size, height: 1.15)
+        .copyWith(fontFamily: family);
+    // التدرّج كـforeground shader لا كقناع: يحفظ التفاف الأسطر (قناع
+    // على WidgetSpan يجعل النص كتلة واحدة لا تلتفّ) ولا يمسّ الاسم.
+    // المستطيل تقديري بعرض الشاشة لأنّ المدى الحقيقي غير معروف هنا،
+    // وهو كافٍ لتدرّج يُقرأ طرفاه.
+    if (gradientTo != null) {
+      base = base.copyWith(
+        color: null,
+        foreground: Paint()
+          ..shader = LinearGradient(
+            colors: [color, gradientTo],
+            begin: Alignment.centerRight,
+            end: Alignment.centerLeft,
+          ).createShader(Rect.fromLTWH(0, 0, 320, size * 1.4)),
+        decorationColor: color,
+      );
+    }
     final names = mentionNames
         .map((name) => name.trim().replaceFirst(RegExp(r'^@'), ''))
         .where((name) => name.isNotEmpty)

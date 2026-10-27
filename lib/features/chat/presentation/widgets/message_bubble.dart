@@ -293,18 +293,32 @@ class MessageBubble extends ConsumerWidget {
                   child: Icon(Icons.more_horiz_rounded, size: 18, color: Color(0xFF64748B)),
                 ),
               ),
+            // بلا فقاعة: رسائل الخاص تُعرَض نصًّا على خلفية الصفحة.
+            //
+            // ما تبعه ذلك: كان لون النص مختارًا ليقرأ على ملء الفقاعة
+            // (أبيض على p.accent، وp.background للطرف الآخر). بلا ملء
+            // صار المرجع خلفية الصفحة، فكل لون نص وزمن وحالة هنا
+            // يُقاس عليها — وإلّا صار النص بلون الخلفية نفسها أي
+            // غير مقروء أصلًا.
             Container(
-              margin: const EdgeInsets.symmetric(vertical: 2),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.74),
-              decoration: BoxDecoration(
-                color: isMine ? p.surfaceHighlight : p.accent,
-                borderRadius: BorderRadius.circular(14),
-                border: message.isPinned
-                    ? Border.all(color: p.accentBright, width: 1)
-                    : null,
+              margin: const EdgeInsets.symmetric(vertical: 3),
+              padding: EdgeInsets.only(
+                top: 2,
+                bottom: 2,
+                right: message.isPinned ? 8 : 0,
+                left: 0,
               ),
+              constraints: BoxConstraints(
+                  maxWidth: MediaQuery.of(context).size.width * 0.92),
+              decoration: message.isPinned
+                  // المثبَّتة وحدها تبقى مميَّزة، بشريط جانبي لا بفقاعة:
+                  // بلا أيّ تمييز يضيع معنى التثبيت.
+                  ? BoxDecoration(
+                      border: Border(
+                        right: BorderSide(color: p.accentBright, width: 2.5),
+                      ),
+                    )
+                  : null,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -313,17 +327,13 @@ class MessageBubble extends ConsumerWidget {
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Row(
                         children: [
-                          Icon(Icons.push_pin,
-                              size: 12,
-                              color: isMine ? p.accent : p.background),
+                          Icon(Icons.push_pin, size: 12, color: p.accentBright),
                           const SizedBox(width: 4),
                           Text(
                             'مثبّتة',
                             style: TextStyle(
                               fontSize: 10,
-                              color: isMine
-                                  ? p.accent
-                                  : p.background.withValues(alpha: 0.8),
+                              color: p.accentBright.withValues(alpha: .9),
                             ),
                           ),
                         ],
@@ -348,13 +358,18 @@ class MessageBubble extends ConsumerWidget {
                       // كان يُمرَّر p.textPrimary بشكل صريح فيتجاوز الكتالوج
                       // الخادمي ويتجاهل message_color_1/message_color_key التي
                       // تكتبها set_my_message_color فعليًا.
+                      // null للطرف الآخر: فليقرأ ServerChatInlineMessage
+                      // لونه من هويّته الخادمية. تمرير الأبيض صراحةً كان
+                      // يطمس لون الرسالة الذي اشتراه ويجعله أبيض للجميع.
                       messageColor: isMine
-                          ? (myMessageColor ?? Colors.white)
-                          : Colors.white,
+                          ? (myMessageColor ?? p.textPrimary)
+                          : p.textPrimary,
                       // The bubble's real fill, so a sender's own chosen
                       // message colour is checked for contrast against
                       // whatever it is actually rendered on top of.
-                      backgroundColor: isMine ? p.surfaceHighlight : p.accent,
+                      // بعد إزالة الفقاعة صارت خلفية الصفحة هي ما يُرسَم
+                      // عليه النص، فعليها يُقاس التباين.
+                      backgroundColor: p.background,
                       mentionColor: mentionFrameColor,
                       onNameTap: onSenderTap,
                       nameFontSize: 12,
@@ -379,22 +394,18 @@ class MessageBubble extends ConsumerWidget {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 6),
                                 decoration: BoxDecoration(
-                                    color: p.background.withValues(alpha: .18),
+                                    color: p.surfaceElevated
+                                        .withValues(alpha: .55),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border(
                                         right: BorderSide(
-                                            color: isMine
-                                                ? p.accent
-                                                : p.background,
-                                            width: 2.5))),
+                                            color: p.accent, width: 2.5))),
                                 child: Text(message.replyToPreview ?? '',
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                         fontSize: 11.5,
-                                        color: (isMine
-                                                ? p.textSecondary
-                                                : p.background)
+                                        color: p.textSecondary
                                             .withValues(alpha: .85))),
                               ),
                             ),
@@ -440,8 +451,10 @@ class MessageBubble extends ConsumerWidget {
                         // Message. لون رسالة مخصَّص قريب من لون الفقاعة كان
                         // يجعل النص غير مقروء تمامًا في الخاص.
                         textColor: _readablePrivateTextColor(
-                            isMine ? (myMessageColor ?? Colors.white) : Colors.white,
-                            isMine ? p.surfaceHighlight : p.accent),
+                            isMine
+                                ? (myMessageColor ?? p.textPrimary)
+                                : p.textPrimary,
+                            p.background),
                         frameColor: mentionFrameColor,
                         showMentionBadge: _currentUserIsMentioned(message),
                         // الخطوط العربية محفوظة في الخادم لا في المشروع،
@@ -473,7 +486,7 @@ class MessageBubble extends ConsumerWidget {
                   if (deletedForEveryone)
                     Text('🚫 تم حذف هذه الرسالة',
                         style: TextStyle(
-                            color: isMine ? p.textPrimary : p.background,
+                            color: p.textMuted,
                             fontStyle: FontStyle.italic)),
                   if (message.type == MessageType.gift &&
                       !deletedForEveryone &&
@@ -498,8 +511,7 @@ class MessageBubble extends ConsumerWidget {
                             'مُعدَّلة',
                             style: TextStyle(
                               fontSize: 9.5,
-                              color: (isMine ? p.textMuted : p.background)
-                                  .withValues(alpha: 0.7),
+                              color: p.textMuted.withValues(alpha: 0.7),
                             ),
                           ),
                         ),
@@ -512,8 +524,7 @@ class MessageBubble extends ConsumerWidget {
                         _formatTime(message.createdAt),
                         style: TextStyle(
                           fontSize: 10,
-                          color: (isMine ? p.textMuted : p.background)
-                              .withValues(alpha: 0.75),
+                          color: p.textMuted.withValues(alpha: 0.75),
                         ),
                       ),
                       if (isMine) ...[
