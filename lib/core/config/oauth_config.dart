@@ -27,7 +27,8 @@ class OAuthConfig {
   const OAuthConfig._();
 
   /// Client ID من نوع **Web application** (ينتهي بـ .apps.googleusercontent.com).
-  static const String googleWebClientId = '';
+  static const String googleWebClientId =
+      '339879850506-pdop8qu0kesh6qo8du9d40h0l6sgj50r.apps.googleusercontent.com';
 
   /// Services ID من Apple Developer (مطلوب للويب وأندرويد فقط؛
   /// على iOS يُستخدم Bundle ID تلقائيًا).
