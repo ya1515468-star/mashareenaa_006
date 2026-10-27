@@ -112,9 +112,10 @@ class _ActiveCallPageState extends ConsumerState<ActiveCallPage> {
       } catch (e) {
         throw StateError(
           kIsWeb
-              ? 'مكتبة Agora للويب غير محمّلة. أضف سكربت iris-web-rtc إلى '
-                  FailureText.of(e)
-              : FailureText.of(e),
+              // رسالة الويب تخصّ المطوّر لا المستخدم: نصّها ثابت ولا
+              // يحمل تفصيلًا تقنيًّا من الاستثناء.
+              ? 'تعذّر تهيئة محرك الاتصال على المتصفح'
+              : FailureText.action(e, action: 'تهيئة الاتصال'),
         );
       }
       _engine = engine;
