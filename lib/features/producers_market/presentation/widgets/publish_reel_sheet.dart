@@ -139,12 +139,12 @@ class _PublishReelSheetState extends ConsumerState<PublishReelSheet> {
     try {
       final uid = Supabase.instance.client.auth.currentUser?.id ?? 'anon';
       final ext = file.name.split('.').last;
-      final path = FailureText.of(e);
+      final path = '$uid/reel_thumbnails/${DateTime.now().millisecondsSinceEpoch}.$ext';
       final url = await MediaUploadService(bucket: 'media').uploadBytesAtPath(
         bytes: file.bytes!,
         fileName: file.name,
         path: path,
-        contentType: FailureText.of(e),
+        contentType: 'image/$ext',
       );
       if (mounted) setState(() => _thumbnailUrl = url);
     } catch (e) {

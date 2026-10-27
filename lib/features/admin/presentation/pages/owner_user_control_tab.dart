@@ -157,7 +157,7 @@ class _OwnerUserControlTabState extends ConsumerState<OwnerUserControlTab> {
               error: (e, _) => _ErrorBox(
                 message: e.toString().contains('OWNER_ONLY')
                     ? 'هذه اللوحة للمالك فقط.'
-                    : FailureText.of(e, subject: 'المستخدمين'),
+                    : 'تعذّر تحميل المستخدمين:\n$e',
                 onRetry: () => ref.invalidate(ownerUserSearchProvider(_args)),
               ),
               data: (data) {

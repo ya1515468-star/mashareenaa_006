@@ -866,7 +866,7 @@ class _SeasonChip extends StatelessWidget {
               ? Border.all(color: const Color(0xFFFFD700))
               : null,
         ),
-        child: Text(FailureText.of(e),
+        child: Text('$emoji $label',
             style: TextStyle(
                 color: selected ? const Color(0xFFFFD700) : Colors.white70,
                 fontSize: 13)),

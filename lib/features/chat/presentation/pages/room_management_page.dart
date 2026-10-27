@@ -900,12 +900,12 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
 
       setState(() => _busy = true);
       final ext = file.name.contains('.') ? file.name.split('.').last : 'jpg';
-      final path = FailureText.of(e);
+      final path = '$myUid/room_backgrounds/${widget.roomId}/${const Uuid().v4()}.$ext';
       final url = await MediaUploadService(bucket: 'media').uploadBytesAtPath(
         bytes: bytes,
         fileName: file.name,
         path: path,
-        contentType: FailureText.of(e),
+        contentType: 'image/$ext',
       );
       await _sb.rpc('set_room_background',
           params: {'p_room_id': widget.roomId, 'p_background_url': url});
@@ -1362,7 +1362,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
           'p_room_id': widget.roomId,
           'p_user_id': uid,
           for (final entry in _permissions.entries)
-            FailureText.of(e): entry.value,
+            'p_${entry.key}': entry.value,
         },
       );
       if (!mounted) return;
@@ -1439,7 +1439,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
       );
       if (mounted) {
         setState(() => _roomSounds[event] = sound);
-        _publishCommandResult(FailureText.of(e), success: true);
+        _publishCommandResult('تعيين صوت $event', success: true);
       }
     } catch (e) {
       if (mounted) _publishCommandResult(FailureText.of(e), success: false, detail: _commandError(e));
@@ -1485,7 +1485,7 @@ class _RoomManagementPageState extends State<RoomManagementPage> {
     });
     try {
       final path =
-          FailureText.of(e);
+          'room_sounds/${widget.roomId}/${const Uuid().v4()}/$event.$ext';
       var uploaded = false;
       try {
         await MediaUploadService(bucket: 'chat-sounds').uploadBytesAtPath(

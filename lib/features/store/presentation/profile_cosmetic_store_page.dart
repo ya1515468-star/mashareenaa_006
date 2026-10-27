@@ -1295,7 +1295,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
     const supported = {'gif', 'png', 'jpg', 'jpeg', 'webp', 'bmp'};
     if (!supported.contains(extension)) {
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text(FailureText.of(e))),
+        SnackBar(content: Text('صيغة الإطار غير مدعومة: .$extension')),
       );
       return;
     }
