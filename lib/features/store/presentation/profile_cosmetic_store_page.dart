@@ -2681,6 +2681,257 @@ class _MessageTextStyleSectionState
   }
 }
 
+class _RoleColorTab extends StatefulWidget {
+  /// قائمة المالك (تعديل شامل/إهداء/حذف) المشتركة مع بقية تبويبات المتجر.
+  final Widget Function(ProfileCosmeticItem item) ownerMenu;
+  const _RoleColorTab({required this.ownerMenu});
+  @override
+  State<_RoleColorTab> createState() => _RoleColorTabState();
+}
+
+class _RoleColorTabState extends State<_RoleColorTab> {
+  final _db = Supabase.instance.client;
+  List<Map<String, dynamic>> _effects = [];
+  List<Map<String, dynamic>> _backgrounds = [];
+  Set<String> _ownedItems = {};
+  String? _fx;
+  String? _bg;
+  bool _owner = false;
+  bool _loading = true;
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final uid = _db.auth.currentUser?.id;
+    try {
+      final fx = await _db
+          .from('profile_cosmetic_catalog')
+          .select('item_key,name_ar,metadata,price_points,price_gems,sort_order')
+          .eq('category', 'name_effect')
+          .eq('is_active', true)
+          .order('sort_order');
+      final bg = await _db
+          .from('profile_cosmetic_catalog')
+          .select('item_key,name_ar,color1,color2,price_points,price_gems,sort_order')
+          .eq('category', 'background')
+          .eq('is_active', true)
+          .order('sort_order');
+      final owned = uid == null ? <dynamic>[] : await _db.rpc('get_my_profile_cosmetic_ownership');
+      final me = uid == null
+          ? null
+          : await _db.from('profiles').select('role_effect_key,role_background_key').eq('id', uid).maybeSingle();
+      final owner = await _db.rpc('is_my_platform_owner');
+      // نسختا الذكور والإناث تشتركان في المؤثر نفسه؛ يُعرض كل مؤثر مرة واحدة.
+      final seen = <String>{};
+      final effects = <Map<String, dynamic>>[];
+      final itemKeys = <String, List<String>>{};
+      for (final e in List<Map<String, dynamic>>.from(fx as List)) {
+        final key = (e['metadata'] is Map ? e['metadata']['effect_key'] : null)?.toString() ?? '';
+        if (key.isEmpty) continue;
+        (itemKeys[key] ??= []).add(e['item_key'].toString());
+        if (!seen.add(key)) continue;
+        effects.add({...e, 'effect_key': key});
+      }
+      if (!mounted) return;
+      setState(() {
+        _effects = effects;
+        _effectItemKeys = itemKeys;
+        _backgrounds = List<Map<String, dynamic>>.from(bg as List);
+        _ownedItems = (owned as List).map((e) => e['item_key'].toString()).toSet();
+        _fx = me?['role_effect_key']?.toString();
+        _bg = me?['role_background_key']?.toString();
+        _owner = owner == true;
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (mounted) setState(() { _loading = false; _error = e.toString(); });
+    }
+  }
+
+  /// مؤثر ← منتجاته (نسختا الذكور والإناث). يملك العضو المؤثر إن اشترى أيًّا منها.
+  Map<String, List<String>> _effectItemKeys = {};
+  bool _ownsEffect(String effectKey) =>
+      _owner || (_effectItemKeys[effectKey]?.any(_ownedItems.contains) ?? false);
+
+  bool _ownsBg(Map<String, dynamic> b) => _owner ||
+      _ownedItems.contains(b['item_key']) ||
+      ((b['price_points'] ?? 0) == 0 && (b['price_gems'] ?? 0) == 0);
+
+  Color _c(String? hex) {
+    final h = (hex ?? '').replaceAll('#', '');
+    return h.length == 6 ? Color(int.parse('FF$h', radix: 16)) : const Color(0xFF8E7CFF);
+  }
+
+  Future<void> _run(Future<void> Function() op, String ok) async {
+    setState(() => _busy = true);
+    final m = ScaffoldMessenger.of(context);
+    try {
+      await op();
+      await _load();
+      m.showSnackBarSfx(SnackBar(content: Text(ok)));
+    } catch (e) {
+      final t = e.toString();
+      m.showSnackBarSfx(SnackBar(content: Text(t.contains('INSUFFICIENT')
+          ? 'رصيدك لا يكفي.'
+          : t.contains('ITEM_NOT_OWNED') ? 'اشترِ العنصر أولًا.' : 'تعذّر التنفيذ: $t')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _apply({String? fx, String? bg}) => _run(
+      () => _db.rpc('set_my_role_style', params: {'p_effect_key': fx, 'p_background_key': bg}),
+      'طُبّق على شارة رتبتك');
+
+  Future<void> _buy(String itemKey) => _run(
+      () => _db.rpc('purchase_profile_cosmetic', params: {
+            'p_item_key': itemKey,
+            'p_currency': 'points',
+            'p_request_id': const Uuid().v4(),
+          }),
+      'تم الشراء');
+
+  Widget _preview({String? fx, Map<String, dynamic>? bg}) {
+    const label = '👑 رتبتك';
+    final Widget text = fx != null
+        ? UsernameEffectText(name: label, effect: UsernameEffectX.fromWire(fx), fontSize: 11, fontWeight: FontWeight.w900)
+        : Text(label, style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w900));
+    if (bg == null) return text;
+    final c1 = _c(bg['color1']?.toString());
+    final c2 = _c((bg['color2'] ?? bg['color1'])?.toString());
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(gradient: LinearGradient(colors: [c1, c2]), borderRadius: BorderRadius.circular(7)),
+      child: text,
+    );
+  }
+
+  Widget _withOwnerMenu(Widget cell, Map<String, dynamic> row, String category) {
+    if (!_owner) return cell;
+    final item = ProfileCosmeticItem(
+      key: row['item_key'].toString(), category: category, gender: 'unisex',
+      nameAr: row['name_ar']?.toString() ?? '', animationMode: 'gif', palette: 'custom',
+      modeVariant: 'remote', color1: row['color1']?.toString() ?? '#FFFFFF',
+      color2: row['color2']?.toString(),
+      pricePoints: (row['price_points'] as num?)?.toInt() ?? 0,
+      priceGems: (row['price_gems'] as num?)?.toInt() ?? 0,
+      metadata: row['metadata'] is Map ? Map<String, dynamic>.from(row['metadata'] as Map) : const {},
+      isActive: true, sortOrder: (row['sort_order'] as num?)?.toInt() ?? 0);
+    return Stack(children: [
+      Positioned.fill(child: cell),
+      PositionedDirectional(top: 0, start: 0, child: widget.ownerMenu(item)),
+    ]);
+  }
+
+  Widget _cell({required Widget preview, required bool active, required bool owned,
+      required int price, required VoidCallback onApply, required VoidCallback onBuy}) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: active ? const Color(0xFFFFD700) : Colors.white24, width: active ? 2 : 1),
+      ),
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        preview,
+        const SizedBox(height: 6),
+        if (!owned) Text('⭐ $price', style: const TextStyle(fontSize: 11)),
+        const SizedBox(height: 4),
+        SizedBox(
+          height: 28,
+          child: owned
+              ? FilledButton(
+                  onPressed: _busy || active ? null : onApply,
+                  style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                  child: Text(active ? 'مفعّل' : 'تطبيق', style: const TextStyle(fontSize: 11)))
+              : OutlinedButton(
+                  onPressed: _busy ? null : onBuy,
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                  child: const Text('شراء', style: TextStyle(fontSize: 11))),
+        ),
+      ]),
+    );
+  }
+
+  Widget _grid(List<Widget> children) => GridView.count(
+        crossAxisCount: 3,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+        childAspectRatio: .95,
+        children: children,
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('تعذّر التحميل'),
+          const SizedBox(height: 10),
+          OutlinedButton(
+            onPressed: () { setState(() { _loading = true; _error = null; }); _load(); },
+            child: const Text('إعادة المحاولة'),
+          ),
+        ]),
+      );
+    }
+    final currentBg = _backgrounds.where((b) => b['item_key'] == _bg).firstOrNull;
+    return ListView(padding: const EdgeInsets.all(12), children: [
+          Center(child: Padding(padding: const EdgeInsets.all(8), child: _preview(fx: _fx, bg: currentBg))),
+          if (_fx != null || _bg != null)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                onPressed: _busy ? null : () => _apply(fx: null, bg: null),
+                icon: const Icon(Icons.restart_alt_rounded),
+                label: const Text('إعادة الشارة الافتراضية'),
+              ),
+            ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text('مؤثرات الاسم', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+          ),
+          _grid([
+            for (final e in _effects)
+              _withOwnerMenu(_cell(
+                preview: _preview(fx: e['effect_key'], bg: currentBg),
+                active: _fx == e['effect_key'],
+                owned: _ownsEffect(e['effect_key']),
+                price: (e['price_points'] as num?)?.toInt() ?? 0,
+                onApply: () => _apply(fx: e['effect_key'], bg: _bg),
+                onBuy: () => _buy(e['item_key'].toString()),
+              ), e, 'name_effect'),
+          ]),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text('خلفيات إطار الاسم', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+          ),
+          _grid([
+            for (final b in _backgrounds)
+              _withOwnerMenu(_cell(
+                preview: _preview(fx: _fx, bg: b),
+                active: _bg == b['item_key'],
+                owned: _ownsBg(b),
+                price: (b['price_points'] as num?)?.toInt() ?? 0,
+                onApply: () => _apply(fx: _fx, bg: b['item_key'].toString()),
+                onBuy: () => _buy(b['item_key'].toString()),
+              ), b, 'background'),
+          ]),
+        ]);
+  }
+}
+
+
+/// اختيار خط الرسائل من خطوط عربية محفوظة في الخادم (جدول server_fonts).
 class _ServerFontPicker extends ConsumerStatefulWidget {
   const _ServerFontPicker();
   @override
