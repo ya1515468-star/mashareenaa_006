@@ -11,6 +11,7 @@ import 'package:audio_meta/audio_meta.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../../core/services/media_upload_service.dart';
 import '../../../../core/config/legal_links.dart';
+import 'legal_document_page.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/safe_launch.dart';
 import '../../../friends/presentation/pages/friends_list_page.dart';
@@ -433,31 +434,37 @@ class AccountSettingsContent extends ConsumerWidget {
                 fontSize: 12.5,
                 fontWeight: FontWeight.w800)),
       ),
-      ListTile(
-        leading: const Icon(Icons.privacy_tip_outlined, color: AppColors.gold),
-        title: const Text('سياسة الخصوصية'),
-        trailing: const Icon(Icons.open_in_new, color: AppColors.textMuted, size: 18),
-        onTap: () => safeLaunch(LegalLinks.privacy),
+      // تُقرأ داخل التطبيق لا في نافذة متصفّح. الروابط العامّة باقية
+      // (المتجران يشترطانها) وتُفتَح بالضغط المطوّل على البند، لكنّها
+      // لم تبقَ الطريق الأول.
+      _LegalTile(
+        icon: Icons.privacy_tip_outlined,
+        title: 'سياسة الخصوصية',
+        subtitle: 'ما نجمعه، ولماذا، وما لا نجمعه',
+        docKey: LegalDocumentPage.privacy,
+        webUrl: LegalLinks.privacy,
       ),
-      ListTile(
-        leading: const Icon(Icons.gavel_outlined, color: AppColors.gold),
-        title: const Text('شروط الاستخدام'),
-        trailing: const Icon(Icons.open_in_new, color: AppColors.textMuted, size: 18),
-        onTap: () => safeLaunch(LegalLinks.terms),
+      _LegalTile(
+        icon: Icons.gavel_outlined,
+        title: 'شروط الاستخدام',
+        subtitle: 'الاتفاق بينك وبين المنصّة',
+        docKey: LegalDocumentPage.terms,
+        webUrl: LegalLinks.terms,
       ),
-      ListTile(
-        leading: const Icon(Icons.groups_outlined, color: AppColors.gold),
-        title: const Text('إرشادات المجتمع'),
-        trailing: const Icon(Icons.open_in_new, color: AppColors.textMuted, size: 18),
-        onTap: () => safeLaunch(LegalLinks.guidelines),
+      _LegalTile(
+        icon: Icons.groups_outlined,
+        title: 'إرشادات المجتمع',
+        subtitle: 'كيف نتعامل في الغرف والأسواق',
+        docKey: LegalDocumentPage.guidelines,
+        webUrl: LegalLinks.guidelines,
       ),
-      ListTile(
-        leading: const Icon(Icons.delete_forever_outlined, color: Colors.redAccent),
-        title: const Text('حذف الحساب والبيانات'),
-        subtitle: const Text('صفحة الطلب على الويب',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 11.5)),
-        trailing: const Icon(Icons.open_in_new, color: AppColors.textMuted, size: 18),
-        onTap: () => safeLaunch(LegalLinks.deleteAccount),
+      _LegalTile(
+        icon: Icons.delete_forever_outlined,
+        iconColor: Colors.redAccent,
+        title: 'حذف الحساب والبيانات',
+        subtitle: 'ما يُحذَف، وما يبقى، ومدّته',
+        docKey: LegalDocumentPage.accountDeletion,
+        webUrl: LegalLinks.deleteAccount,
       ),
       const SizedBox(height: 24),
     ];
@@ -547,6 +554,48 @@ class AccountSettingsContent extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// بند قانوني يُقرأ داخل التطبيق، مع الرابط العام كخيار ثانٍ.
+///
+/// الضغط يفتح القارئ الداخلي؛ والضغط المطوّل يفتح الصفحة العامّة على
+/// الويب — تبقى متاحة لأنّ متجري Google Play وApp Store يشترطان رابطًا
+/// يُفتَح بلا تسجيل دخول، ولأنّ من يريد مشاركته أو طباعته يحتاجه.
+class _LegalTile extends StatelessWidget {
+  const _LegalTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.docKey,
+    required this.webUrl,
+    this.iconColor = AppColors.gold,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String docKey;
+  final String webUrl;
+  final Color iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: iconColor),
+      title: Text(title),
+      subtitle: Text(subtitle,
+          style: const TextStyle(
+              color: AppColors.textMuted, fontSize: 11.5)),
+      trailing:
+          const Icon(Icons.chevron_left, color: AppColors.textMuted, size: 20),
+      onTap: () => LegalDocumentPage.open(context, docKey),
+      onLongPress: () {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('يُفتَح الرابط العام في المتصفّح…')));
+        safeLaunch(webUrl);
+      },
     );
   }
 }
