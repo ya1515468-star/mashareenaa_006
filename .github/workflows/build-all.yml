@@ -265,8 +265,9 @@ jobs:
               tail -200 ios_build.txt
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
-            grep -iE "error:|error \(|minimum deployment|CocoaPods|not compatible|could not find|BUILD FAILED" ios_build.txt \
-              | tail -20 | sed 's/^/::error::/'
+            # آخر الأسطر دائمًا، بلا تصفية: التعليقات هي القناة الوحيدة
+            # المقروءة عبر الواجهة البرمجية من هذه البيئة.
+            tail -10 ios_build.txt | sed 's/^/::error::/'
             exit 1
           fi
 

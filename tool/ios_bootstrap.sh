@@ -13,7 +13,11 @@ set -euo pipefail
 
 BUNDLE_ID="com.mashareena.mashareena"
 APP_NAME="مشاريعنا"
-MIN_IOS="13.0"   # agora_rtc_engine 6.5.4 و camera و record تتطلّب 13 فأعلى
+# 15.0 لا 13.0: حزم حديثة كثيرة (record, file_picker, permission_handler,
+# agora) رفعت حدّها الأدنى، وفشل CocoaPods في إيجاد نسخة متوافقة هو السبب
+# الأشيع لفشل أول بناء iOS. iOS 15 إصدار قديم اليوم فلا يُستثنى به مستخدمون
+# عمليًا، ويريح من مطاردة حدود كل حزمة على حدة.
+MIN_IOS="15.0"
 
 if [ ! -d ios ]; then
   echo "▶ توليد مشروع iOS…"
