@@ -19,6 +19,7 @@ class AdminAdsTab extends StatefulWidget {
 class _AdminAdsTabState extends State<AdminAdsTab> {
   final _db = Supabase.instance.client;
   Map<String, dynamic> _data = const {};
+  List<Map<String, dynamic>> _placements = const [];
   bool _loading = true;
   String? _busy;
   String? _error;
@@ -36,9 +37,13 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
     });
     try {
       final raw = await _db.rpc('owner_get_ads_dashboard', params: {'p_limit': 80});
+      final pl = await _db.rpc('owner_get_ad_placements');
       if (!mounted) return;
       setState(() {
         _data = raw is Map ? Map<String, dynamic>.from(raw) : const {};
+        _placements = pl is List
+            ? pl.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+            : const [];
         _loading = false;
       });
     } catch (e) {
@@ -369,6 +374,153 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
     }
   }
 
+  Widget _placementCard(Map<String, dynamic> p) {
+    final on = p['enabled'] == true;
+    final key = '${p['key']}';
+    return Card(
+      color: on ? null : const Color(0xFF26262B),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Text('${p['emoji'] ?? '📣'}', style: const TextStyle(fontSize: 18)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${p['label'] ?? key}',
+                      style: const TextStyle(fontWeight: FontWeight.w900)),
+                  if ((p['description']?.toString() ?? '').isNotEmpty)
+                    Text('${p['description']}',
+                        style: const TextStyle(
+                            fontSize: 10, color: Colors.white54)),
+                ],
+              ),
+            ),
+            if (_busy == key)
+              const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+            else
+              Switch(
+                value: on,
+                activeThumbColor: const Color(0xFFFFD700),
+                onChanged: _busy != null
+                    ? null
+                    : (v) => _savePlacement(key, enabled: v),
+              ),
+          ]),
+          if (on) ...[
+            const SizedBox(height: 2),
+            Row(children: [
+              Expanded(
+                child: Text(
+                  key == 'home' || key == 'game_result'
+                      ? 'خانة واحدة في الشاشة'
+                      : 'إعلان بعد كل ${_n(p['every_n'])} عنصرًا',
+                  style: const TextStyle(fontSize: 11, color: Colors.white70),
+                ),
+              ),
+              Text(
+                _n(p['max_per_day']) == 0
+                    ? 'بلا حدّ يومي'
+                    : 'حتى ${_n(p['max_per_day'])} يوميًّا',
+                style: const TextStyle(fontSize: 11, color: Colors.white70),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.tune_rounded, size: 17),
+                onPressed:
+                    _busy != null ? null : () => _editPlacement(p),
+              ),
+            ]),
+            Text(
+              '📊 ${_n(p['impressions_30d'])} ظهورًا · '
+              '${_n(p['clicks_30d'])} نقرة — آخر 30 يومًا',
+              style: const TextStyle(fontSize: 10, color: Colors.white38),
+            ),
+          ],
+        ]),
+      ),
+    );
+  }
+
+  Future<void> _editPlacement(Map<String, dynamic> p) async {
+    final key = '${p['key']}';
+    final every = TextEditingController(text: '${_n(p['every_n'])}');
+    final cap = TextEditingController(text: '${_n(p['max_per_day'])}');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text('${p['emoji'] ?? ''} ${p['label'] ?? key}'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(
+              controller: every,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                  labelText: 'عنصر بين إعلان وإعلان',
+                  border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: cap,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                  labelText: 'حدّ يومي لكل عضو (0 = بلا حدّ)',
+                  border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'الحدّ اليومي مفروض على الخادم: لا يستطيع أي جهاز تجاوزه. '
+              'ورقم أصغر للتردّد يعني إعلانات أكثر — وقائمة مليئة '
+              'بالإعلانات تُهجَر، فيذهب جمهور المعلن نفسه.',
+              style: TextStyle(fontSize: 10.5, color: Colors.white60, height: 1.6),
+            ),
+          ]),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('إلغاء')),
+            FilledButton(
+                onPressed: () => Navigator.pop(c, true),
+                child: const Text('حفظ')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+    await _savePlacement(key,
+        everyN: int.tryParse(every.text.trim()),
+        maxPerDay: int.tryParse(cap.text.trim()));
+  }
+
+  Future<void> _savePlacement(String key,
+      {bool? enabled, int? everyN, int? maxPerDay}) async {
+    setState(() => _busy = key);
+    try {
+      await _db.rpc('owner_set_ad_placement', params: {
+        'p_placement_key': key,
+        'p_is_enabled': enabled,
+        'p_every_n_items': everyN,
+        'p_max_per_day': maxPerDay,
+      });
+      await _load();
+      _toast('حُفظ على الخادم ✓', ok: true);
+    } catch (e) {
+      _toast(e.toString().contains('INVALID_FREQUENCY')
+          ? 'التردّد يجب أن يكون بين 1 و 100.'
+          : e.toString().contains('INVALID_DAILY_CAP')
+              ? 'الحدّ اليومي بين 0 و 100.'
+              : 'تعذّر الحفظ: $e');
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
@@ -418,6 +570,22 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
                 ),
               ),
             ),
+            const SizedBox(height: 14),
+
+            // المواضع: أين تظهر الإعلانات، وهل تظهر أصلًا. القرار كلّه
+            // خادمي — إغلاق موضع هنا يسري فورًا على كل الأجهزة، ولو
+            // طلبته نسخة قديمة لم تُعطَ شيئًا.
+            const Text('أماكن ظهور الإعلانات',
+                style: TextStyle(fontWeight: FontWeight.w900)),
+            const SizedBox(height: 2),
+            const Text(
+              'افتح أو أغلق كل مكان على حدة، واضبط كم عنصرًا بين إعلان '
+              'وإعلان، وحدًّا يوميًّا لما يراه العضو من ذلك المكان.',
+              style: TextStyle(fontSize: 10.5, color: Colors.white54, height: 1.6),
+            ),
+            const SizedBox(height: 6),
+            for (final p in _placements) _placementCard(p),
+
             const SizedBox(height: 14),
 
             Row(children: [

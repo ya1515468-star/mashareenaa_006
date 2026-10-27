@@ -1,7 +1,35 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// إعداد المواضع كما يضبطه المالك.
+///
+/// يُستعمل للتخطيط وحده (كم عنصرًا بين خانة وخانة): السياسة تبقى
+/// خادمية، فلو تجاهله عميلٌ وطلب إعلانًا لموضع أغلقه المالك لم يُعطَ
+/// شيئًا. ولذلك لا ضرر في تخزينه، ولا نفع في التلاعب به.
+final adPlacementsProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  try {
+    final raw = await Supabase.instance.client.rpc('get_ad_placements');
+    return raw is Map ? Map<String, dynamic>.from(raw) : const {};
+  } catch (_) {
+    return const {};
+  }
+});
+
+/// كم عنصرًا بين خانة وخانة في هذا الموضع، و0 إن كان مغلقًا.
+///
+/// الصفر يعني «لا تُدرِج خانة إطلاقًا»، فتوفّر على القائمة بناءً
+/// ونداءً لا طائل منه.
+int adEveryN(Map<String, dynamic> config, String placement) {
+  final p = config[placement];
+  if (p is! Map) return 0;
+  if (p['enabled'] != true) return 0;
+  final n = (p['every_n'] as num?)?.toInt() ?? 0;
+  return n < 1 ? 0 : n;
+}
 
 /// خانة إعلان مدفوع.
 ///
@@ -21,6 +49,7 @@ class ServedAdSlot extends StatefulWidget {
     this.height = 92,
     this.margin = const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
     this.onOpen,
+    this.fullPage = false,
   });
 
   /// موضع العرض، يُسجَّل في الإحصاء ليعرف المالك أيّ موضع يُجدي.
@@ -30,6 +59,10 @@ class ServedAdSlot extends StatefulWidget {
 
   /// ما يُفعَل عند النقر. الاحتساب يحدث دائمًا قبل هذا.
   final void Function(Map<String, dynamic> ad)? onOpen;
+
+  /// صفحة كاملة لا شريط: سوق المنتجين عرضٌ رأسي بملء الشاشة، فشريط
+  /// صغير بينه وبين الريلات يبدو عطلًا في التخطيط لا إعلانًا.
+  final bool fullPage;
 
   @override
   State<ServedAdSlot> createState() => _ServedAdSlotState();
@@ -90,6 +123,74 @@ class _ServedAdSlotState extends State<ServedAdSlot> {
     if (_gone || ad == null) return const SizedBox.shrink();
 
     final image = ad['image_url']?.toString() ?? '';
+
+    if (widget.fullPage) {
+      return VisibilityCounter(
+        onVisible: _countImpression,
+        child: GestureDetector(
+          onTap: _click,
+          child: Container(
+            color: const Color(0xFF0B0718),
+            child: Stack(fit: StackFit.expand, children: [
+              if (image.isNotEmpty)
+                Image.network(image,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+              // تعتيم متدرّج: النصّ يجب أن يُقرأ فوق أي صورة يرفعها
+              // المعلن، فاتحةً كانت أو غامقة.
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0x33000000), Color(0xCC000000)],
+                  ),
+                ),
+              ),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFD700),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text('إعلان ممول',
+                            style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900)),
+                      ),
+                      const SizedBox(height: 10),
+                      Directionality(
+                        textDirection: TextDirection.rtl,
+                        child: Text(
+                          ad['text']?.toString() ?? '',
+                          maxLines: 4,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              height: 1.6,
+                              fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ]),
+          ),
+        ),
+      );
+    }
 
     return VisibilityCounter(
       onVisible: _countImpression,
@@ -226,4 +327,38 @@ class _VisibilityCounterState extends State<VisibilityCounter> {
 
   @override
   Widget build(BuildContext context) => widget.child;
+}
+
+/// يُحوّل عدد عناصر القائمة إلى عدد صفوفها بعد دسّ خانات الإعلان،
+/// ويترجم موضع الصفّ إلى «إعلان» أو «العنصر رقم كذا».
+///
+/// لماذا مُشترَك: خمس قوائم تدسّ خانات بالتردّد نفسه الذي يضبطه
+/// المالك. حسابُ الفهرس في كل قائمة على حدة يعني خمس نسخ من منطق
+/// واحد — وخطأ ±1 في إحداها يُظهر عنصرًا مرّتين أو يُخفي آخر.
+class AdInterleave {
+  const AdInterleave._(this.everyN, this.itemCount);
+
+  /// [everyN] = 0 يُلغي الدسّ تمامًا (موضع مغلق).
+  factory AdInterleave(int everyN, int itemCount) =>
+      AdInterleave._(everyN < 1 ? 0 : everyN, itemCount);
+
+  final int everyN;
+  final int itemCount;
+
+  /// عدد الخانات المدسوسة: واحدة بعد كل [everyN] عنصرًا، ولا تُدَسّ
+  /// خانة بعد آخر عنصر (إعلان يُذيّل القائمة بلا محتوى بعده مزعج).
+  int get adCount =>
+      everyN == 0 || itemCount <= everyN ? 0 : (itemCount - 1) ~/ everyN;
+
+  int get rowCount => itemCount + adCount;
+
+  /// هل هذا الصفّ خانة إعلان؟
+  bool isAd(int row) {
+    if (everyN == 0) return false;
+    // المواضع: everyN, 2*everyN+1, 3*everyN+2 … (يتقدّم بواحد لكل خانة سبقته)
+    return row > 0 && (row + 1) % (everyN + 1) == 0;
+  }
+
+  /// فهرس العنصر الحقيقي المقابل لهذا الصفّ.
+  int itemIndex(int row) => everyN == 0 ? row : row - ((row + 1) ~/ (everyN + 1));
 }

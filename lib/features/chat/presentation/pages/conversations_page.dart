@@ -114,24 +114,24 @@ class ConversationsPage extends ConsumerWidget {
                 ]),
               );
             }
-            // خانة إعلان واحدة بعد المحادثة الثالثة: الموضع الذي
-            // اشتراه المعلن. واحدة لا أكثر — قائمة محادثات مليئة
-            // بالإعلانات تُهجَر، فيذهب جمهور المعلن نفسه.
-            const adAfter = 3;
-            final showAd = list.length > adAfter;
-            final count = list.length + (showAd ? 1 : 0);
+            // التردّد يضبطه المالك لكل موضع، ومغلقٌ يعني لا خانة
+            // إطلاقًا. والقرار خادمي أيضًا: لو تجاهل عميلٌ الإعداد
+            // وطلب إعلانًا لموضع مغلق لم يُعطَ شيئًا.
+            final placements =
+                ref.watch(adPlacementsProvider).valueOrNull ?? const {};
+            final slots =
+                AdInterleave(adEveryN(placements, 'conversations'), list.length);
             return ListView.separated(
               controller: scrollController,
-              itemCount: count,
+              itemCount: slots.rowCount,
               separatorBuilder: (_, __) =>
                   const Divider(height: 1, color: Colors.white10, indent: 76),
               itemBuilder: (_, i) {
-                if (showAd && i == adAfter) {
+                if (slots.isAd(i)) {
                   return const ServedAdSlot(placement: 'conversations');
                 }
-                final index = (showAd && i > adAfter) ? i - 1 : i;
                 return _ThreadTile(
-                  thread: list[index],
+                  thread: list[slots.itemIndex(i)],
                   onChanged: () => ref.invalidate(myThreadsProvider),
                 );
               },

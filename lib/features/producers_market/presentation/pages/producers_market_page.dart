@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../../core/widgets/served_ad_slot.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../providers/producers_market_provider.dart';
@@ -140,18 +141,38 @@ class _ProducersMarketPageState extends ConsumerState<ProducersMarketPage>
                       if (reels.isEmpty) {
                         return _EmptyMarketState(onPublish: _showPublishSheet);
                       }
+                      // موضع «سوق المنتجين»: صفحة إعلان كاملة بين كل
+                      // عدد من الريلات يضبطه المالك. مغلقًا = لا صفحة
+                      // إعلان إطلاقًا، فالقائمة كما كانت بالضبط.
+                      final placements = ref
+                              .watch(adPlacementsProvider)
+                              .valueOrNull ??
+                          const {};
+                      final slots = AdInterleave(
+                          adEveryN(placements, 'producers_market'),
+                          reels.length);
                       return PageView.builder(
                         controller: _pageController,
                         scrollDirection: Axis.vertical,
                         onPageChanged: (i) =>
                             setState(() => _currentIndex = i),
-                        itemCount: reels.length,
-                        itemBuilder: (context, i) => _ReelPlayer(
-                          reel: reels[i],
-                          isActive: i == _currentIndex,
-                          glowAnim: _glowAnim,
-                          isOwner: _isOwner,
-                        ),
+                        itemCount: slots.rowCount,
+                        itemBuilder: (context, i) {
+                          if (slots.isAd(i)) {
+                            return const ServedAdSlot(
+                                placement: 'producers_market',
+                                fullPage: true);
+                          }
+                          final index = slots.itemIndex(i);
+                          return _ReelPlayer(
+                            reel: reels[index],
+                            // المقارنة بصفّ الصفحة لا بفهرس الريل:
+                            // خلطهما يُشغّل فيديو صفحةٍ أخرى.
+                            isActive: i == _currentIndex,
+                            glowAnim: _glowAnim,
+                            isOwner: _isOwner,
+                          );
+                        },
                       );
                     },
                     loading: () => const Center(

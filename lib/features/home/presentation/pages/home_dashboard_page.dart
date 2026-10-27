@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:async';
 import '../../../rbac/presentation/widgets/server_username_display.dart';
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/served_ad_slot.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/ui/ambient_gif_world.dart';
 import '../../../admin/presentation/pages/admin_dashboard_page.dart';
@@ -69,6 +70,11 @@ class HomeDashboardPage extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // موضع «الشاشة الرئيسية»: خانة واحدة تحت الترويسة، بحدّ
+            // يومي يضبطه المالك. مغلقًا لا تُرسَم ولا تُنادي الخادم.
+            const ServedAdSlot(
+                placement: 'home',
+                margin: EdgeInsets.only(top: 10, bottom: 4)),
             // ─── بطاقة الترحيب ──────────────────────────────────────
             SizedBox(
               height: 170,

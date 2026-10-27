@@ -3,6 +3,7 @@ import '../../../../core/services/snack_sfx.dart';
 import '../../../../core/services/media_upload_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
+import '../../../../core/widgets/served_ad_slot.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -622,11 +623,24 @@ class _ServiceAdsTab extends ConsumerWidget {
                 title: 'لا إعلانات خدمات',
               );
             }
+            // موضع «صفحات القطاعات»: استهداف طبيعي — معلن الأقمشة
+            // يصل لمن يتصفّح الأقمشة. فتحه وإغلاقه وتردّده بيد المالك.
+            final placements =
+                ref.watch(adPlacementsProvider).valueOrNull ?? const {};
+            final slots = AdInterleave(
+                adEveryN(placements, 'garment_sector'), list.length);
             return ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-              itemCount: list.length,
+              itemCount: slots.rowCount,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (_, i) => _ServiceAdCard(
+              itemBuilder: (_, row) {
+                if (slots.isAd(row)) {
+                  return const ServedAdSlot(
+                      placement: 'garment_sector',
+                      margin: EdgeInsets.zero);
+                }
+                final i = slots.itemIndex(row);
+                return _ServiceAdCard(
                 ad: list[i],
                 isOwner: isOwner,
                 onModerate: (status) async {
@@ -652,7 +666,8 @@ class _ServiceAdsTab extends ConsumerWidget {
                     m?.showSnackBarSfx(SnackBar(content: Text('تعذّر: $e')));
                   }
                 },
-              ),
+              );
+              },
             );
           },
         ),
