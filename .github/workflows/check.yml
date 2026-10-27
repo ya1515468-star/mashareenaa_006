@@ -1,0 +1,54 @@
+# بوّابة فحص سريعة: تحليل واختبارات فقط، بلا بناء.
+#
+# لماذا منفصلة عن build-all: البناء الكامل يستغرق قرب الساعة، فاستعماله
+# للتحقّق من خطأ كتابة في Dart يجعل كل تصحيح صغير انتظارًا طويلًا —
+# فتُدفَع التعديلات بلا فحص، وهو ما يصل إلى النسخة.
+name: Check — analyze + tests
+
+on:
+  push:
+    branches-ignore: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: mashareena-check-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.47.2'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      # التعليقات (::error::) هي قناة السجلّ الوحيدة المقروءة من بيئة
+      # العمل هذه، فتُطبَع الأخطاء بها لا في السجلّ الخام وحده.
+      - name: Flutter analyze
+        run: |
+          set -o pipefail
+          if ! flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.txt; then
+            grep -E "error •" analyze.txt | head -60 | sed 's/^/::error::/'
+            exit 1
+          fi
+          echo "::notice::analyze clean"
+
+      - name: Flutter tests
+        run: |
+          set -o pipefail
+          if ! flutter test 2>&1 | tee test.txt; then
+            grep -E "Error|error:|Expected|Actual|FAILED" test.txt | head -40 | sed 's/^/::error::/'
+            exit 1
+          fi
+          echo "::notice::tests passed"
