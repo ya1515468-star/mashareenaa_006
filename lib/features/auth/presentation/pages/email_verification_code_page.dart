@@ -1,3 +1,4 @@
+import '../../../../core/config/auth_otp.dart';
 import '../../../../core/config/auth_redirect.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'dart:async';
@@ -40,6 +41,7 @@ class _EmailVerificationCodePageState
   @override
   void dispose() {
     _authSub?.cancel();
+    _validityTicker?.cancel();
     _codeController.dispose();
     super.dispose();
   }
@@ -55,6 +57,11 @@ class _EmailVerificationCodePageState
     _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       final user = data.session?.user;
       if (user?.emailConfirmedAt != null) _onConfirmed();
+    });
+    _validityTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() => _validityLeft =
+          AuthOtp.validity - DateTime.now().difference(_codeSentAt));
     });
   }
 
@@ -135,6 +142,34 @@ class _EmailVerificationCodePageState
     }
   }
 
+  bool _cancelling = false;
+
+  // عدّاد صلاحية الرمز. المدّة الفعلية يفرضها الخادم
+  // (Email OTP Expiration في لوحة Supabase)؛ هذا عرض للمستخدم فقط،
+  // والخادم يبقى الحَكَم فيرفض المنتهي.
+  DateTime _codeSentAt = DateTime.now();
+  Timer? _validityTicker;
+  Duration _validityLeft = AuthOtp.validity;
+  bool get _codeExpired => _validityLeft.isNegative;
+
+  /// الخروج المشروع الوحيد من هذه الشاشة: تسجيل خروج فعلي من Supabase ثم
+  /// العودة لشاشة الدخول. الحساب **لا يُحذف** — يبقى موجودًا غير مؤكَّد،
+  /// ويمكن إكمال تأكيده لاحقًا بتسجيل الدخول نفسه.
+  Future<void> _cancelRegistration() async {
+    setState(() => _cancelling = true);
+    try {
+      await Supabase.instance.client.auth.signOut();
+    } catch (_) {
+      // الخروج المحلي يكفي؛ لا جلسة أصلًا في هذه المرحلة.
+    }
+    if (!mounted) return;
+    // إن كانت الشاشة مدفوعة فوق شاشة أخرى أسقطها؛ وإن كانت جذر البوّابة
+    // فإنّ AppRouter يعيد بناء شاشة الدخول وحده بعد انتهاء الجلسة.
+    final nav = Navigator.of(context);
+    if (nav.canPop()) nav.pop();
+    if (mounted) setState(() => _cancelling = false);
+  }
+
   Future<void> _resend() async {
     if (!_canResend) return;
     try {
@@ -146,7 +181,9 @@ class _EmailVerificationCodePageState
       if (!mounted) return;
       setState(() {
         _canResend = false;
-        _secondsLeft = 60;
+        _secondsLeft = AuthOtp.resendCooldown.inSeconds;
+        _codeSentAt = DateTime.now();
+        _validityLeft = AuthOtp.validity;
       });
       while (_secondsLeft > 0) {
         await Future.delayed(const Duration(seconds: 1));
@@ -180,7 +217,13 @@ class _EmailVerificationCodePageState
   Widget build(BuildContext context) {
     final p = context.palette;
 
-    return PremiumAuthScaffold(
+    // خط الدفاع الثالث: زر «رجوع» لا يُسقط هذه الشاشة إطلاقًا.
+    // canPop: false وحده (بلا callback) كي لا نعتمد على اسم ردّ النداء
+    // الذي تغيّر بين إصدارات Flutter. الخروج المشروع عبر زر «إلغاء
+    // التسجيل» أدناه فقط، وهو يُسجّل الخروج فعليًا فتعود شاشة الدخول.
+    return PopScope(
+      canPop: false,
+      child: PremiumAuthScaffold(
       child: ShakeWidget(
         key: _shakeKey,
         child: SingleChildScrollView(
@@ -201,6 +244,17 @@ class _EmailVerificationCodePageState
                 'تحقق من بريدك الوارد وغير المرغوب فيه لرمز التأكيد:\n${widget.email}',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: p.textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _codeExpired
+                    ? '⏳ انتهت صلاحية الرمز — اطلب رمزًا جديدًا'
+                    : '⏳ الرمز صالح لمدة ${AuthOtp.countdown(_validityLeft)}',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: _codeExpired ? p.error : p.textMuted,
+                ),
               ),
               const SizedBox(height: 24),
               TextField(
@@ -242,14 +296,25 @@ class _EmailVerificationCodePageState
                       ),
               ),
               const SizedBox(height: 16),
+              Center(
+                child: TextButton.icon(
+                  onPressed: _cancelling ? null : _cancelRegistration,
+                  icon: const Icon(Icons.logout_rounded, size: 18),
+                  label: const Text('العودة لشاشة الدخول'),
+                  style: TextButton.styleFrom(foregroundColor: p.textMuted),
+                ),
+              ),
+              const SizedBox(height: 4),
               Text(
-                'إذا لم تصل الرسالة، افحص البريد غير المرغوب ثم أعد الإرسال. تحتاج هذه الشاشة قالب Confirm signup الذي يعرض رمز OTP ({{ .Token }})، كما يحتاج التطبيق مزوّد SMTP مخصصًا للإرسال إلى جميع الأعضاء.',
+                'لا يمكن الدخول إلى التطبيق قبل تأكيد البريد. حسابك محفوظ — '
+                'يمكنك العودة وإكمال التأكيد لاحقًا بتسجيل الدخول نفسه.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: p.textMuted, fontSize: 11.5),
               ),
             ],
           ),
         ),
+      ),
       ),
     );
   }

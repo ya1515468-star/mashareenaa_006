@@ -233,73 +233,6 @@ class _ProducersMarketPageState extends ConsumerState<ProducersMarketPage>
     );
   }
 
-  Widget _buildCategoryBar(dynamic p) {
-    return SizedBox(
-      height: 48,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        itemCount: _categories.length,
-        itemBuilder: (context, i) {
-          final cat = _categories[i];
-          final isSelected = _selectedCategory == cat['key'];
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: AnimatedBuilder(
-              animation: _glowAnim,
-              builder: (context, child) => GestureDetector(
-                onTap: () =>
-                    setState(() => _selectedCategory = cat['key'] as String?),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOut,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    gradient: isSelected
-                        ? const LinearGradient(colors: [
-                            Color(0xFFFFD700),
-                            Color(0xFFFFA500),
-                          ])
-                        : null,
-                    color: isSelected ? null : Colors.white10,
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: const Color(0xFFFFD700)
-                                  .withValues(alpha: _glowAnim.value * 0.5),
-                              blurRadius: 10,
-                            )
-                          ]
-                        : null,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(cat['icon'] as String,
-                          style: const TextStyle(fontSize: 14)),
-                      const SizedBox(width: 4),
-                      Text(
-                        cat['label'] as String,
-                        style: TextStyle(
-                          color: isSelected ? Colors.black : Colors.white70,
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.normal,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   Future<void> _showPublishSheet() async {
     final published = await showModalBottomSheet<bool>(
       context: context,
@@ -651,22 +584,6 @@ class _ReelInfoOverlay extends StatelessWidget {
     );
   }
 
-  String _categoryLabel(String key) {
-    const map = {
-      'packaging': 'أمبلاج 📦',
-      'cutting': 'قطاعة ✂️',
-      'washing': 'غسيل 🫧',
-      'dyeing': 'صباغة 🎨',
-      'embroidery': 'تطريز 🪡',
-      'ironing': 'كوي 🔥',
-      'printing': 'طباعة 🖨️',
-      'fabric': 'أقمشة 🧵',
-      'accessories': 'إكسسوار 💎',
-      'pattern': 'باترون 📐',
-      'other': 'أخرى 🏷️',
-    };
-    return map[key] ?? key;
-  }
 }
 
 

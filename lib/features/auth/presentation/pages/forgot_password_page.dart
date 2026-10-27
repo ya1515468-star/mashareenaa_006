@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+
+import '../../../../core/utils/email_validation.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_button.dart';
 import '../widgets/auth_text_field.dart';
+import 'reset_password_code_page.dart';
 
 class ForgotPasswordPage extends ConsumerStatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -34,17 +37,24 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBarSfx(
-      SnackBar(
-        content: Text(
-          success
-              ? 'تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني'
-              : 'تعذّر إرسال رابط الاستعادة، تحقق من البريد المُدخل',
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBarSfx(
+        const SnackBar(
+          content: Text('تعذّر إرسال رمز الاستعادة، تحقق من البريد المُدخل'),
         ),
+      );
+      return;
+    }
+
+    // كان المسار ينتهي هنا بـpop: تُرسل رسالة ولا توجد في التطبيق أي شاشة
+    // لإدخال رمز وتعيين كلمة مرور جديدة. فالرابط كان يفتح التطبيق ويُنشئ
+    // جلسة استعادة فيدخل المستخدم إلى الشات دون أن يُعيد التعيين إطلاقًا.
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            ResetPasswordCodePage(email: _emailController.text.trim()),
       ),
     );
-
-    if (success) Navigator.of(context).pop();
   }
 
   @override
@@ -60,7 +70,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
-                  'أدخل بريدك الإلكتروني وسنرسل لك رابطًا لإعادة تعيين كلمة المرور.',
+                  'أدخل بريدك الإلكتروني وسنرسل لك رمزًا من 6 أرقام لإعادة تعيين كلمة المرور.',
                   style: TextStyle(color: Colors.grey),
                 ),
                 const SizedBox(height: 20),
@@ -69,12 +79,9 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                   label: 'البريد الإلكتروني',
                   keyboardType: TextInputType.emailAddress,
                   prefixIcon: Icons.email_outlined,
-                  validator: (value) {
-                    if (value == null || !value.contains('@')) {
-                      return 'الرجاء إدخال بريد إلكتروني صحيح';
-                    }
-                    return null;
-                  },
+                  // نفس صنف العطل: خطأ مطبعي في النطاق يعني أنّ رسالة
+                  // الاستعادة لن تصل أبدًا بلا أي رسالة خطأ.
+                  validator: EmailValidation.validate,
                 ),
                 const SizedBox(height: 24),
                 AuthButton(

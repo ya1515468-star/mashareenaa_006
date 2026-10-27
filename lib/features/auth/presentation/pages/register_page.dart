@@ -2,6 +2,8 @@ import 'dart:async';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
+
+import '../../../../core/utils/email_validation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
@@ -180,7 +182,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           'email provider',
           'deliver',
         ].any(raw.contains);
-        final message = mailDeliveryProblem
+        final alreadyRegistered = raw.contains('مسجَّل مسبقًا') ||
+            raw.contains('already_registered') ||
+            raw.contains('already registered') ||
+            raw.contains('مستخدم بالفعل');
+        final message = alreadyRegistered
+            ? 'هذا البريد مسجَّل مسبقًا. سجّل الدخول، أو استخدم «نسيت كلمة المرور».'
+            : mailDeliveryProblem
             ? 'تعذّر إرسال رسالة التأكيد من مزوّد البريد: ${detail.isEmpty ? 'راجع إعدادات SMTP في Supabase' : detail}'
             : (raw.contains('confirm') || raw.contains('email') || raw.contains('تأكيد البريد'))
                 ? 'تعذّر إكمال تأكيد البريد. ${detail.isEmpty ? 'تحقق من إعدادات البريد ثم أعد المحاولة.' : detail}'
@@ -194,7 +202,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       return;
     }
 
-    final user = ref.read(authControllerProvider).value;
+    // التسجيل الذي يحتاج تأكيد بريد لا يُنتج حالة دخول عن قصد (منع تجاوز
+    // شاشة التأكيد بزر «رجوع»)، فنقرأ الحساب المعلَّق من المتحكّم.
+    final notifier = ref.read(authControllerProvider.notifier);
+    final user = ref.read(authControllerProvider).value ?? notifier.pendingVerification;
     final uid = user?.uid;
 
     // اسم المستخدم + PIN اختياريان — فشلهما لا يوقف إتمام التسجيل.
@@ -290,15 +301,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 label: 'البريد الإلكتروني',
                 keyboardType: TextInputType.emailAddress,
                 prefixIcon: Icons.email_outlined,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return 'الرجاء إدخال البريد الإلكتروني';
-                  }
-                  if (!v.contains('@')) {
-                    return 'صيغة البريد الإلكتروني غير صحيحة';
-                  }
-                  return null;
-                },
+                // كان الفحص «يحتوي @» فقط، فمرّ عنوان حقيقي بنطاق
+                // gmail.co (لا .com) ولم تصل رسالته أبدًا.
+                validator: EmailValidation.validate,
               ),
               const SizedBox(height: 14),
               Focus(

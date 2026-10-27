@@ -1,9 +1,14 @@
+import 'dart:convert';
+import 'dart:math' as math;
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../../core/config/oauth_config.dart';
 import '../../../../../core/theme/app_theme.dart';
 
 /// تسجيل الدخول الاجتماعي عبر Supabase Auth.
@@ -30,15 +35,41 @@ class SocialLoginRow extends StatefulWidget {
 class _SocialLoginRowState extends State<SocialLoginRow> {
   bool _busy = false;
 
+  /// nonce عشوائي: يُرسَل مُجزَّأً (SHA-256) إلى المزوّد ويُرسَل الأصل إلى
+  /// Supabase كي يطابقه مع ما في التوكن. هذا ما يمنع إعادة استخدام توكن
+  /// مسروق (replay) لتسجيل الدخول بحساب غيرك.
+  static String _rawNonce([int len = 32]) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._';
+    final r = math.Random.secure();
+    return List.generate(len, (_) => chars[r.nextInt(chars.length)]).join();
+  }
+
+  static String _sha256(String s) => sha256.convert(utf8.encode(s)).toString();
+
   Future<void> _signInWithGoogle() async {
+    if (!OAuthConfig.googleReady) {
+      widget.onError?.call(
+        'الدخول عبر Google غير مهيّأ بعد على هذا الإصدار. '
+        'يلزم إضافة معرّف عميل الويب (Web Client ID).',
+      );
+      return;
+    }
     setState(() => _busy = true);
     try {
-      final googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) return;
+      // serverClientId إلزامي على أندرويد: بدونه تعود idToken = null دائمًا
+      // ويفشل الدخول في كل مرة. على iOS/الويب لا يضرّ تمريره.
+      final googleUser = await GoogleSignIn(
+        serverClientId: OAuthConfig.googleWebClientId,
+        scopes: const ['email', 'profile'],
+      ).signIn();
+      if (googleUser == null) return; // ألغى المستخدم
       final googleAuth = await googleUser.authentication;
       final idToken = googleAuth.idToken;
       if (idToken == null) {
-        throw StateError('تعذّر الحصول على Google ID token.');
+        throw StateError(
+          'لم يُعِد Google رمز هوية. تأكّد من تطابق بصمة SHA-1 ومعرّف الحزمة '
+          'في عميل أندرويد، ومن صحّة Web Client ID.',
+        );
       }
       await Supabase.instance.client.auth.signInWithIdToken(
         provider: OAuthProvider.google,
@@ -55,11 +86,13 @@ class _SocialLoginRowState extends State<SocialLoginRow> {
   Future<void> _signInWithApple() async {
     setState(() => _busy = true);
     try {
+      final rawNonce = _rawNonce();
       final appleCredential = await SignInWithApple.getAppleIDCredential(
         scopes: [
           AppleIDAuthorizationScopes.email,
           AppleIDAuthorizationScopes.fullName
         ],
+        nonce: _sha256(rawNonce),
       );
       final idToken = appleCredential.identityToken;
       if (idToken == null) {
@@ -68,7 +101,7 @@ class _SocialLoginRowState extends State<SocialLoginRow> {
       await Supabase.instance.client.auth.signInWithIdToken(
         provider: OAuthProvider.apple,
         idToken: idToken,
-        accessToken: appleCredential.authorizationCode,
+        nonce: rawNonce,
       );
     } catch (e) {
       widget.onError?.call('تعذّر تسجيل الدخول عبر Apple: $e');

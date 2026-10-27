@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/config/realtime_tuning.dart';
 import '../../../../core/navigation/app_navigator.dart';
 import '../../../../core/services/server_sounds.dart';
 import '../../../../core/services/snack_sfx.dart';
@@ -571,7 +573,7 @@ class _TrixLobbyState extends State<_TrixLobby> with SingleTickerProviderStateMi
     _loadMyTable();
     _loadOpen();
     _loadInvites();
-    _poll = Timer.periodic(const Duration(seconds: 2), (_) => _pollTick());
+    _poll = Timer.periodic(RealtimeTuning.idle, (_) => _pollTick());
   }
 
   @override

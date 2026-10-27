@@ -218,6 +218,23 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         );
       }
 
+      // ─────────────────────────────────────────────────────────────────
+      // بريد مسجَّل مسبقًا: Supabase **لا** يُرجع خطأ في هذه الحالة حين
+      // يكون تأكيد البريد مفعّلًا — يُرجع 200 ومستخدمًا بقائمة identities
+      // **فارغة** ولا يُرسل أي رسالة، وذلك قصدًا لمنع استكشاف العناوين
+      // المسجَّلة (email enumeration).
+      // الأثر العملي قبل هذا الإصلاح: التطبيق يعتبرها نجاحًا ويفتح شاشة
+      // إدخال الرمز، فينتظر المستخدم رمزًا **لم يُرسَل أبدًا**. وهذا هو
+      // ما ظهر في سجلّ الخادم: 3 عمليات /signup ناجحة مقابل حدث
+      // mail.send واحد فقط.
+      if ((user.identities ?? const []).isEmpty) {
+        throw const AuthException(
+          message: 'هذا البريد مسجَّل مسبقًا. سجّل الدخول، أو استخدم '
+              '«نسيت كلمة المرور» إن لم تتذكّرها.',
+          code: 'EMAIL_ALREADY_REGISTERED',
+        );
+      }
+
       // With Confirm Email enabled Supabase intentionally returns a user without a session.
       // Keep the registration flow successful and let the UI open the verification page;
       // session-dependent security checks run after the user completes confirmation/sign-in.
@@ -512,6 +529,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   String _mapAuthError(sb.AuthException e) {
     final code = e.code?.toLowerCase() ?? '';
     final message = e.message.toLowerCase();
+
+    // حدّ إرسال البريد: ظهر فعليًا في سجلّ الخادم (429 على /resend).
+    // خدمة بريد Supabase المدمجة محدودة، فالرسالة يجب أن تقول السبب
+    // بدل «تعذّر الإرسال» الغامضة.
+    if (code.contains('over_email_send_rate_limit') ||
+        code.contains('over_request_rate_limit') ||
+        message.contains('rate limit') ||
+        message.contains('only request this after')) {
+      return 'تجاوزت حدّ إرسال رسائل البريد. انتظر دقيقة ثم أعد المحاولة.';
+    }
 
     if (code.contains('user_already_exists') ||
         code.contains('email_exists') ||

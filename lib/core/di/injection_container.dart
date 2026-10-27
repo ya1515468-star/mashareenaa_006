@@ -9,17 +9,13 @@ import '../network/network_info.dart';
 import '../services/media_upload_service.dart';
 
 import '../../features/auth/data/datasources/auth_remote_data_source.dart';
-import '../../features/auth/data/datasources/email_verification_remote_data_source.dart';
 import '../../features/auth/data/datasources/username_credential_remote_data_source.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
-import '../../features/auth/data/repositories/email_verification_repository_impl.dart';
 import '../../features/auth/data/repositories/username_credential_repository_impl.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
-import '../../features/auth/domain/repositories/email_verification_repository.dart';
 import '../../features/auth/domain/repositories/username_credential_repository.dart';
 import '../../features/auth/domain/usecases/check_username_available_usecase.dart';
 import '../../features/auth/domain/usecases/create_username_pin_usecase.dart';
-import '../../features/auth/domain/usecases/email_verification_usecases.dart';
 import '../../features/auth/domain/usecases/get_current_user_usecase.dart';
 import '../../features/auth/domain/usecases/reset_password_usecase.dart';
 import '../../features/auth/domain/usecases/sign_in_usecase.dart';
@@ -218,15 +214,12 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton(() => CreateUsernamePinUseCase(sl()));
   sl.registerLazySingleton(() => VerifyPinUseCase(sl()));
 
-  // كود تأكيد البريد الإلكتروني
-  sl.registerLazySingleton<EmailVerificationRemoteDataSource>(
-    () => EmailVerificationRemoteDataSourceImpl(sl()),
-  );
-  sl.registerLazySingleton<EmailVerificationRepository>(
-    () => EmailVerificationRepositoryImpl(remoteDataSource: sl()),
-  );
-  sl.registerLazySingleton(() => SendVerificationCodeUseCase(sl()));
-  sl.registerLazySingleton(() => ConfirmVerificationCodeUseCase(sl()));
+  // أُزيلت سلسلة «كود تأكيد البريد» القديمة بالكامل: كانت تنادي دالّتي
+  // Edge Functions باسم sendVerificationCode / confirmVerificationCode
+  // **غير موجودتين إطلاقًا** في المشروع (تحقّقتُ من قائمة الدوال المنشورة:
+  // 21 دالة وليست أيٌّ منهما بينها)، ولم تكن أي واجهة تستدعيها.
+  // التأكيد الفعلي يجري عبر Supabase نفسه: verifyOTP(type: signup) في
+  // EmailVerificationCodePage.
 
   // ------------------------------ Profile ----------------------------------
   sl.registerLazySingleton<ProfileRemoteDataSource>(

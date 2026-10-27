@@ -14,6 +14,12 @@ import '../../domain/usecases/sign_up_usecase.dart';
 class AuthController extends AsyncNotifier<UserEntity?> {
   AuthRepository get _repository => sl<AuthRepository>();
 
+  /// الحساب الذي أُنشئ للتوّ وينتظر تأكيد البريد. لا يُوضع في [state] لأنّ
+  /// [state] تعني «مسجّل دخوله» وتفتح HomeShell. شاشة التسجيل تحتاج uid
+  /// و email لتنتقل إلى شاشة إدخال الرمز، فتقرأهما من هنا.
+  UserEntity? _pendingVerification;
+  UserEntity? get pendingVerification => _pendingVerification;
+
   @override
   Future<UserEntity?> build() async {
     // Resolve the current Supabase session immediately instead of waiting on
@@ -59,6 +65,19 @@ class AuthController extends AsyncNotifier<UserEntity?> {
         return false;
       },
       (user) {
+        // تجاوز أمني مُصلَح: كان يُوضع المستخدم في حالة «مسجَّل دخوله» فورًا
+        // بعد signUp، حتى حين لا توجد جلسة إطلاقًا (البريد غير مؤكَّد).
+        // AppRouter يراقب هذه الحالة، فكان يستبدل شاشة الدخول بـHomeShell
+        // (الشات) **تحت** شاشة إدخال الرمز. فضغطة «رجوع» تُسقط شاشة الرمز
+        // فيظهر الشات بحساب غير مؤكَّد وبلا جلسة.
+        // الآن: التسجيل الذي يحتاج تأكيدًا لا يُنتج حالة دخول. تبقى null
+        // حتى ينجح verifyOTP فتصل الجلسة عبر authStateChanges.
+        if (!user.emailVerified) {
+          _pendingVerification = user;
+          state = const AsyncData(null);
+          return true;
+        }
+        _pendingVerification = null;
         state = AsyncData(user);
         return true;
       },
@@ -86,6 +105,7 @@ class AuthController extends AsyncNotifier<UserEntity?> {
   Future<void> signOut() async {
     final useCase = sl<SignOutUseCase>();
     await useCase();
+    _pendingVerification = null;
     state = const AsyncData(null);
   }
 

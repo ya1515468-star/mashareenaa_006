@@ -1,9 +1,9 @@
 name: MASHAREENA Android ARM64 Release
 
+# أُوقف التشغيل التلقائي: build-all.yml صار يبني كل النسخ (AAB + arm64 +
+# شاملة + iOS) عند كل دفع. هذا الملف يبقى للتشغيل اليدوي فقط عند الحاجة
+# إلى نسخة arm64 وحدها بسرعة، كي لا يعمل بناءان متوازيان على كل دفعة.
 on:
-  push:
-    branches: [main, master]
-    tags: ['v*']
   workflow_dispatch:
 
 permissions:

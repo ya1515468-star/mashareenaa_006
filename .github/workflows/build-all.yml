@@ -1,0 +1,247 @@
+# بناء كل النسخ: Google Play (AAB) + أندرويد arm64 + أندرويد شاملة + iOS.
+# نفس أسرار التوقيع وبوّابات الجودة المستخدمة في البناء السابق:
+#   ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD
+#   ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD
+# البناء يتوقّف عند أي خطأ في flutter analyze أو flutter test قبل أي إخراج.
+name: MASHAREENA Release — All Targets
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mashareena-all-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: '3.47.2'
+
+jobs:
+  # ─────────────────────────── أندرويد: ثلاث نسخ ───────────────────────────
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Check source release configuration
+        run: |
+          test -f pubspec.yaml
+          test -f android/app/proguard-rules.pro
+          test -f assets/fonts/decorative/OFL.txt
+          ! grep -qE '^[[:space:]]*record:[[:space:]]*\^?5\.1\.2[[:space:]]*$' pubspec.yaml
+          test ! -e android/key.properties
+          test -z "$(find android/app -maxdepth 1 -type f \( -name '*.jks' -o -name '*.keystore' \) -print -quit)"
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Flutter analyze
+        run: |
+          set -o pipefail
+          if ! flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.txt; then
+            grep -E "error •" analyze.txt | head -50 | sed 's/^/::error::/'
+            exit 1
+          fi
+
+      - name: Flutter tests
+        run: |
+          set -o pipefail
+          if ! flutter test 2>&1 | tee test.txt; then
+            grep -E "Error|error:|Expected|Actual|FAILED" test.txt | head -40 | sed 's/^/::error::/'
+            exit 1
+          fi
+
+      - name: Verify release signing secrets
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for v in KEYSTORE_B64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!v}" ]; then echo "::error::سرّ التوقيع $v غير مضبوط"; exit 1; fi
+          done
+
+      - name: Configure release keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > android/app/mashareena-upload.jks
+          cat > android/key.properties <<EOF2
+          storeFile=mashareena-upload.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF2
+          chmod 600 android/app/mashareena-upload.jks android/key.properties
+
+      # ① Google Play — حزمة AAB هي الصيغة التي يقبلها متجر Play حصرًا.
+      - name: Build Google Play bundle (AAB)
+        run: flutter build appbundle --release
+
+      # ② arm64 فقط — أصغر حجمًا لأجهزة 64-bit الحديثة (نفس بناء السابق).
+      - name: Build signed ARM64 APK
+        run: flutter build apk --release --target-platform android-arm64 --split-per-abi
+
+      # ③ شاملة — تعمل على أي جهاز، للتوزيع المباشر خارج المتجر.
+      - name: Build universal APK
+        run: flutter build apk --release
+
+      - name: Verify outputs, architecture and signatures
+        run: |
+          set -e
+          AAB=build/app/outputs/bundle/release/app-release.aab
+          APK64=build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          APKU=build/app/outputs/flutter-apk/app-release.apk
+          test -f "$AAB";  test -f "$APK64";  test -f "$APKU"
+          # arm64 يجب ألّا تحتوي أي معمارية أخرى
+          unzip -l "$APK64" | grep -q 'lib/arm64-v8a/'
+          ! unzip -l "$APK64" | grep -qE 'lib/(armeabi-v7a|x86|x86_64)/' || exit 1
+          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          "$BT/apksigner" verify --verbose "$APK64"
+          "$BT/apksigner" verify --verbose "$APKU"
+          SHORT="${GITHUB_SHA::7}"
+          mkdir -p out
+          cp "$AAB"   "out/MASHAREENA-playstore-${SHORT}.aab"
+          cp "$APK64" "out/MASHAREENA-arm64-${SHORT}.apk"
+          cp "$APKU"  "out/MASHAREENA-universal-${SHORT}.apk"
+          ls -lh out/
+
+      - name: Generate third-party notices and release metadata
+        run: |
+          SHORT="${GITHUB_SHA::7}"
+          python3 scripts/generate_third_party_notices.py --output out/THIRD_PARTY_NOTICES.txt
+          cp assets/fonts/decorative/OFL.txt out/SIL-OPEN-FONT-LICENSE-1.1.txt
+          cat > out/BUILD_INFO.txt <<EOF2
+          Project: MASHAREENA
+          Repository: ${GITHUB_REPOSITORY}
+          Commit: ${GITHUB_SHA}
+          Flutter: ${FLUTTER_VERSION} stable
+          Java: 17
+          Build mode: release
+          Application ID: com.mashareena.mashareena
+          Version: $(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -1)
+          Outputs:
+            - MASHAREENA-playstore-${SHORT}.aab   (Google Play — AAB موقّعة)
+            - MASHAREENA-arm64-${SHORT}.apk       (arm64-v8a فقط)
+            - MASHAREENA-universal-${SHORT}.apk   (كل المعماريات)
+          EOF2
+          (cd out && sha256sum ./*.aab ./*.apk > SHA256SUMS.txt)
+          (cd out && zip -q "MASHAREENA-ANDROID-${SHORT}.zip" \
+            "MASHAREENA-playstore-${SHORT}.aab" \
+            "MASHAREENA-arm64-${SHORT}.apk" \
+            "MASHAREENA-universal-${SHORT}.apk" \
+            BUILD_INFO.txt SHA256SUMS.txt THIRD_PARTY_NOTICES.txt SIL-OPEN-FONT-LICENSE-1.1.txt)
+          ls -lh out/
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MASHAREENA-android-release
+          path: out/*
+          retention-days: 30
+
+      - name: GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            out/*.aab
+            out/*.apk
+            out/*.zip
+            out/SHA256SUMS.txt
+            out/BUILD_INFO.txt
+            out/THIRD_PARTY_NOTICES.txt
+          generate_release_notes: true
+
+      - name: Publish latest build (pre-release)
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-build
+          name: Latest build (${{ github.sha }})
+          prerelease: true
+          target_commitish: ${{ github.sha }}
+          files: |
+            out/*.aab
+            out/*.apk
+            out/SHA256SUMS.txt
+
+      - name: Remove temporary signing files
+        if: always()
+        run: rm -f android/app/mashareena-upload.jks android/key.properties
+
+  # ──────────────────────────────── iOS ────────────────────────────────
+  # يُبنى بلا توقيع: التوقيع يحتاج شهادات Apple Developer وملفات
+  # provisioning، وهي ليست بين أسرار المستودع. هذا البناء يُثبت أنّ
+  # الشيفرة تُصرَّف وتُحزَّم لـiOS. لإنتاج IPA موقّعة للـApp Store أضف
+  # أسرار Apple ثم استبدل الخطوة بـ`flutter build ipa` مع ExportOptions.
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Flutter analyze
+        run: |
+          set -o pipefail
+          if ! flutter analyze --no-fatal-infos --no-fatal-warnings 2>&1 | tee analyze.txt; then
+            grep -E "error •" analyze.txt | head -50 | sed 's/^/::error::/'
+            exit 1
+          fi
+
+      - name: Build iOS (unsigned)
+        run: flutter build ios --release --no-codesign
+
+      - name: Package unsigned app
+        run: |
+          SHORT="${GITHUB_SHA::7}"
+          APP=build/ios/iphoneos/Runner.app
+          test -d "$APP"
+          mkdir -p out/Payload
+          cp -R "$APP" out/Payload/
+          (cd out && zip -qry "MASHAREENA-ios-unsigned-${SHORT}.ipa" Payload && rm -rf Payload)
+          (cd out && shasum -a 256 ./*.ipa > SHA256SUMS-ios.txt)
+          ls -lh out/
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MASHAREENA-ios-unsigned
+          path: out/*
+          retention-days: 30

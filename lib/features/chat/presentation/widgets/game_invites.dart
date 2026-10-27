@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../../core/config/realtime_tuning.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'game_hub.dart' show gameErrorText, gameTitle, sendGameChallengeFlow;
 
@@ -209,7 +210,7 @@ class _MyInvitesTabState extends State<_MyInvitesTab> {
   void initState() {
     super.initState();
     _load();
-    _t = Timer.periodic(const Duration(seconds: 4), (_) => _load());
+    _t = Timer.periodic(RealtimeTuning.idle, (_) => _load());
   }
 
   @override
@@ -218,7 +219,13 @@ class _MyInvitesTabState extends State<_MyInvitesTab> {
     super.dispose();
   }
 
+  bool _loadBusy = false;
+
   Future<void> _load() async {
+    // 400ms × عميل واحد = 2.5 طلب/ث. الحارس يمنع تراكم الطلبات إن تأخّر
+    // الخادم، فلا يزيد الحمل الفعلي عن طلب واحد قيد التنفيذ في كل لحظة.
+    if (_loadBusy) return;
+    _loadBusy = true;
     try {
       final raw = await _idb.rpc('my_game_invites');
       if (raw is List && mounted) {
@@ -229,6 +236,8 @@ class _MyInvitesTabState extends State<_MyInvitesTab> {
       }
     } catch (_) {
       if (mounted) setState(() => _loading = false);
+    } finally {
+      _loadBusy = false;
     }
   }
 

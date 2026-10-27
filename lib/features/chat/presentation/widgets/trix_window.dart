@@ -119,7 +119,9 @@ class _TrixFloatingHostState extends State<TrixFloatingHost> {
   void _watchTable(String tableId) {
     _waitTimer?.cancel();
     setState(() => _waitTable = tableId);
-    _waitTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
+    _waitTimer = Timer.periodic(RealtimeTuning.idle, (_) async {
+      if (_waitBusy) return; // حارس تراكم: لا طلب ثانٍ قبل عودة الأول
+      _waitBusy = true;
       try {
         final raw = await _tdb.rpc('trix_table_view', params: {'p_table': tableId});
         if (raw is! Map) return;
@@ -133,9 +135,14 @@ class _TrixFloatingHostState extends State<TrixFloatingHost> {
           if (mounted) setState(() => _waitTable = null);
           _toast('ألغى المضيف الطاولة واسترددت رهانك.');
         }
-      } catch (_) {}
+      } catch (_) {
+      } finally {
+        _waitBusy = false;
+      }
     });
   }
+
+  bool _waitBusy = false;
 
   String? _toastText;
   void _toast(String t) {
