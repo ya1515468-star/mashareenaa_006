@@ -1,0 +1,236 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// تحكّم المالك بتسليم الإشعارات.
+///
+/// لماذا وُجدت هذه الشاشة: ستّ ميزات مبنيّة في التطبيق (المنشن، الرد،
+/// الإعجاب، التعليق، المتابعة، طلب الصداقة) كانت معطَّلة بالكامل —
+/// قناة في القاعدة كانت تُسقط إشعاراتها كلّها بلا شرط، فلم يُخزَّن منها
+/// صفّ واحد قطّ بينما العميل يرندرها جميعًا.
+///
+/// استُبدل الحجب الأعمى بسياسة من ثلاث طبقات، وهذه الشاشة هي الطبقة
+/// الأولى: المفتاح العامّ بيد المالك. والطبقتان الأخريان خادميّتان —
+/// تفضيل العضو لنفسه، ودمج المكرّر مع سقف بالساعة.
+class AdminNotificationsTab extends StatefulWidget {
+  const AdminNotificationsTab({super.key});
+
+  @override
+  State<AdminNotificationsTab> createState() => _AdminNotificationsTabState();
+}
+
+class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
+  final _db = Supabase.instance.client;
+  List<Map<String, dynamic>> _rows = const [];
+  bool _loading = true;
+  String? _busyType;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final raw = await _db.rpc('owner_get_notification_settings');
+      final list = raw is List ? raw : const <dynamic>[];
+      setState(() {
+        _rows = list
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList(growable: false);
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = '$e';
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _save(String type,
+      {bool? enabled, int? maxPerHour, int? dedupeMinutes}) async {
+    setState(() => _busyType = type);
+    try {
+      await _db.rpc('owner_set_notification_setting', params: {
+        'p_type': type,
+        'p_enabled': enabled,
+        'p_max_per_hour': maxPerHour,
+        'p_dedupe_minutes': dedupeMinutes,
+      });
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('حُفظ على الخادم ✓'),
+          backgroundColor: Color(0xFF16A34A)));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('تعذّر الحفظ: $e')));
+    } finally {
+      if (mounted) setState(() => _busyType = null);
+    }
+  }
+
+  Future<void> _editNumber(Map<String, dynamic> r, String field) async {
+    final isCap = field == 'max_per_hour';
+    final c = TextEditingController(text: '${r[field] ?? 0}');
+    final v = await showDialog<int>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text(isCap ? 'سقف الساعة' : 'نافذة الدمج (دقائق)'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(
+              controller: c,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              isCap
+                  ? 'أقصى عدد إشعارات من هذا النوع يصل العضو الواحد في الساعة. '
+                      'صفر = بلا سقف — استعمله لما لا يجوز إسقاطه مثل طلب '
+                      'الصداقة، فإسقاطه يعني ألّا يعلم المستلم بالطلب أصلًا.'
+                  : 'إشعارٌ ثانٍ لنفس العضو ونفس المرجع داخل هذه المدّة '
+                      'يُدمَج ولا يُرسَل. صفر = بلا دمج.',
+              style: const TextStyle(fontSize: 11, color: Colors.white60),
+            ),
+          ]),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.pop(ctx, int.tryParse(c.text.trim()) ?? 0),
+              child: const Text('حفظ'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (v == null) return;
+    await _save('${r['type']}',
+        maxPerHour: isCap ? v : null, dedupeMinutes: isCap ? null : v);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('تعذّر الجلب:\n$_error', textAlign: TextAlign.center),
+          const SizedBox(height: 10),
+          FilledButton(onPressed: _load, child: const Text('إعادة')),
+        ]),
+      );
+    }
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.all(12),
+          children: [
+            Card(
+              color: const Color(0xFF1B1230),
+              child: const Padding(
+                padding: EdgeInsets.all(12),
+                child: Text(
+                  'المفتاح هنا عامّ لكل المنصّة. ويبقى للعضو أن يُطفئ نوعًا '
+                  'لنفسه، وتفضيله يغلب — فإطفاؤك يُسكت الجميع، وتشغيلك لا '
+                  'يُجبر من أطفأه.',
+                  style: TextStyle(fontSize: 12, color: Colors.white70),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            for (final r in _rows)
+              Card(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${r['label'] ?? r['type']}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w900)),
+                              Text(
+                                '${r['type']}  ·  أُرسل في 24 ساعة: ${r['sent_24h'] ?? 0}',
+                                style: const TextStyle(
+                                    fontSize: 11, color: Colors.white54),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (_busyType == r['type'])
+                          const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2))
+                        else
+                          Switch(
+                            value: r['enabled'] == true,
+                            onChanged: (v) =>
+                                _save('${r['type']}', enabled: v),
+                          ),
+                      ]),
+                      const SizedBox(height: 4),
+                      Row(children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _busyType != null
+                                ? null
+                                : () => _editNumber(r, 'max_per_hour'),
+                            child: Text(
+                              (r['max_per_hour'] as num?)?.toInt() == 0
+                                  ? 'سقف الساعة: بلا حدّ'
+                                  : 'سقف الساعة: ${r['max_per_hour']}',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _busyType != null
+                                ? null
+                                : () => _editNumber(r, 'dedupe_minutes'),
+                            child: Text(
+                              (r['dedupe_minutes'] as num?)?.toInt() == 0
+                                  ? 'الدمج: معطّل'
+                                  : 'الدمج: ${r['dedupe_minutes']} د',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ),
+                      ]),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
