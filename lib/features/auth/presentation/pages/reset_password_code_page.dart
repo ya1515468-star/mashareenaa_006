@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -127,7 +128,7 @@ class _ResetPasswordCodePageState extends State<ResetPasswordCodePage> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'تعذّر إكمال العملية: $e';
+        _error = FailureText.of(e);
       });
     }
   }
@@ -165,7 +166,7 @@ class _ResetPasswordCodePageState extends State<ResetPasswordCodePage> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'تعذّرت إعادة الإرسال: $e';
+        _error = FailureText.of(e);
       });
     }
   }

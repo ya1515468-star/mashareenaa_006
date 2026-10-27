@@ -1,4 +1,5 @@
 import '../../../../core/data/supabase_document_compat.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../wallet/domain/entities/currency.dart';
 import '../../domain/entities/pattern_enums.dart';
@@ -48,7 +49,7 @@ class PatternStudioRemoteDataSourceImpl
         ),
       );
     } catch (e) {
-      throw ServerException(message: 'تعذّر جلب إعدادات الميزة: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -61,7 +62,7 @@ class PatternStudioRemoteDataSourceImpl
         'currency': config.price.currency.wire,
       });
     } catch (e) {
-      throw ServerException(message: 'تعذّر تحديث إعدادات الميزة: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -70,7 +71,7 @@ class PatternStudioRemoteDataSourceImpl
     try {
       await _requests.add(request.toMap());
     } catch (e) {
-      throw ServerException(message: 'تعذّر إنشاء الطلب: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -117,7 +118,7 @@ class PatternStudioRemoteDataSourceImpl
         if (reviewerNote != null) 'reviewerNote': reviewerNote,
       });
     } catch (e) {
-      throw ServerException(message: 'تعذّر رفع النتيجة: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -130,7 +131,7 @@ class PatternStudioRemoteDataSourceImpl
         'reviewerNote': reason,
       });
     } catch (e) {
-      throw ServerException(message: 'تعذّر رفض الطلب: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 }

@@ -1,4 +1,5 @@
 import '../../../../core/data/supabase_document_compat.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../domain/entities/report_entity.dart';
 import '../models/report_model.dart';
@@ -26,7 +27,7 @@ class ReportRemoteDataSourceImpl implements ReportRemoteDataSource {
     try {
       await _reports.add(report.toMap());
     } catch (e) {
-      throw ServerException(message: 'تعذّر إرسال البلاغ: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -61,7 +62,7 @@ class ReportRemoteDataSourceImpl implements ReportRemoteDataSource {
         'p_new_status': newStatus.wire,
       });
     } catch (e) {
-      throw ServerException(message: 'تعذّر تحديث حالة البلاغ: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 }

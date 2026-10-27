@@ -787,7 +787,7 @@ class HttpsCallable {
 
         default:
           throw SupabaseFunctionException(
-              code: 'unimplemented', message: 'عملية الخادم غير مهيأة: $name');
+              code: 'unimplemented', message: 'هذه العملية غير مهيّأة بعد: $name');
       }
       return HttpsCallableResult(result);
     } on PostgrestException catch (e) {

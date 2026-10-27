@@ -15,6 +15,8 @@ import '../../profile/presentation/providers/profile_provider.dart';
 import '../../rbac/presentation/widgets/server_username_display.dart';
 import '../../rbac/presentation/widgets/server_user_identity_badges.dart';
 import '../../admin/presentation/widgets/admin_gift_dialog.dart';
+import 'chat_wallpaper_page.dart';
+import 'social_links_page.dart';
 
 class ProfilePremiumServiceItem {
   final String key;
@@ -178,8 +180,8 @@ class _ProfilePremiumServicesTabState
       'INVALID_RECIPIENT': 'لا يمكن شراء منتجك من نفسك.',
       'AD_NOT_FOUND': 'الإعلان غير موجود.',
       'REQUEST_ID_REPLAY_FORBIDDEN': 'تعذر تكرار عملية شراء قديمة.',
-      'PLATFORM_OWNER_NOT_CONFIGURED': 'لم يتم إعداد مالك المنصة DRAGON على الخادم.',
-      'SERVICE_CHECK_FAILED': 'تعذر التحقق من أهلية خدمة VIP على الخادم.',
+      'PLATFORM_OWNER_NOT_CONFIGURED': 'لم يتم إعداد مالك المنصة بعد.',
+      'SERVICE_CHECK_FAILED': 'تعذّر التحقق من أهلية خدمة VIP.',
       'FEATURE_REQUIRED_VOICE_VIDEO': 'خدمة الاتصال الصوتي والمرئي غير مفعلة لهذا الحساب.',
       'PROFILE_SERVICE_REQUIRED': 'يجب تفعيل خدمة تصغير حجم اسم المستخدم أولًا.',
       'USERNAME_FONT_SIZE_OUT_OF_RANGE': 'حجم الاسم يجب أن يكون بين 10 و26.',
@@ -255,7 +257,7 @@ class _ProfilePremiumServicesTabState
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('تأكيد الشراء'),
-        content: Text('سيتم شراء خدمة «${item.nameAr}» مقابل $selectedPrice وحفظها على الخادم. هل تريد المتابعة؟'),
+        content: Text('سيتم شراء خدمة «${item.nameAr}» مقابل $selectedPrice. هل تريد المتابعة؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('شراء')),
@@ -277,7 +279,7 @@ class _ProfilePremiumServicesTabState
       ref.invalidate(profilePremiumRuntimeProvider(item.key));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text('تم تفعيل ${item.nameAr} على الخادم ✓')),
+        SnackBar(content: Text('تم تفعيل ${item.nameAr} ✓')),
       );
       await _openService(item);
     } catch (e) {
@@ -340,7 +342,7 @@ class _ProfilePremiumServicesTabState
         builder: (dialogContext) => StatefulBuilder(
           builder: (dialogContext, setState) => AlertDialog(
             title: Text(item.nameAr),
-            content: Column(
+            content: SingleChildScrollView(child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
@@ -362,7 +364,7 @@ class _ProfilePremiumServicesTabState
                   onChanged: (value) => setState(() => active = value),
                 ),
               ],
-            ),
+            )),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
@@ -400,7 +402,7 @@ class _ProfilePremiumServicesTabState
       ref.invalidate(profilePremiumServicesCatalogProvider);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        const SnackBar(content: Text('تم تحديث السعر وحالة البيع على الخادم ✓')),
+        const SnackBar(content: Text('تم تحديث السعر وحالة البيع ✓')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -418,7 +420,7 @@ class _ProfilePremiumServicesTabState
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setState) => AlertDialog(
           title: const Text('تصغير/تكبير اسم المستخدم'),
-          content: Column(
+          content: SingleChildScrollView(child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text('${value.toStringAsFixed(1)} px', style: const TextStyle(fontWeight: FontWeight.w900)),
@@ -426,9 +428,9 @@ class _ProfilePremiumServicesTabState
                 min: 14, max: 34, divisions: 20, value: value,
                 onChanged: (v) => setState(() => value = v),
               ),
-              const Text('يُحفظ الحجم على الخادم ويُستخدم في البروفايل والشات.', style: TextStyle(fontSize: 11)),
+              const Text('الحجم يُستخدم في البروفايل والشات.', style: TextStyle(fontSize: 11)),
             ],
-          ),
+          )),
           actions: [
             TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
             FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('حفظ')),
@@ -442,7 +444,7 @@ class _ProfilePremiumServicesTabState
       ref.invalidate(currentProfileProvider);
       ref.invalidate(serverUserIdentityProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم حفظ حجم الاسم على الخادم ✓')));
+      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم حفظ حجم الاسم ✓')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
@@ -472,8 +474,23 @@ class _ProfilePremiumServicesTabState
         case 'achievement_badges':
           await _showBadges();
           break;
-        case 'profile_music':
+        // البند ١٠: chat_wallpaper لم يكن له فرعٌ هنا إطلاقًا، فالضغط
+        // عليه يسقط في `default: return;` — خدمة مدفوعة لا تفتح شيئًا
+        // ولا تقول شيئًا.
+        case 'chat_wallpaper':
+          await Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => const ChatWallpaperPage(),
+          ));
+          break;
+        // روابط التواصل كانت تفتح «تعديل البروفايل»، وهي صفحة لا تحتوي
+        // محرّرًا للروابط إطلاقًا — فيعود العضو منها بلا شيء. لها الآن
+        // محرّرها.
         case 'social_links':
+          await Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => const SocialLinksPage(),
+          ));
+          break;
+        case 'profile_music':
           final profile = ref.read(currentProfileProvider).valueOrNull;
           if (!mounted || profile == null) return;
           await Navigator.push<void>(
@@ -594,13 +611,13 @@ class _ProfilePremiumServicesTabState
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text('المكان: ${item.usageHintAr}', style: const TextStyle(color: Colors.cyanAccent, fontSize: 12, fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 2),
-                      Text('الإجراء: ${item.actionKey}', style: const TextStyle(color: Colors.white38, fontSize: 9)),
+                      // كان هنا «الإجراء: profile_music_v2» — مفتاح داخليّ
+                      // لا يعني للعضو شيئًا (البند ٨). أُزيل.
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    runtime['enabled'] == true ? 'الخدمة مفعلة على الخادم ✓' : 'الخدمة غير مفعلة على الخادم',
+                    runtime['enabled'] == true ? 'الخدمة مفعّلة ✓' : 'الخدمة غير مفعّلة',
                     style: TextStyle(color: runtime['enabled'] == true ? Colors.greenAccent : Colors.orangeAccent, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 8),
@@ -655,7 +672,7 @@ class _ProfilePremiumServicesTabState
       ref.invalidate(profilePremiumRuntimeProvider(item.key));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text('تم حفظ ${item.nameAr} وربطه بحسابك على الخادم ✓')),
+        SnackBar(content: Text('تم حفظ ${item.nameAr} وربطه بحسابك ✓')),
       );
     } finally {
       controller.dispose();
@@ -672,7 +689,7 @@ class _ProfilePremiumServicesTabState
         builder: (dialogContext) => StatefulBuilder(
           builder: (dialogContext, setState) => AlertDialog(
             title: const Text('دعم المنشئ'),
-            content: Column(mainAxisSize: MainAxisSize.min, children: [
+            content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(controller: recipient, decoration: const InputDecoration(labelText: 'UID صاحب المحتوى')),
               TextField(controller: amount, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'مقدار الدعم')),
               const SizedBox(height: 8),
@@ -681,7 +698,7 @@ class _ProfilePremiumServicesTabState
                 selected: {currency},
                 onSelectionChanged: (v) => setState(() => currency = v.first),
               ),
-            ]),
+            ])),
             actions: [
               TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
               FilledButton(onPressed: () { final n=int.tryParse(amount.text.trim())??0; if(recipient.text.trim().isEmpty||n<=0)return; Navigator.pop(dialogContext,(recipient.text.trim(),n)); }, child: const Text('إرسال الدعم')),
@@ -697,8 +714,8 @@ class _ProfilePremiumServicesTabState
           'p_amount': result.$2,
           'p_idempotency_key': const Uuid().v4(),
         });
-        if (raw is! Map || raw['ok'] != true) throw StateError('لم يؤكد الخادم نجاح الدعم.');
-        if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم إرسال دعم المنشئ وتسجيل العملية خادميًا ✓')));
+        if (raw is! Map || raw['ok'] != true) throw StateError('لم تكتمل عملية الدعم، أعد المحاولة.');
+        if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم إرسال دعم المنشئ ✓')));
       } catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
       }
@@ -760,7 +777,7 @@ class _ProfilePremiumServicesTabState
     return labels[key] ?? 'إعداد الخدمة';
   }
 
-  String _vipSettingHint(String key) => 'يُحفظ على الخادم ضمن إعدادات ${itemNameForKey(key)}';
+  String _vipSettingHint(String key) => 'يُضاف إلى إعدادات ${itemNameForKey(key)}';
 
   String itemNameForKey(String key) {
     const names = <String, String>{
@@ -1040,14 +1057,14 @@ class _ProfilePremiumServicesTabState
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('استطلاع متقدم'),
-        content: Column(
+        content: SingleChildScrollView(child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(controller: q, decoration: const InputDecoration(labelText: 'السؤال')),
             TextField(controller: o1, decoration: const InputDecoration(labelText: 'الخيار الأول')),
             TextField(controller: o2, decoration: const InputDecoration(labelText: 'الخيار الثاني')),
           ],
-        ),
+        )),
         actions: [
           FilledButton(
             onPressed: () async {
@@ -1174,7 +1191,7 @@ class _ProfilePremiumServicesTabState
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'المرفق: ${file.name} • $mediaType\nبعد التأكيد سيتم رفع الملف ثم حفظ المنتج على الخادم.',
+                  'المرفق: ${file.name} • $mediaType\nبعد التأكيد يُرفع الملف ويُنشر المنتج.',
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -1234,7 +1251,7 @@ class _ProfilePremiumServicesTabState
       ref.invalidate(profilePremiumRuntimeProvider('profile_products'));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          const SnackBar(content: Text('تم رفع المنتج وحفظه على الخادم ✓')),
+          const SnackBar(content: Text('تم رفع المنتج ونشره ✓')),
         );
       }
     } finally {
@@ -1244,43 +1261,218 @@ class _ProfilePremiumServicesTabState
     }
   }
 
+  /// المتجر المصغر كمعرض منتجات حقيقي (البند ١٠).
+  ///
+  /// كان النموذج أربعة حقول نصّية: عنوان ووصف ونقاط وجواهر — ولا صورة
+  /// ولا فيديو، مع أنّ الجدول والدالة يقبلان media_url وmedia_type
+  /// أصلًا. فيعرض العضو «منتجًا» لا يراه أحد، ولا شيء يُغري زائرًا
+  /// بالسؤال عنه. ولا زرّ إلغاء في النموذج إطلاقًا.
+  ///
+  /// الآن: صورة أو فيديو من الجهاز يُرفَع إلى Storage، ويُعرَض في
+  /// بروفايله ليراه الزوّار ويتواصلوا معه.
   Future<void> _createMiniStoreItemDialog() async {
     final title = TextEditingController();
     final desc = TextEditingController();
     final points = TextEditingController(text: '0');
     final gems = TextEditingController(text: '0');
+    String? mediaUrl;
+    String mediaType = 'image';
+    var uploading = false;
+    var saving = false;
+
     try {
       await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('عنصر المتجر المصغر'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: title, decoration: const InputDecoration(labelText: 'العنوان')),
-          TextField(controller: desc, decoration: const InputDecoration(labelText: 'الوصف')),
-          TextField(controller: points, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'النقاط')),
-          TextField(controller: gems, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'الجواهر')),
-        ]),
-        actions: [
-          FilledButton(
-            onPressed: () async {
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setD) {
+            // FilePicker لا ImagePicker: هو المستعمل في بقية هذا الملف
+            // (ولا حاجة لحزمة جديدة)، ويقبل الصور والفيديو معًا.
+            Future<void> pick(bool video) async {
+              final picked = await FilePicker.pickFiles(
+                type: FileType.custom,
+                allowedExtensions: video
+                    ? const ['mp4', 'webm', 'mov']
+                    : const ['png', 'jpg', 'jpeg', 'webp', 'gif'],
+                withData: true,
+              );
+              if (picked == null || picked.files.isEmpty) return;
+              final file = picked.files.single;
+              final bytes = file.bytes;
+              if (bytes == null || bytes.isEmpty) {
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBarSfx(
+                      const SnackBar(content: Text('تعذّر قراءة الملف.')));
+                }
+                return;
+              }
+              setD(() => uploading = true);
               try {
-                await Supabase.instance.client.rpc('create_profile_mini_store_item', params: {
-                  'p_title': title.text,
-                  'p_description': desc.text,
-                  'p_price_points': int.tryParse(points.text) ?? 0,
-                  'p_price_gems': int.tryParse(gems.text) ?? 0,
+                final uid = Supabase.instance.client.auth.currentUser!.id;
+                final url =
+                    await MediaUploadService(bucket: 'profile-products')
+                        .uploadBytes(
+                  bytes: bytes,
+                  fileName: file.name,
+                  folder: 'mini-store',
+                  uid: uid,
+                );
+                setD(() {
+                  mediaUrl = url;
+                  mediaType = video ? 'video' : 'image';
                 });
-                if (dialogContext.mounted) Navigator.pop(dialogContext);
               } catch (e) {
                 if (dialogContext.mounted) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
+                  ScaffoldMessenger.of(dialogContext).showSnackBarSfx(
+                      SnackBar(content: Text(_friendly(e))));
                 }
+              } finally {
+                setD(() => uploading = false);
               }
-            },
-            child: const Text('حفظ'),
-          ),
-        ],
-      ),
+            }
+
+            return AlertDialog(
+              title: const Text('منتج في متجرك المصغر'),
+              content: SizedBox(
+                width: 460,
+                child: SingleChildScrollView(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    TextField(
+                        controller: title,
+                        decoration: const InputDecoration(
+                            labelText: 'اسم المنتج',
+                            hintText: 'مثال: عبايات تطريز يدوي')),
+                    TextField(
+                        controller: desc,
+                        maxLines: 3,
+                        decoration:
+                            const InputDecoration(labelText: 'الوصف')),
+                    const SizedBox(height: 12),
+                    if (mediaUrl != null)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: mediaType == 'video'
+                            ? Container(
+                                height: 110,
+                                width: double.infinity,
+                                color: Colors.black26,
+                                child: const Center(
+                                    child: Icon(Icons.play_circle_fill_rounded,
+                                        size: 38)),
+                              )
+                            : Image.network(mediaUrl!,
+                                height: 110,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                    height: 110, color: Colors.white10)),
+                      ),
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: uploading ? null : () => pick(false),
+                          icon: uploading
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2))
+                              : const Icon(Icons.image_outlined, size: 17),
+                          label: const Text('صورة'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: uploading ? null : () => pick(true),
+                          icon: const Icon(Icons.videocam_outlined, size: 17),
+                          label: const Text('فيديو'),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Expanded(
+                        child: TextField(
+                            controller: points,
+                            keyboardType: TextInputType.number,
+                            decoration:
+                                const InputDecoration(labelText: 'النقاط ⭐')),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                            controller: gems,
+                            keyboardType: TextInputType.number,
+                            decoration:
+                                const InputDecoration(labelText: 'الجواهر 💎')),
+                      ),
+                    ]),
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'يظهر في بروفايلك ليراه الزوّار، ويتواصلون معك عليه.',
+                        style: TextStyle(fontSize: 11, color: Colors.white54),
+                      ),
+                    ),
+                  ]),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed:
+                      saving ? null : () => Navigator.pop(dialogContext),
+                  child: const Text('إلغاء'),
+                ),
+                FilledButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          if (title.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(dialogContext).showSnackBarSfx(
+                                const SnackBar(
+                                    content: Text('اكتب اسم المنتج.')));
+                            return;
+                          }
+                          if (mediaUrl == null) {
+                            ScaffoldMessenger.of(dialogContext).showSnackBarSfx(
+                                const SnackBar(
+                                    content: Text(
+                                        'أضف صورة أو فيديو — المنتج بلا صورة لا يراه أحد.')));
+                            return;
+                          }
+                          setD(() => saving = true);
+                          try {
+                            await Supabase.instance.client.rpc(
+                                'create_profile_mini_store_item',
+                                params: {
+                                  'p_title': title.text.trim(),
+                                  'p_description': desc.text.trim(),
+                                  'p_price_points':
+                                      int.tryParse(points.text.trim()) ?? 0,
+                                  'p_price_gems':
+                                      int.tryParse(gems.text.trim()) ?? 0,
+                                  'p_media_url': mediaUrl,
+                                  'p_media_type': mediaType,
+                                });
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext);
+                            }
+                          } catch (e) {
+                            setD(() => saving = false);
+                            if (dialogContext.mounted) {
+                              ScaffoldMessenger.of(dialogContext)
+                                  .showSnackBarSfx(
+                                      SnackBar(content: Text(_friendly(e))));
+                            }
+                          }
+                        },
+                  child: Text(saving ? 'جارٍ الحفظ' : 'نشر'),
+                ),
+              ],
+            );
+          },
+        ),
       );
     } finally {
       title.dispose();
@@ -1311,7 +1503,7 @@ class _ProfilePremiumServicesTabState
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text('باترون جديد'),
-          content: Column(
+          content: SingleChildScrollView(child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
@@ -1334,7 +1526,7 @@ class _ProfilePremiumServicesTabState
                 decoration: const InputDecoration(labelText: 'سعر الجواهر'),
               ),
             ],
-          ),
+          )),
           actions: [
             FilledButton(
               onPressed: () async {
@@ -1424,8 +1616,8 @@ class _ProfilePremiumServicesTabState
                         const SizedBox(height: 4),
                         Text(
                           owner
-                              ? 'أنت مالك المنصة: تتحكم بالأسعار وحالة البيع من الخادم، بينما باقي الأعضاء يشترون الخدمة فقط.'
-                              : 'كل خدمة تُفعل بعد شراء حقيقي من الخادم وتبقى مرتبطة بحسابك وحقوقك.',
+                              ? 'أنت مالك المنصة: تتحكّم بالأسعار وحالة البيع، وباقي الأعضاء يشترون الخدمة.'
+                              : 'كل خدمة تُفعَّل بعد شراء حقيقي وتبقى مرتبطة بحسابك وحقوقك.',
                           style: const TextStyle(color: Colors.white70, height: 1.35),
                         ),
                       ],

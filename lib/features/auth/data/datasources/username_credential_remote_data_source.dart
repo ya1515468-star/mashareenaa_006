@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart' show Supabase;
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/data/supabase_document_compat.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -38,7 +39,7 @@ class UsernameCredentialRemoteDataSourceImpl
           params: {'p_name': username, 'p_kind': 'username'});
       return result == true;
     } catch (e) {
-      throw ServerException(message: 'تعذّر التحقق من توفر اسم المستخدم: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -68,7 +69,7 @@ class UsernameCredentialRemoteDataSourceImpl
           message: e.message ?? 'تعذّر إنشاء اسم المستخدم ورمز PIN',
           code: e.code);
     } catch (e) {
-      throw ServerException(message: 'تعذّر إنشاء اسم المستخدم ورمز PIN: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -89,7 +90,7 @@ class UsernameCredentialRemoteDataSourceImpl
       throw ServerException(
           message: e.message ?? 'تعذّر التحقق من رمز PIN', code: e.code);
     } catch (e) {
-      throw ServerException(message: 'تعذّر التحقق من رمز PIN: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -105,10 +106,10 @@ class UsernameCredentialRemoteDataSourceImpl
       return (result.data as Map?)?['uid'] as String?;
     } on SupabaseFunctionException catch (e) {
       throw ServerException(
-          message: e.message ?? 'تعذّر البحث عن اسم المستخدم: ${e.code}',
+          message: e.message ?? FailureText.of(e),
           code: e.code);
     } catch (e) {
-      throw ServerException(message: 'تعذّر البحث عن اسم المستخدم: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 }

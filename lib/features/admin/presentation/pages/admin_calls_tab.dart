@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -46,7 +47,7 @@ class _AdminCallsTabState extends State<AdminCallsTab> {
       });
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = FailureText.of(e);
         _loading = false;
       });
     }
@@ -68,7 +69,7 @@ class _AdminCallsTabState extends State<AdminCallsTab> {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: Text('دقائق ${t['name'] ?? t['tier_id']}'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             TextField(
               controller: voice,
               keyboardType: TextInputType.number,
@@ -90,7 +91,7 @@ class _AdminCallsTabState extends State<AdminCallsTab> {
               'نفادها يُحاسَب بسعر الدقيقة أدناه. صفر = بلا دقائق مرفقة.',
               style: TextStyle(fontSize: 11, color: Colors.white60),
             ),
-          ]),
+          ])),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(c, false),
@@ -114,12 +115,12 @@ class _AdminCallsTabState extends State<AdminCallsTab> {
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('حُفظ على الخادم ✓'),
+          content: Text('تم الحفظ ✓'),
           backgroundColor: Color(0xFF16A34A)));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('تعذّر الحفظ: $e')));
+          .showSnackBar(SnackBar(content: Text(FailureText.action(e, action: 'الحفظ'))));
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -138,7 +139,7 @@ class _AdminCallsTabState extends State<AdminCallsTab> {
             title: Text(p['call_type'] == 'video'
                 ? 'سعر المكالمة المرئية'
                 : 'سعر المكالمة الصوتية'),
-            content: Column(mainAxisSize: MainAxisSize.min, children: [
+            content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(
                 controller: pts,
                 keyboardType: TextInputType.number,
@@ -164,7 +165,7 @@ class _AdminCallsTabState extends State<AdminCallsTab> {
                 'إطفاء المحاسبة يجعل المكالمات مجانية للجميع بلا حدّ.',
                 style: TextStyle(fontSize: 11, color: Colors.white60),
               ),
-            ]),
+            ])),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(c, false),
@@ -191,7 +192,7 @@ class _AdminCallsTabState extends State<AdminCallsTab> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('تعذّر الحفظ: $e')));
+          .showSnackBar(SnackBar(content: Text(FailureText.action(e, action: 'الحفظ'))));
     } finally {
       if (mounted) setState(() => _busy = null);
     }

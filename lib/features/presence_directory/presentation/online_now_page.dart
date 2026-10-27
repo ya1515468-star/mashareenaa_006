@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../core/error/failure_text.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -109,7 +110,7 @@ class OnlineNowPage extends ConsumerWidget {
           Expanded(
               child: async.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('تعذّر التحميل: $e')),
+            error: (e, _) => Center(child: Text(FailureText.action(e, action: 'التحميل'))),
             data: (rows) {
               if (rows.isEmpty) {
                 return Center(

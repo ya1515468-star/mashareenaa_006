@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -242,6 +243,10 @@ class MembershipStoreTab extends ConsumerWidget {
           const SnackBar(content: Text('سعر هذه العضوية غير محدّد بعد.')));
       return;
     }
+    // البند ١٣: كان الخيار نقاطًا أو جواهر فقط — ومن لا رصيد له لا طريق
+    // له إلى العضوية إطلاقًا. أُضيف «الكاش»، ويُوصِل الطلب إلى المالك
+    // والسوبر أدمن في اللحظة نفسها (request_membership_cash تُشعِر
+    // كليهما خادميًّا).
     final currency = await showModalBottomSheet<String>(
       context: context,
       builder: (ctx) => Directionality(
@@ -263,11 +268,23 @@ class MembershipStoreTab extends ConsumerWidget {
                 title: Text('الدفع بالجواهر ($gems)'),
                 onTap: () => Navigator.pop(ctx, 'gems'),
               ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Text('💵', style: TextStyle(fontSize: 22)),
+              title: const Text('الدفع بالكاش'),
+              subtitle: const Text('يصل طلبك إلى المالك والسوبر أدمن معًا',
+                  style: TextStyle(fontSize: 11)),
+              onTap: () => Navigator.pop(ctx, 'cash'),
+            ),
           ]),
         ),
       ),
     );
     if (currency == null || !context.mounted) return;
+    if (currency == 'cash') {
+      await _requestCash(context, ref, tier);
+      return;
+    }
     try {
       final callable =
           SupabaseFunctionsCompat.instance.httpsCallable('purchaseMembership');
@@ -292,6 +309,67 @@ class MembershipStoreTab extends ConsumerWidget {
     }
   }
 
+  /// طلب عضوية بالكاش: لا خصم من المحفظة، بل طلبٌ مسجَّل خادميًّا
+  /// يراه المالك والسوبر أدمن في لوحتهما ويصلهما إشعاره فورًا.
+  Future<void> _requestCash(BuildContext context, WidgetRef ref,
+      SubscriptionTierEntity tier) async {
+    final note = TextEditingController();
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (d) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: Text('طلب ${tier.name} بالكاش'),
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text(
+                'سيصل طلبك إلى المالك والسوبر أدمن معًا، ويتواصل معك أوّل '
+                'من يراه لإتمام الدفع.',
+                style: TextStyle(fontSize: 12, color: Colors.white60)),
+            const SizedBox(height: 10),
+            TextField(
+              controller: note,
+              maxLength: 300,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                  labelText: 'ملاحظة (اختياري)',
+                  hintText: 'مثال: أدفع كاش في حلب',
+                  border: OutlineInputBorder()),
+            ),
+          ])),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(d, false),
+                child: const Text('إلغاء')),
+            FilledButton.icon(
+                onPressed: () => Navigator.pop(d, true),
+                icon: const Icon(Icons.send_rounded, size: 18),
+                label: const Text('إرسال الطلب')),
+          ],
+        ),
+      ),
+    );
+    final text = note.text.trim();
+    note.dispose();
+    if (go != true || !context.mounted) return;
+    try {
+      await Supabase.instance.client.rpc('request_membership_cash', params: {
+        'p_tier_id': tier.id,
+        'p_note': text.isEmpty ? null : text,
+      });
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(
+          content: Text('وصل طلبك إلى الإدارة ✓ سيتواصلون معك قريبًا.')));
+    } catch (e) {
+      if (!context.mounted) return;
+      final msg = e is PostgrestException &&
+              (e.message).contains('REQUEST_ALREADY_PENDING')
+          ? 'لديك طلب كاش قيد المعالجة بالفعل.'
+          : FailureText.action(e, action: 'إرسال الطلب');
+      ScaffoldMessenger.of(context)
+          .showSnackBarSfx(SnackBar(content: Text(msg)));
+    }
+  }
+
   String _membershipError(String? m) => switch (m ?? '') {
         'INSUFFICIENT_POINTS' => 'رصيد النقاط غير كافٍ.',
         'INSUFFICIENT_GEMS' => 'رصيد الجواهر غير كافٍ.',
@@ -307,7 +385,7 @@ class MembershipStoreTab extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('إيقاف عضوية مستخدم'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           TextField(
               controller: controller,
               decoration: const InputDecoration(labelText: 'UID المستخدم')),
@@ -315,7 +393,7 @@ class MembershipStoreTab extends ConsumerWidget {
           const Text(
               'تتوقف مزايا العضوية والخدمات المضمّنة فيها فورًا، وتبقى الخدمات التي اشتراها المستخدم بنفسه.',
               style: TextStyle(fontSize: 12)),
-        ]),
+        ])),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(dialogContext),
@@ -342,7 +420,7 @@ class MembershipStoreTab extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(
           content: Text(e.message.contains('NO_ACTIVE_MEMBERSHIP')
               ? 'لا توجد عضوية فعّالة لهذا المستخدم.'
-              : 'تعذّر الإيقاف: ${e.message}')));
+              : FailureText.of(e))));
     }
   }
 
@@ -379,7 +457,7 @@ class MembershipStoreTab extends ConsumerWidget {
     } on SupabaseFunctionException catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBarSfx(SnackBar(content: Text(e.message ?? 'تعذّر الإهداء')));
+          .showSnackBarSfx(SnackBar(content: Text(FailureText.action(e.message, action: 'الإهداء'))));
     }
   }
 
@@ -500,7 +578,7 @@ class MembershipStoreTab extends ConsumerWidget {
       messenger?.showSnackBarSfx(SnackBar(
           content: Text(e.toString().contains('OWNER_ONLY')
               ? 'هذا الإجراء للمالك فقط.'
-              : 'تعذّر تحديث الشارة: $e'),
+              : FailureText.of(e)),
           backgroundColor: const Color(0xFFDC2626)));
     }
   }
@@ -533,7 +611,7 @@ class MembershipStoreTab extends ConsumerWidget {
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBarSfx(SnackBar(content: Text('تعذّر الحذف: $e')));
+          .showSnackBarSfx(SnackBar(content: Text(FailureText.action(e, action: 'الحذف'))));
     }
   }
 
@@ -764,7 +842,7 @@ class MembershipStoreTab extends ConsumerWidget {
                             onChanged: (v) => setLocal(() => autoRenew = v)),
                         sectionTitle('مزايا العضوية الفعلية'),
                         const Text(
-                          'هذه هي المزايا التي يحصل عليها المشترك فعليًا — تُقرأ وتُحفظ من الخادم مباشرة.',
+                          'هذه هي المزايا التي يحصل عليها المشترك فعليًا.',
                           style: TextStyle(fontSize: 10.5, color: Colors.white38),
                         ),
                         ...featureLabelsAr.entries.map((entry) => CheckboxListTile(
@@ -1013,7 +1091,7 @@ class MembershipStoreTab extends ConsumerWidget {
           screen: 'membership_full_editor', source: 'save'));
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBarSfx(SnackBar(content: Text('تعذّر الحفظ: $e')));
+          .showSnackBarSfx(SnackBar(content: Text(FailureText.action(e, action: 'الحفظ'))));
     }
   }
 }

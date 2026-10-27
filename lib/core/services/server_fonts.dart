@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../error/failure_text.dart';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -67,17 +68,12 @@ class ServerFonts {
       await loader.load();
       _loaded.add(key);
       revision.value++;
-      // نجاح صريح أيضًا: بدونه لا نعرف أبدًا إن كان الخط وصل ثم لم يُطبَّق
-      // (علّة عرض) أم لم يصل أصلًا (علّة تنزيل) — وهذا هو الفرق الذي كان
-      // يُضيّع الوقت.
-      unawaited(ErrorMonitor.report(
-        'FONT_LOADED key=$key family=${family(key)} bytes=${res.bodyBytes.length}',
-        source: 'server_fonts',
-        severity: 'info',
-      ));
+      // أُزيل سجلّ النجاح: أدّى غرضه في التشخيص (أثبت أنّ الخطوط
+      // تصل وتُسجَّل)، وبقاؤه ضخّ نحو 200 سجلّ info في المراقبة —
+      // فصار النجاح يُخفي الفشل بين السجلّات.
     } catch (e, st) {
       unawaited(ErrorMonitor.report(
-        'FONT_EXCEPTION key=$key $e',
+        FailureText.of(e),
         stack: st,
         source: 'server_fonts',
         severity: 'warning',

@@ -1,4 +1,5 @@
 import '../domain/usecases/store_usecases.dart';
+import '../../../core/error/failure_text.dart';
 import '../../../core/services/snack_sfx.dart';
 // ignore_for_file: prefer_const_declarations
 
@@ -92,7 +93,7 @@ class _StoreFeaturesTabState extends ConsumerState<StoreFeaturesTab> {
 
     return catalogAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('تعذّر تحميل المتجر: $e')),
+      error: (e, _) => Center(child: Text(FailureText.of(e, subject: 'المتجر'))),
       data: (catalog) {
         final type = widget.featureType ?? StoreFeatureType.glow;
         final items = _filterAndGenerate(
@@ -431,7 +432,7 @@ class _StoreItemCardState extends ConsumerState<_StoreItemCard> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('تأكيد الشراء'),
-        content: Text('سيتم شراء «${widget.item.nameAr}» مقابل ${_priceLabel(widget.item)} وحفظ الملكية على الخادم. هل تريد المتابعة؟'),
+        content: Text('سيتم شراء «${widget.item.nameAr}» مقابل ${_priceLabel(widget.item)}. هل تريد المتابعة؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('شراء')),
@@ -444,7 +445,7 @@ class _StoreItemCardState extends ConsumerState<_StoreItemCard> {
     if (!mounted) return;
     result.fold(
       (failure) => ScaffoldMessenger.of(context)
-          .showSnackBarSfx(SnackBar(content: Text(failure.message))),
+          .showSnackBarSfx(SnackBar(content: Text(FailureText.of(failure.message)))),
       (_) => ScaffoldMessenger.of(context)
           .showSnackBarSfx(const SnackBar(content: Text('تم الشراء ✓'))),
     );
@@ -456,7 +457,7 @@ class _StoreItemCardState extends ConsumerState<_StoreItemCard> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('تأكيد التجهيز'),
-        content: Text('سيتم تجهيز «${widget.item.nameAr}» وحفظه على ملفك في الخادم. هل تريد المتابعة؟'),
+        content: Text('سيتم تجهيز «${widget.item.nameAr}»  وتجهيزه في ملفك. هل تريد المتابعة؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('تجهيز')),

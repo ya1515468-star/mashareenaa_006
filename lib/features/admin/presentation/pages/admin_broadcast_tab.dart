@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/di/injection_container.dart';
@@ -48,9 +49,9 @@ class _AdminBroadcastTabState extends ConsumerState<AdminBroadcastTab> {
       if (!mounted) return;
       setState(() {
         _sending = false;
-        _resultMessage = 'تعذر تنفيذ البث: $e';
+        _resultMessage = FailureText.of(e);
       });
-      messenger.showSnackBarSfx(SnackBar(content: Text('تعذر تنفيذ البث: $e')));
+      messenger.showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 

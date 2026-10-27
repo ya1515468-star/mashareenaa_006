@@ -1,4 +1,5 @@
 import '../../../../core/data/supabase_document_compat.dart';
+import '../../../../core/error/failure_text.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exceptions.dart';
@@ -49,7 +50,7 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
       if (!doc.exists) return WalletModel.fromMap(uid, const {});
       return WalletModel.fromMap(uid, doc.data()!);
     } catch (e) {
-      throw ServerException(message: 'تعذّر جلب المحفظة: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -74,7 +75,7 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
               d.id, Map<String, dynamic>.from(d.data())))
           .toList();
     } catch (e) {
-      throw ServerException(message: 'تعذّر جلب سجل المعاملات: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 

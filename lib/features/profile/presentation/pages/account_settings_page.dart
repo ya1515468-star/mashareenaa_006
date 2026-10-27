@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../rbac/presentation/widgets/server_user_identity_badges.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../../../../core/services/snack_sfx.dart';
@@ -22,6 +23,7 @@ import '../../domain/profile_storage_cleanup.dart';
 import '../providers/profile_provider.dart';
 import '../widgets/account_setting_tiles.dart';
 import '../widgets/profile_avatar.dart';
+import '../widgets/avatar_frame_picker_sheet.dart';
 import '../../../rbac/presentation/widgets/server_username_display.dart';
 import '../widgets/avatar_frame_picker_sheet.dart';
 import '../widgets/arabic_font_catalog.dart';
@@ -224,16 +226,11 @@ class AccountSettingsContent extends ConsumerWidget {
         onChanged: (v) => save(liveProfile.copyWith(statusFontSize: v)),
       ),
       _AnimatedAvatarTile(profile: liveProfile, onSave: save),
-      ListTile(
-        leading: const Icon(Icons.filter_frames_rounded, color: AppColors.gold),
-        title: const Text('إطار الصورة المتحرك'),
-        subtitle: Text(
-          liveProfile.avatarFrameKey == null ? 'اختر إطارًا فاخرًا متحركًا' : 'الإطار الحالي: ${liveProfile.avatarFrameKey}',
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-        ),
-        trailing: const Icon(Icons.chevron_left, color: AppColors.textMuted),
-        onTap: () => AvatarFramePickerSheet.show(context, uid),
-      ),
+      // البند ٨: كان هذا يطبع المفتاح الخام
+      // («الإطار الحالي: frame_static6679334219754457b») — اسمٌ داخليّ
+      // لا يعني للعضو شيئًا ولا يدلّه على ما اختاره. الآن: صورة الإطار
+      // نفسه مصغّرة واسمه العربي من الفهرس، فما يراه هو ما جهّزه.
+      _ActiveFrameTile(frameKey: liveProfile.avatarFrameKey, uid: uid),
       ProfileMusicTile(
         profile: liveProfile,
         onSave: save,
@@ -257,7 +254,7 @@ class AccountSettingsContent extends ConsumerWidget {
           final ok = await save(liveProfile.copyWith(visibility: selected));
           if (ok && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(
-                content: Text('حُفظت الخصوصية على الخادم ✓'),
+                content: Text('تم حفظ الخصوصية ✓'),
                 backgroundColor: Color(0xFF16A34A)));
           }
         },
@@ -489,7 +486,7 @@ class AccountSettingsContent extends ConsumerWidget {
         builder: (context, setState) => AlertDialog(
           backgroundColor: AppColors.surfaceElevated,
           title: const Text('تنسيق الحالة'),
-          content: Column(
+          content: SingleChildScrollView(child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               SwitchListTile(
@@ -535,7 +532,7 @@ class AccountSettingsContent extends ConsumerWidget {
                     .toList(),
               ),
             ],
-          ),
+          )),
           actions: [
             TextButton(
                 onPressed: () => Navigator.of(context).pop(),
@@ -624,7 +621,7 @@ Future<ProfileVisibility?> _chooseProfileVisibility(
     context: context,
     builder: (_) => AlertDialog(
       title: const Text('خصوصية الحساب'),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
         SegmentedButton<ProfileVisibility>(
           segments: const [
             ButtonSegment(
@@ -651,7 +648,7 @@ Future<ProfileVisibility?> _chooseProfileVisibility(
           '«عام» و«الأصدقاء» متاحان للجميع.',
           style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
         ),
-      ]),
+      ])),
     ),
   );
 }
@@ -783,7 +780,7 @@ class _ProfileMusicTileState extends State<ProfileMusicTile> {
           ? 'المقطع يجب ألا يتجاوز 15 ثانية.'
           : t.contains('PROFILE_MUSIC_UNREADABLE')
               ? 'تعذّرت قراءة مدة الملف. جرّب ملف MP3 أو WAV.'
-              : 'فشل رفع موسيقى البروفايل: $e');
+              : FailureText.of(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -830,7 +827,7 @@ class _ProfileMusicTileState extends State<ProfileMusicTile> {
       } catch (_) {}
       _show('تم حذف موسيقى البروفايل.');
     } catch (e) {
-      _show('فشل حذف موسيقى البروفايل: $e');
+      _show(FailureText.of(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1059,7 +1056,7 @@ class _ProfileSliderTile extends StatelessWidget {
           builder: (dialogContext) => StatefulBuilder(
             builder: (context, setState) => AlertDialog(
               title: Text(title),
-              content: Column(
+              content: SingleChildScrollView(child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(draft.toStringAsFixed(1)),
@@ -1072,7 +1069,7 @@ class _ProfileSliderTile extends StatelessWidget {
                     onChanged: (v) => setState(() => draft = v),
                   ),
                 ],
-              ),
+              )),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogContext),
@@ -1215,7 +1212,7 @@ class _AnimatedAvatarTileState extends State<_AnimatedAvatarTile> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-            SnackBar(content: Text('فشل رفع GIF المتحرك: $e')));
+            SnackBar(content: Text(FailureText.of(e))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -1239,7 +1236,7 @@ class _AnimatedAvatarTileState extends State<_AnimatedAvatarTile> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          SnackBar(content: Text('فشل إزالة GIF المتحرك: $e')),
+          SnackBar(content: Text(FailureText.of(e))),
         );
       }
     } finally {
@@ -1276,6 +1273,51 @@ class _AnimatedAvatarTileState extends State<_AnimatedAvatarTile> {
               ],
             ),
       onTap: _busy ? null : _pickAndUpload,
+    );
+  }
+}
+
+/// سطر الإطار المُجهَّز: معاينة مرئية بدل المفتاح الخام.
+///
+/// يقرأ الفهرس نفسه الذي يقرأه المنتقي، فإن تعذّر تحميله (أو كان
+/// المفتاح لإطار حُذف) يُكتب نصّ محايد ولا يظهر المفتاح إطلاقًا.
+class _ActiveFrameTile extends ConsumerWidget {
+  const _ActiveFrameTile({required this.frameKey, required this.uid});
+  final String? frameKey;
+  final String uid;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final key = frameKey?.trim();
+    final has = key != null && key.isNotEmpty;
+    final frames = has
+        ? ref.watch(availableAvatarFramesProvider).valueOrNull
+        : null;
+    final def = frames?.where((f) => f.key == key).firstOrNull;
+
+    return ListTile(
+      leading: has && def?.assetUrl != null
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                def!.assetUrl!,
+                width: 38,
+                height: 38,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                    Icons.filter_frames_rounded, color: AppColors.gold),
+              ),
+            )
+          : const Icon(Icons.filter_frames_rounded, color: AppColors.gold),
+      title: const Text('إطار الصورة المتحرك'),
+      subtitle: Text(
+        !has
+            ? 'اختر إطارًا فاخرًا متحركًا'
+            : (def != null ? def.nameAr : 'إطارك مُجهَّز'),
+        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+      ),
+      trailing: const Icon(Icons.chevron_left, color: AppColors.textMuted),
+      onTap: () => AvatarFramePickerSheet.show(context, uid),
     );
   }
 }

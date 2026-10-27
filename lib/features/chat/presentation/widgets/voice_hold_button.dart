@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -88,7 +89,7 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
       setState(() => _stage = _VoiceStage.recording);
       _showOverlay();
     } catch (e) {
-      _toast('تعذّر بدء التسجيل: $e');
+      _toast(FailureText.of(e));
     }
   }
 
@@ -140,7 +141,7 @@ class _VoiceHoldButtonState extends State<VoiceHoldButton> {
       );
       await widget.onUploaded(url);
     } catch (e) {
-      _toast('تعذّر إرسال الرسالة الصوتية: $e');
+      _toast(FailureText.of(e));
     } finally {
       _recordedPath = null;
       if (mounted) setState(() => _uploading = false);

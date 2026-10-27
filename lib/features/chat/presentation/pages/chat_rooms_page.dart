@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'chat_lobby_page.dart';
@@ -18,7 +19,7 @@ class ChatRoomsPage extends ConsumerWidget {
         stream: stream,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(child: Text('تعذر تحميل الغرف: ${snapshot.error}'));
+            return Center(child: Text(FailureText.of(snapshot.error, subject: 'الغرف')));
           }
           final rows = (snapshot.data ?? const [])
               .where((r) => r['is_active'] == true && r['is_public'] != false)

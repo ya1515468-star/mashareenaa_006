@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
@@ -116,7 +117,7 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
         await _voice.setMuted(mine['self_muted'] == true || mine['muted'] == true);
       }
     } catch (e) {
-      _toast('تعذّر الاتصال الصوتي: $e');
+      _toast(FailureText.of(e));
     }
   }
 
@@ -260,7 +261,7 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
       builder: (d) => StatefulBuilder(
         builder: (d, setLocal) => AlertDialog(
           title: const Text('سعر الصعود إلى المايك'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('تفعيل الدفع عند كل صعود'),
@@ -271,7 +272,7 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
                 decoration: const InputDecoration(labelText: 'جواهر 💎')),
             TextField(controller: points, keyboardType: TextInputType.number,
                 decoration: const InputDecoration(labelText: 'نقاط ⭐ (تُستعمل إن كانت الجواهر 0)')),
-          ]),
+          ])),
           actions: [
             TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('إلغاء')),
             FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('حفظ')),

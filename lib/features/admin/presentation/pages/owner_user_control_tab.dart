@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/widgets/animated_gold.dart';
 import '../../../../core/services/snack_sfx.dart';
 
@@ -532,7 +533,7 @@ class _UserDetailSheet extends ConsumerWidget {
             loading: () =>
                 const Center(child: CircularProgressIndicator()),
             error: (e, _) => _ErrorBox(
-              message: '$e',
+              message: FailureText.of(e),
               onRetry: () => ref.invalidate(ownerUserDetailProvider(userId)),
             ),
             data: (data) =>
@@ -799,7 +800,7 @@ class _UserDetailSheet extends ConsumerWidget {
     } catch (e) {
       messenger?.hideCurrentSnackBar();
       messenger?.showSnackBarSfx(SnackBar(
-          content: Text('تعذّر الاستنتاج: $e'),
+          content: Text(FailureText.action(e, action: 'الاستنتاج')),
           backgroundColor: const Color(0xFFDC2626)));
     }
   }
@@ -886,7 +887,7 @@ class _UserDetailSheet extends ConsumerWidget {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: const Text('🔑 استعادة كلمة المرور'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: const [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: const [
             Text(
               'اختر الطريقة:',
               style: TextStyle(fontWeight: FontWeight.w800),
@@ -900,7 +901,7 @@ class _UserDetailSheet extends ConsumerWidget {
               'وصوله إلى بريده.',
               style: TextStyle(fontSize: 12, height: 1.7),
             ),
-          ]),
+          ])),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx),
@@ -946,7 +947,7 @@ class _UserDetailSheet extends ConsumerWidget {
           textDirection: TextDirection.rtl,
           child: AlertDialog(
             title: const Text('🔐 الكلمة المؤقّتة'),
-            content: Column(mainAxisSize: MainAxisSize.min, children: [
+            content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
               const Text(
                 'تُعرَض مرّة واحدة فقط. انسخها وسلّمها للعضو، وسيُطلَب '
                 'منه تغييرها فور دخوله.',
@@ -967,7 +968,7 @@ class _UserDetailSheet extends ConsumerWidget {
                     style: const TextStyle(
                         fontSize: 11, color: Colors.orangeAccent)),
               ],
-            ]),
+            ])),
             actions: [
               TextButton(
                 onPressed: () {
@@ -1039,7 +1040,7 @@ class _UserDetailSheet extends ConsumerWidget {
           ? 'لا يمكن تقييد مالك المنصة.'
           : e.toString().contains('OWNER_ONLY')
               ? 'هذا الإجراء للمالك فقط.'
-              : 'فشل الإجراء: $e';
+              : FailureText.of(e);
       messenger?.showSnackBarSfx(SnackBar(
           content: Text(msg), backgroundColor: const Color(0xFFDC2626)));
     }
@@ -1077,7 +1078,7 @@ class _ApplyDialogState extends State<_ApplyDialog> {
             Text(widget.kind.label),
           ],
         ),
-        content: Column(
+        content: SingleChildScrollView(child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1112,7 +1113,7 @@ class _ApplyDialogState extends State<_ApplyDialog> {
                   .toList(),
             ),
           ],
-        ),
+        )),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),

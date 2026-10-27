@@ -1,4 +1,5 @@
 import '../../../../core/data/supabase_document_compat.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../auth/domain/entities/user_entity.dart';
 
@@ -28,7 +29,7 @@ class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
         'p_status': status.wire,
       });
     } catch (e) {
-      throw ServerException(message: 'تعذّر تحديث حالة الحساب: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 }

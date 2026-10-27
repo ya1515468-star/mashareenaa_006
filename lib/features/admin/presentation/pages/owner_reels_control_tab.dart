@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/animated_gold.dart';
 import '../../../../core/services/snack_sfx.dart';
@@ -93,7 +94,7 @@ class _OwnerReelsControlTabState extends ConsumerState<OwnerReelsControlTab> {
                   child: Text(
                       e.toString().contains('OWNER_ONLY')
                           ? 'هذا القسم للمالك فقط.'
-                          : '$e',
+                          : FailureText.of(e),
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.white54)),
                 ),
@@ -164,7 +165,7 @@ class _DefaultDurationBarState extends State<_DefaultDurationBar> {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: const Text('⏳ مدّة ظهور الريلز الجديدة'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             TextField(
               controller: ctrl,
               keyboardType: TextInputType.number,
@@ -181,7 +182,7 @@ class _DefaultDurationBarState extends State<_DefaultDurationBar> {
               style: TextStyle(fontSize: 11.5, height: 1.7,
                   color: Colors.white60),
             ),
-          ]),
+          ])),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(c, false),
@@ -210,13 +211,13 @@ class _DefaultDurationBarState extends State<_DefaultDurationBar> {
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('حُفظ على الخادم ✓'),
+        content: Text('تم الحفظ ✓'),
         backgroundColor: Color(0xFF16A34A),
       ));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('تعذّر الحفظ: $e')));
+          .showSnackBar(SnackBar(content: Text(FailureText.action(e, action: 'الحفظ'))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -425,7 +426,7 @@ class _ReelAdminCard extends StatelessWidget {
           content: Text('نُفّذ'), backgroundColor: Color(0xFF16A34A)));
     } catch (e) {
       messenger?.showSnackBarSfx(SnackBar(
-          content: Text('فشل: $e'),
+          content: Text(FailureText.of(e)),
           backgroundColor: const Color(0xFFDC2626)));
     }
   }
@@ -475,13 +476,13 @@ class _ReelAdminCard extends StatelessWidget {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: const Text('حذف نهائي'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             const Text('سيُحذف الفيديو وتعليقاته نهائيًا ولا يمكن التراجع.'),
             const SizedBox(height: 10),
             TextField(
                 controller: c,
                 decoration: const InputDecoration(labelText: 'السبب')),
-          ]),
+          ])),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -507,7 +508,7 @@ class _ReelAdminCard extends StatelessWidget {
           backgroundColor: Color(0xFF16A34A)));
     } catch (e) {
       messenger?.showSnackBarSfx(SnackBar(
-          content: Text('فشل الحذف: $e'),
+          content: Text(FailureText.action(e, action: 'الحذف')),
           backgroundColor: const Color(0xFFDC2626)));
     }
   }

@@ -1,4 +1,5 @@
 import '../../../../core/data/supabase_document_compat.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../domain/entities/garment_business_profile_entity.dart';
@@ -27,7 +28,7 @@ class GarmentHubRemoteDataSourceImpl implements GarmentHubRemoteDataSource {
           .doc(profile.uid)
           .set(profile.toFieldMap(), const SetOptions(merge: true));
     } catch (e) {
-      throw ServerException(message: 'تعذّر حفظ الملف التجاري: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -38,7 +39,7 @@ class GarmentHubRemoteDataSourceImpl implements GarmentHubRemoteDataSource {
       if (!doc.exists || doc.data()?['garmentBusiness'] == null) return null;
       return GarmentBusinessProfileModel.fromMap(uid, doc.data()!);
     } catch (e) {
-      throw ServerException(message: 'تعذّر جلب الملف التجاري: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 

@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/error/failure_text.dart';
 
 import '../../../../core/error/exceptions.dart';
 import '../models/broadcast_model.dart';
@@ -43,14 +44,14 @@ class BroadcastRemoteDataSourceImpl implements BroadcastRemoteDataSource {
       );
     } on PostgrestException catch (e) {
       throw ServerException(
-        message: 'تعذّر إرسال البث: ${e.message}',
+        message: FailureText.of(e),
         code: e.code,
       );
     } on ServerException {
       rethrow;
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر إرسال البث: $e',
+        message: FailureText.of(e),
       );
     }
   }

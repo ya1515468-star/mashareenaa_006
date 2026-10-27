@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/error/failure_text.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exceptions.dart';
@@ -134,12 +135,12 @@ class RbacRemoteDataSourceImpl implements RbacRemoteDataSource {
       );
     } on PostgrestException catch (e) {
       throw ServerException(
-        message: 'تعذّر جلب دور المستخدم: ${e.message}',
+        message: FailureText.of(e),
         code: e.code,
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر جلب دور المستخدم: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -162,7 +163,7 @@ class RbacRemoteDataSourceImpl implements RbacRemoteDataSource {
       return role.hasPermission(permission);
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر التحقق من الصلاحية: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -242,12 +243,12 @@ class RbacRemoteDataSourceImpl implements RbacRemoteDataSource {
       return result;
     } on PostgrestException catch (e) {
       throw ServerException(
-        message: 'تعذّر جلب الأدوار: ${e.message}',
+        message: FailureText.of(e),
         code: e.code,
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر جلب الأدوار: $e',
+        message: FailureText.of(e),
       );
     }
   }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/data/supabase_document_compat.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -147,12 +148,12 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
       rethrow;
     } on PostgrestException catch (e) {
       throw ServerException(
-        message: 'تعذّر جلب إحصائيات التلعيب: ${e.message}',
+        message: FailureText.of(e),
         code: e.code,
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر جلب إحصائيات التلعيب: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -260,7 +261,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر خصم النقاط: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -288,7 +289,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر خصم الجواهر: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -316,7 +317,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر إضافة النقاط: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -344,7 +345,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر إضافة الجواهر: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -373,7 +374,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر تحويل النقاط: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -397,7 +398,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
 
       if (session == null) {
         throw const ServerException(
-          message: 'جلسة Supabase غير موجودة.',
+          message: 'لا توجد جلسة دخول — سجّل الدخول ثم أعد المحاولة.',
           code: 'AUTH_REQUIRED',
         );
       }
@@ -439,7 +440,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
       rethrow;
     } on FunctionException catch (e) {
       throw ServerException(
-        message: 'تعذّر تحديث نقاط الخبرة: ${e.details}',
+        message: FailureText.of(e),
         code: e.status.toString(),
       );
     } on PostgrestException catch (e) {
@@ -449,7 +450,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر تحديث نقاط الخبرة: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -464,7 +465,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
 
       if (session == null) {
         throw const ServerException(
-          message: 'جلسة Supabase غير موجودة.',
+          message: 'لا توجد جلسة دخول — سجّل الدخول ثم أعد المحاولة.',
           code: 'AUTH_REQUIRED',
         );
       }
@@ -489,7 +490,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
       rethrow;
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر منح المكافأة اليومية: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -504,7 +505,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
 
       if (session == null) {
         throw const ServerException(
-          message: 'جلسة Supabase غير موجودة.',
+          message: 'لا توجد جلسة دخول — سجّل الدخول ثم أعد المحاولة.',
           code: 'AUTH_REQUIRED',
         );
       }
@@ -524,7 +525,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر منح الوسام: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -553,7 +554,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر تدوير عجلة الحظ: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -561,7 +562,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
   @override
   Future<List<PointsPackageEntity>> listPointsPackages() async {
     throw const ServerException(
-      message: 'حزم النقاط لم تُنقل إلى Supabase بعد.',
+      message: 'حزم النقاط غير متاحة بعد.',
       code: 'SUPABASE_MIGRATION_PENDING',
     );
   }
@@ -590,7 +591,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر تحديث سعر الحزمة: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -601,7 +602,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
     required String packageId,
   }) async {
     throw const ServerException(
-      message: 'شراء حزم النقاط لم يُنقل إلى Supabase بعد.',
+      message: 'شراء حزم النقاط غير متاح بعد.',
       code: 'SUPABASE_MIGRATION_PENDING',
     );
   }

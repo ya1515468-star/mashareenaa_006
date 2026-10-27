@@ -1,4 +1,5 @@
 import '../../../../core/widgets/mini_player_chip.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import '../widgets/voice_hold_button.dart';
 import '../../../../core/widgets/song_search_sheet.dart';
@@ -500,7 +501,7 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
       m.showSnackBarSfx(SnackBar(
           content: Text(e.toString().contains('FORBIDDEN')
               ? 'لا يمكنك حذف رسالة عضو أعلى منك رتبة.'
-              : 'تعذّر الحذف: $e')));
+              : FailureText.action(e, action: 'الحذف'))));
     }
   }
 
@@ -598,7 +599,7 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
 
     final call = result.fold((failure) {
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text(failure.message)),
+        SnackBar(content: Text(FailureText.of(failure.message))),
       );
       return null;
     }, (c) => c);

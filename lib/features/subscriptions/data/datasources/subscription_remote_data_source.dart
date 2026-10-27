@@ -1,4 +1,5 @@
 import '../../../../core/data/supabase_document_compat.dart';
+import '../../../../core/error/failure_text.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/error/exceptions.dart';
@@ -40,7 +41,7 @@ class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
       return UserSubscriptionModel.fromMap(uid, doc.data()!);
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر جلب حالة الاشتراك: $e',
+        message: FailureText.of(e),
       );
     }
   }
@@ -109,7 +110,7 @@ class SubscriptionRemoteDataSourceImpl implements SubscriptionRemoteDataSource {
       );
     } catch (e) {
       throw ServerException(
-        message: 'تعذّر منح المزية: $e',
+        message: FailureText.of(e),
       );
     }
   }

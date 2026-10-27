@@ -1,4 +1,5 @@
 import 'package:mashareena/core/utils/safe_launch.dart';
+import '../../../../core/error/failure_text.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -20,7 +21,7 @@ class PlatformSafetyWarningsPage extends StatelessWidget {
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(
-                child: Text('تعذر تحميل التحذيرات: ${snapshot.error}'));
+                child: Text(FailureText.of(snapshot.error, subject: 'التحذيرات')));
           }
           final rows = snapshot.data ?? const <Map<String, dynamic>>[];
           if (rows.isEmpty) {

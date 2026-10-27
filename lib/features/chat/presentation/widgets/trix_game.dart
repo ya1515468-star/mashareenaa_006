@@ -681,13 +681,13 @@ class _TrixLobbyState extends State<_TrixLobby> with SingleTickerProviderStateMi
           (m) => m == 'partner' ? (vsComputer ? 'شراكة 2×2 (شريكك كمبيوتر)' : 'شراكة 2×2') : 'فردي (كل لاعب لنفسه)', (m) => _mode = m),
       _label('نوع اللعبة'),
       _chips<String>(const ['classic', 'complex'], _variant, (v) => trixVariantName[v]!, (v) => _variant = v),
-      _label('الرهان (يُحسم في الخادم)'),
+      _label('الرهان'),
       _chips<int>(const [0, 10, 50, 100, 500, 1000], _stake, (s) => s == 0 ? 'ودّي' : '$s', (s) => _stake = s),
       const SizedBox(height: 8),
       Text(
         vsComputer
-            ? '🏆 الفوز ضد الكمبيوتر: جائزة 50 نقطة من الخادم (حسب الأهلية والحد اليومي).'
-            : '🏆 مباراة بأربعة لاعبين حقيقيين: جائزة الفائز 200 نقطة + 2 💎 من الخادم. المقاعد الفارغة عند البدء يلعبها الكمبيوتر (جائزتها 50).',
+            ? '🏆 الفوز ضد الكمبيوتر: جائزة 50 نقطة (حسب الأهلية والحد اليومي).'
+            : '🏆 مباراة بأربعة لاعبين حقيقيين: جائزة الفائز 200 نقطة + 2 💎. المقاعد الفارغة عند البدء يلعبها الكمبيوتر (جائزتها 50).',
         textDirection: TextDirection.rtl,
         style: const TextStyle(color: Color(0xFFFFD54F), fontSize: 12),
       ),

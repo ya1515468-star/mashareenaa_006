@@ -251,7 +251,7 @@ class ProducerMarketController extends StateNotifier<AsyncValue<void>> {
     final raw = await _db.rpc('reel_download_url', params: {'p_reel_id': reelId});
     final data = raw is Map ? Map<String, dynamic>.from(raw) : const {};
     final url = data['url']?.toString() ?? '';
-    if (url.isEmpty) throw 'لم يُعطِ الخادم رابطًا للفيديو';
+    if (url.isEmpty) throw 'تعذّر الحصول على رابط الفيديو';
 
     final res = await http.get(Uri.parse(url));
     if (res.statusCode != 200 || res.bodyBytes.isEmpty) {

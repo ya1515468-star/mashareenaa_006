@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -55,7 +56,7 @@ class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
       });
     } catch (e) {
       setState(() {
-        _error = '$e';
+        _error = FailureText.of(e);
         _loading = false;
       });
     }
@@ -74,12 +75,12 @@ class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('حُفظ على الخادم ✓'),
+          content: Text('تم الحفظ ✓'),
           backgroundColor: Color(0xFF16A34A)));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('تعذّر الحفظ: $e')));
+          .showSnackBar(SnackBar(content: Text(FailureText.action(e, action: 'الحفظ'))));
     } finally {
       if (mounted) setState(() => _busyType = null);
     }
@@ -94,7 +95,7 @@ class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: Text(isCap ? 'سقف الساعة' : 'نافذة الدمج (دقائق)'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             TextField(
               controller: c,
               keyboardType: TextInputType.number,
@@ -111,7 +112,7 @@ class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
                       'يُدمَج ولا يُرسَل. صفر = بلا دمج.',
               style: const TextStyle(fontSize: 11, color: Colors.white60),
             ),
-          ]),
+          ])),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
@@ -137,7 +138,7 @@ class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: Text(title),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             TextField(
                 controller: c,
                 keyboardType: TextInputType.number,
@@ -146,7 +147,7 @@ class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
             const SizedBox(height: 8),
             Text(hint,
                 style: const TextStyle(fontSize: 11, color: Colors.white60)),
-          ]),
+          ])),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
@@ -169,7 +170,7 @@ class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('تعذّر الحفظ: $e')));
+          .showSnackBar(SnackBar(content: Text(FailureText.action(e, action: 'الحفظ'))));
     }
   }
 

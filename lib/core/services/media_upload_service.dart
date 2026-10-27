@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../error/failure_text.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../error/exceptions.dart';
@@ -119,10 +120,10 @@ class MediaUploadService {
         fileName: _cleanFileName(fileName, ext),
       );
     } catch (e, st) {
-      debugPrint('[MediaUploadService] upload failed bucket=$bucket: $e');
+      debugPrint(FailureText.of(e));
       debugPrint(st.toString());
       if (e is ServerException) rethrow;
-      throw ServerException(message: 'لم يتم رفع الملف: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -133,7 +134,7 @@ class MediaUploadService {
     try {
       await SupabaseService.deleteStoragePath(bucket: bucket, path: path);
     } catch (e, st) {
-      debugPrint('[MediaUploadService] failed removing $bucket/$path: $e');
+      debugPrint(FailureText.of(e));
       debugPrint(st.toString());
     }
   }

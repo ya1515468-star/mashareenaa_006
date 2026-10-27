@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../domain/entities/app_notification_entity.dart';
 import '../models/app_notification_model.dart';
@@ -50,7 +51,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
         'p_related_id': n.relatedId,
       });
     } catch (e) {
-      throw ServerException(message: 'تعذّر إنشاء الإشعار: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -63,7 +64,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
           .eq('id', id)
           .eq('uid', client.auth.currentUser!.id);
     } catch (e) {
-      throw ServerException(message: 'تعذّر تحديث الإشعار: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -77,7 +78,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
           .eq('uid', uid)
           .eq('is_read', false);
     } catch (e) {
-      throw ServerException(message: 'تعذّر تحديث الإشعارات: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -90,7 +91,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
           .eq('id', id)
           .eq('uid', client.auth.currentUser!.id);
     } catch (e) {
-      throw ServerException(message: 'تعذّر حذف الإشعار: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -100,7 +101,7 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
     try {
       await client.from('notifications').delete().eq('uid', uid);
     } catch (e) {
-      throw ServerException(message: 'تعذّر حذف الإشعارات: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 }

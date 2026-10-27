@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -131,7 +132,7 @@ class NotificationsPage extends ConsumerWidget {
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context)
-              .showSnackBarSfx(SnackBar(content: Text('تعذّر حذف الإشعارات: $e')));
+              .showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
         }
       }
     }
@@ -165,7 +166,7 @@ class NotificationsPage extends ConsumerWidget {
                     } catch (e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBarSfx(
-                            SnackBar(content: Text('تعذّر تحديث الإشعارات: $e')));
+                            SnackBar(content: Text(FailureText.of(e))));
                       }
                     }
                   },
@@ -211,7 +212,7 @@ class NotificationsPage extends ConsumerWidget {
                   // ظاهر للمستخدم إطلاقًا.
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBarSfx(
-                        SnackBar(content: Text('تعذّر حذف الإشعار: $e')));
+                        SnackBar(content: Text(FailureText.of(e))));
                   }
                 }),
                 child: ListTile(
@@ -244,7 +245,7 @@ class NotificationsPage extends ConsumerWidget {
                         .catchError((e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBarSfx(
-                            SnackBar(content: Text('تعذّر حذف الإشعار: $e')));
+                            SnackBar(content: Text(FailureText.of(e))));
                       }
                     }),
                   ),
@@ -254,7 +255,7 @@ class NotificationsPage extends ConsumerWidget {
                       .catchError((e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(
-                          content: Text('تعذّر تحديث الإشعار: $e')));
+                          content: Text(FailureText.of(e))));
                     }
                   }),
                 ),

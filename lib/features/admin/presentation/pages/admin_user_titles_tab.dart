@@ -95,7 +95,7 @@ class _AdminUserTitlesTabState extends ConsumerState<AdminUserTitlesTab> {
         'p_request_id': const Uuid().v4(),
       });
       if (mounted) {
-        _message('تم تعيين اللقب للمستخدم المحدد خادميًا.');
+        _message('تم تعيين اللقب ✓');
         await _lookupExactIdentity();
       }
     } catch (e) {
@@ -267,7 +267,7 @@ class _AdminUserTitlesTabState extends ConsumerState<AdminUserTitlesTab> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(initial == null ? 'إنشاء لقب مستخدم' : 'تحديث لقب مستخدم'),
-        content: Column(
+        content: SingleChildScrollView(child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(controller: key, readOnly: initial != null, decoration: const InputDecoration(labelText: 'المفتاح التقني')),
@@ -275,7 +275,7 @@ class _AdminUserTitlesTabState extends ConsumerState<AdminUserTitlesTab> {
             TextField(controller: icon, decoration: const InputDecoration(labelText: 'رابط الأيقونة (اختياري)')),
             TextField(controller: sort, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'الترتيب')),
           ],
-        ),
+        )),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
           FilledButton(

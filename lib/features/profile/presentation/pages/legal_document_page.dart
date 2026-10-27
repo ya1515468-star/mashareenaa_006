@@ -1,7 +1,11 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/theme/app_colors.dart';
 
@@ -63,7 +67,7 @@ class _LegalDocumentPageState extends State<LegalDocumentPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = FailureText.of(e);
         _loading = false;
       });
     }
@@ -202,6 +206,12 @@ class _LegalDocumentPageState extends State<LegalDocumentPage> {
             const SizedBox(height: 16),
             for (var i = 0; i < sections.length; i++)
               _sectionCard(sections[i], i + 1),
+            // معلومات المالك والتواصل الفوري وحقوق النشر — تظهر حيث
+            // يضعها الخادم (إرشادات المجتمع) ولا تُبنى في الشيفرة.
+            if ((doc['owner_whatsapp']?.toString() ?? '').isNotEmpty)
+              _ownerContact(doc),
+            if ((doc['copyright']?.toString() ?? '').isNotEmpty)
+              _copyright(doc['copyright'].toString()),
             const SizedBox(height: 10),
             _footer(doc),
           ]),
@@ -353,6 +363,90 @@ class _LegalDocumentPageState extends State<LegalDocumentPage> {
       ]),
     );
   }
+
+  /// زرّ تواصل فوري يفتح واتساب.
+  ///
+  /// الرقم من الخادم بصيغته الدولية، فتعديله لا يستلزم نسخة جديدة.
+  /// وإن لم يكن واتساب مُثبَّتًا يُفتَح في المتصفّح — وإن تعذّر ذلك
+  /// أيضًا يُنسَخ الرقم، فلا تبقى الضغطة بلا نتيجة.
+  Widget _ownerContact(Map<String, dynamic> doc) {
+    final wa = doc['owner_whatsapp'].toString();
+    final phone = doc['owner_phone']?.toString() ?? wa;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [Color(0xFF115E3A), Color(0xFF0C2B1E)],
+        ),
+        border: Border.all(color: const Color(0x5525D366)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Row(children: [
+          Text('💬', style: TextStyle(fontSize: 20)),
+          SizedBox(width: 8),
+          Text('تواصل فوري مع المالك',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900)),
+        ]),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 44,
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF25D366),
+                foregroundColor: Colors.black),
+            icon: const Icon(Icons.chat_rounded, size: 18),
+            label: Text(phone,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w900, letterSpacing: 1)),
+            onPressed: () => _openWhatsapp(wa, phone),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Future<void> _openWhatsapp(String intl, String phone) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    for (final uri in [
+      Uri.parse('whatsapp://send?phone=$intl'),
+      Uri.parse('https://wa.me/$intl'),
+    ]) {
+      try {
+        if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+      } catch (_) {
+        // يُجرَّب البديل
+      }
+    }
+    if (!mounted) return;
+    await Clipboard.setData(ClipboardData(text: phone));
+    messenger?.showSnackBar(const SnackBar(
+        content: Text('تعذّر فتح واتساب — نُسخ الرقم، اتصل به مباشرةً')));
+  }
+
+  Widget _copyright(String text) => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: .04),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Column(children: [
+          const Text('©️', style: TextStyle(fontSize: 17)),
+          const SizedBox(height: 6),
+          Text(text,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  color: Colors.white60, fontSize: 11, height: 1.8)),
+        ]),
+      );
 
   Widget _footer(Map<String, dynamic> doc) {
     final email = doc['contact_email']?.toString() ?? '';

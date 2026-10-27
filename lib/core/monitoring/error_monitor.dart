@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../error/failure_text.dart';
+
 /// Ships client-side failures to the server so the platform owner can see what
 /// is actually breaking for real users, instead of the problem being invisible
 /// until someone reports it verbally.
@@ -44,6 +46,7 @@ class ErrorMonitor {
     String? screen,
     String? source,
     String severity = 'error',
+    String? details,
   }) async {
     try {
       if (Supabase.instance.client.auth.currentUser == null) return;
@@ -80,7 +83,7 @@ class ErrorMonitor {
         'p_severity': severity,
         'p_screen': scrFinal,
         'p_source': source,
-        'p_details': stack?.toString(),
+        'p_details': details ?? stack?.toString(),
         'p_platform': kIsWeb ? 'web' : defaultTargetPlatform.name,
         'p_app_version': _appVersion,
       });
@@ -119,16 +122,69 @@ class ErrorMonitor {
           stackText.contains('youtube_player_iframe') &&
               text.contains('unmounted');
       if (isKnownPackageNoise) return;
+
+      // فشل تحميل صورة من الشبكة ليس خطأ برمجيًّا: لكل Image.network
+      // في المشروع errorBuilder يعرض بديلًا، فالمستخدم لا يرى شيئًا
+      // معطوبًا. تسجيله error يجعل رابط أفاتار واحدًا تالفًا يتصدّر
+      // قائمة الأخطاء (10 مرات في الأسبوع الماضي).
+      final isAssetLoad = text.contains('HTTP request failed') ||
+          text.contains('Could not instantiate image codec') ||
+          text.contains('EXCEPTION CAUGHT BY IMAGE RESOURCE SERVICE');
+      if (isAssetLoad) {
+        unawaited(report(
+          text,
+          stack: details.stack,
+          source: 'network_asset',
+          severity: 'warning',
+        ));
+        return;
+      }
+
+      // تجاوز التخطيط (RenderFlex overflowed) لا يُرفق Flutter به
+      // stack يعود إلى شيفرتنا، فكانت ثلاثة تجاوزات في المراقبة بلا
+      // أي دلالة على مكانها — أحدها 325 بكسل، أي محتوى مقطوع فعلًا.
+      // وصف الـcontext وجامع المعلومات يسمّيان الودجت المسؤول.
+      var extra = details.stack?.toString();
+      if (text.contains('overflowed')) {
+        final ctx = details.context?.toDescription();
+        final info = StringBuffer();
+        if (ctx != null && ctx.isNotEmpty) info.writeln('context: $ctx');
+        info.writeln('library: ${details.library ?? '-'}');
+        final collector = details.informationCollector;
+        if (collector != null) {
+          for (final node in collector()) {
+            info.writeln(node.toStringDeep(minLevel: DiagnosticLevel.info));
+          }
+        }
+        if (extra != null) info.writeln(extra);
+        extra = info.toString();
+      }
+
       unawaited(report(
         text,
         stack: details.stack,
         source: 'flutter_error',
-        severity: 'error',
+        severity: FailureText.isTransient(text) ? 'warning' : 'error',
+        details: extra,
       ));
     };
 
     PlatformDispatcher.instance.onError = (error, stack) {
-      unawaited(report(error, stack: stack, source: 'uncaught_async', severity: 'fatal'));
+      // أكثر خطأ في المراقبة كان RealtimeSubscribeException مسجَّلًا
+      // fatal من هذا الموضع — 67 مرة على ستة أعضاء. وهو ليس خللًا:
+      // قناة Realtime تُخطئ على اتصال متقطّع، والتطبيق يعيد الاشتراك
+      // تلقائيًّا (retryOnChannelError). تسجيله fatal يُغرق تقرير
+      // الأخطاء الحقيقية بما لا يُصلَح لأنّه ليس عطلًا.
+      //
+      // يبقى مُسجَّلًا — انقطاعٌ متكرّر عند عضو بعينه معلومة تُفيد —
+      // لكن بمصدر وخطورة يقولان ما هو: اتصال، لا انهيار.
+      if (FailureText.isTransient(error)) {
+        unawaited(report(error,
+            stack: stack, source: 'connectivity', severity: 'warning'));
+        return true;
+      }
+      unawaited(report(error,
+          stack: stack, source: 'uncaught_async', severity: 'fatal'));
       return true;
     };
   }

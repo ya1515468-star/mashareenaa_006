@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -272,13 +273,13 @@ class AvatarFrameUploadService {
         'frame_effect': input.frameEffect,
       };
     } on PostgrestException catch (e, st) {
-      lastError = StateError('FRAME_CATALOG_CREATE_FAILED: ${e.message}');
+      lastError = StateError(FailureText.of(e));
       lastStack = st;
       try {
         await SupabaseService.deleteStoragePath(bucket: 'avatar-frames', path: storagePath);
       } catch (_) {}
     } on StorageException catch (e, st) {
-      lastError = StateError('STORAGE_UPLOAD_FAILED: ${e.message}');
+      lastError = StateError(FailureText.of(e));
       lastStack = st;
       try {
         await SupabaseService.deleteStoragePath(bucket: 'avatar-frames', path: storagePath);

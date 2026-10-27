@@ -252,7 +252,14 @@ class _ProfileCard extends StatelessWidget {
       Wrap(spacing: 6, runSpacing: 4, children: [for (final v in vip.where((e) => e['enabled'] == true)) Chip(label: Text(v['name_ar'] as String? ?? '', style: const TextStyle(fontSize: 11)))]),
       const SizedBox(height: 10),
       Text('سجل المشتريات (${purchases.length})', style: const TextStyle(fontWeight: FontWeight.bold)),
-      for (final o in purchases.take(8)) Text('• ${o['item_key']} — ${o['amount']} ${o['currency']}', style: const TextStyle(fontSize: 12)),
+      // الاسم العربي إن أرسله الخادم، وإلّا فالمفتاح مقروءًا (شرطات
+      // سفلية إلى مسافات) لا خامًا كما كان.
+      for (final o in purchases.take(8))
+        Text(
+          '• ${o['name_ar'] ?? o['item_name'] ?? o['item_key'].toString().replaceAll('_', ' ')}'
+          ' — ${o['amount']} ${o['currency'] == 'gems' ? '💎' : '⭐'}',
+          style: const TextStyle(fontSize: 12),
+        ),
       if (error != null) Padding(padding: const EdgeInsets.only(top: 10), child: Text(error!, style: const TextStyle(color: Colors.redAccent))),
       const SizedBox(height: 14),
       FilledButton.icon(

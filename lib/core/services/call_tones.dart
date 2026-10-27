@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../error/failure_text.dart';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -61,7 +62,7 @@ class CallTones {
       );
     } catch (e, st) {
       _playing = null;
-      unawaited(ErrorMonitor.report('CALL_TONE_FAILED($key): $e',
+      unawaited(ErrorMonitor.report(FailureText.of(e),
           stack: st, source: 'call_tones', severity: 'warning'));
     }
   }

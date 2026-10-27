@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -136,7 +137,7 @@ class _PendingReelsPanel extends ConsumerWidget {
       },
       loading: () =>
           const Center(child: CircularProgressIndicator(color: Color(0xFFFFD700))),
-      error: (e, _) => Center(child: Text('خطأ: $e', style: const TextStyle(color: Colors.red))),
+      error: (e, _) => Center(child: Text(FailureText.of(e), style: const TextStyle(color: Colors.red))),
     );
   }
 }
@@ -187,7 +188,7 @@ class _ReelAdminCardState extends State<_ReelAdminCard> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(FailureText.of(e)), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -357,7 +358,7 @@ class _AllReelsPanel extends ConsumerWidget {
         itemBuilder: (_, i) => _ReelAdminCard(reel: reels[i]),
       ),
       loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFFFD700))),
-      error: (e, _) => Center(child: Text('خطأ: $e')),
+      error: (e, _) => Center(child: Text(FailureText.of(e))),
     );
   }
 }
@@ -416,7 +417,7 @@ class _QuotaPanel extends ConsumerWidget {
         );
       },
       loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFFFD700))),
-      error: (e, _) => Center(child: Text('خطأ: $e')),
+      error: (e, _) => Center(child: Text(FailureText.of(e))),
     );
   }
 }
@@ -506,7 +507,7 @@ class _QuotaEditCardState extends ConsumerState<_QuotaEditCard> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(FailureText.of(e)), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -659,7 +660,7 @@ class _GarmentListingsPendingPanel extends ConsumerWidget {
         );
       },
       loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFFFD700))),
-      error: (e, _) => Center(child: Text('خطأ: $e', style: const TextStyle(color: Colors.red))),
+      error: (e, _) => Center(child: Text(FailureText.of(e), style: const TextStyle(color: Colors.red))),
     );
   }
 }
@@ -687,7 +688,7 @@ class _ListingAdminCardState extends State<_ListingAdminCard> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(FailureText.of(e)), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -726,7 +727,7 @@ class _ListingAdminCardState extends State<_ListingAdminCard> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(FailureText.of(e)), backgroundColor: Colors.red),
         );
       }
     } finally {

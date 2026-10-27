@@ -1,4 +1,5 @@
 import 'package:mashareena/core/utils/safe_launch.dart';
+import '../../../../core/error/failure_text.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -31,6 +32,7 @@ import '../providers/profile_provider.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/manual_avatar_cropper.dart';
 import 'account_settings_page.dart';
+import '../widgets/vip_active_benefits_section.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -79,7 +81,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       if (!mounted) return;
       setState(() => _signingOut = false);
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('تعذّر تسجيل الخروج: $e')));
+          .showSnackBar(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -532,6 +534,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                               .toList(),
                         ),
                       ],
+                      // البند ٩: مزايا VIP المفعّلة في بروفايل العضو
+                      // نفسه، يتحكّم بها هو.
+                      VipActiveBenefitsSection(userId: profile.uid),
                       const SizedBox(height: 16),
                       AppearOfflineToggle(uid: profile.uid),
                       const SizedBox(height: 12),
@@ -678,7 +683,7 @@ Future<void> _openSocialLink(BuildContext context, String value) async {
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text('فشل فتح رابط التواصل: $e')),
+        SnackBar(content: Text(FailureText.of(e))),
       );
     }
   }
@@ -706,7 +711,7 @@ Future<bool> _confirmProfileUpload(
     builder: (dialogContext) => AlertDialog(
       title: Text('تأكيد رفع $label'),
       content: Text(
-        'الملف: $fileName\nالحجم: ${mb.toStringAsFixed(2)} MB\n\nهل تريد رفعه وحفظه على الخادم الآن؟',
+        'الملف: $fileName\nالحجم: ${mb.toStringAsFixed(2)} MB\n\nهل تريد رفعه الآن؟',
         textDirection: TextDirection.rtl,
       ),
       actions: [
@@ -744,7 +749,7 @@ Future<void> _showUploadResult(
       ),
       content: Text(
         success
-            ? 'تم رفع $label وحفظه على الخادم، وتم تحديث البروفايل.'
+            ? 'تم رفع $label وتحديث البروفايل ✓'
             : (error ?? 'فشل تنفيذ العملية.'),
         textDirection: TextDirection.rtl,
       ),
@@ -837,7 +842,7 @@ Future<void> _pickAndUploadProfileImage(
         success: false,
         label: label,
         error: ref.read(profileControllerProvider).error?.toString() ??
-            'فشل حفظ التغيير على الخادم.',
+            'تعذّر حفظ التغيير، أعد المحاولة.',
       );
       return;
     }

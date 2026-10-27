@@ -1,4 +1,5 @@
 import 'package:mashareena/core/utils/safe_launch.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/media_upload_service.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:image_picker/image_picker.dart';
@@ -23,6 +24,7 @@ import '../../../reports/domain/entities/report_entity.dart';
 import '../../../reports/presentation/widgets/report_dialog.dart';
 import '../../../social_graph/domain/repositories/social_graph_repository.dart';
 import '../../../social_graph/presentation/providers/social_graph_provider.dart';
+import '../widgets/vip_active_benefits_section.dart';
 import '../../domain/entities/profile_entity.dart';
 import '../../domain/profile_likes_service.dart';
 import '../../domain/profile_visitors_service.dart';
@@ -270,6 +272,10 @@ class _Body extends ConsumerWidget {
               isOwner: myUid == profile.uid,
             ),
           ),
+          // البند ٩: قسم مستقل لمزايا VIP المفعّلة. الخادم يحصر ظهوره
+          // في العضو نفسه والمالك والسوبر أدمن، فيختفي الودجت وحده عند
+          // غيرهم.
+          VipActiveBenefitsSection(userId: profile.uid),
           const SizedBox(height: 16),
           Wrap(
             alignment: WrapAlignment.center,
@@ -427,7 +433,7 @@ class _LikeButton extends ConsumerWidget {
         } catch (e) {
           if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBarSfx(
-            SnackBar(content: Text('فشل تحديث الإعجاب: $e')),
+            SnackBar(content: Text(FailureText.of(e))),
           );
         }
       },
@@ -499,7 +505,7 @@ class _FollowButton extends ConsumerWidget {
           if (!success && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBarSfx(
               const SnackBar(
-                content: Text('فشل تحديث المتابعة في قاعدة البيانات'),
+                content: Text('تعذّر تحديث المتابعة، أعد المحاولة.'),
               ),
             );
           }
@@ -575,11 +581,11 @@ class _ProfileVipSurface extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('بطاقة QR للبروفايل'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           Image.network(qrUrl, width: 220, height: 220, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.qr_code_2, size: 180)),
           const SizedBox(height: 8),
           SelectableText(link, textAlign: TextAlign.center),
-        ]),
+        ])),
         actions: [
           TextButton(onPressed: () async { await Clipboard.setData(ClipboardData(text: link)); if (dialogContext.mounted) Navigator.pop(dialogContext); }, child: const Text('نسخ الرابط')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إغلاق')),
@@ -601,7 +607,7 @@ class _ProfileVipSurface extends ConsumerWidget {
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text('إحصائيات البروفايل Plus'),
-          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text('المتابعون: ${ref.read(followersCountProvider(profile.uid)).valueOrNull ?? 0}'),
             Text('يتابع: ${ref.read(followingCountProvider(profile.uid)).valueOrNull ?? 0}'),
             Text('الزوار المسجلون: ${count(visitorsRaw)}'),
@@ -609,12 +615,12 @@ class _ProfileVipSurface extends ConsumerWidget {
             Text('عناصر المتجر المصغر: ${count(content['mini_store'])}'),
             Text('الاستطلاعات الفعالة: ${count(content['polls'])}'),
             Text('الإعلانات النشطة/المسودة: ${count(content['ads'])}'),
-          ]),
+          ])),
           actions: [FilledButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إغلاق'))],
         ),
       );
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر تحميل الإحصائيات: $e')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e, subject: 'الإحصائيات'))));
     }
   }
   @override
@@ -712,7 +718,7 @@ class _ProfileVipSurface extends ConsumerWidget {
                           final count = raw is List ? raw.length : 0;
                           ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('لديك $count زائرًا مسجلًا.')));
                         } catch (e) {
-                          if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر قراءة تنبيهات الزوار: $e')));
+                          if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
                         }
                       } : null,
                     ),
@@ -775,7 +781,7 @@ class _ProfileVipSurface extends ConsumerWidget {
         builder: (dialogContext) => StatefulBuilder(
           builder: (dialogContext, setState) => AlertDialog(
             title: Text('دعم ${profile.displayName}'),
-            content: Column(
+            content: SingleChildScrollView(child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
@@ -793,7 +799,7 @@ class _ProfileVipSurface extends ConsumerWidget {
                   onSelectionChanged: (v) => setState(() => currency = v.first),
                 ),
               ],
-            ),
+            )),
             actions: [
               TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
               FilledButton(
@@ -815,16 +821,16 @@ class _ProfileVipSurface extends ConsumerWidget {
         'p_idempotency_key': const Uuid().v4(),
       });
       if (raw is! Map || raw['ok'] != true) {
-        throw StateError('لم يؤكد الخادم نجاح الدعم.');
+        throw StateError('لم تكتمل عملية الدعم، أعد المحاولة.');
       }
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          const SnackBar(content: Text('تم إرسال دعم المنشئ وتسجيل العملية خادميًا ✓')),
+          const SnackBar(content: Text('تم إرسال دعم المنشئ ✓')),
         );
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر إرسال الدعم: $e')));
+        ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
       }
     } finally {
       amount.dispose();
@@ -860,6 +866,40 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
     await safeLaunch(url);
   }
 
+  /// «أسأل عنه»: من أعجبه منتج في معرض عضوٍ آخر لم يكن يملك طريقًا
+  /// للسؤال عنه (زرّ شراء وحده). تُفتح محادثة خاصّة برسالة تحمل اسم
+  /// المنتج، فلا يحتاج البائع أن يسأل عمّا يقصده السائل.
+  Future<void> _askAboutStoreItem(
+      BuildContext context, WidgetRef ref, Map<String, dynamic> item) async {
+    final myUid = Supabase.instance.client.auth.currentUser?.id;
+    if (myUid == null || myUid == widget.profileUid) return;
+    final title = item['title']?.toString() ?? 'منتج';
+    try {
+      await Supabase.instance.client.rpc('send_chat_message', params: {
+        'p_to_uid': widget.profileUid,
+        'p_text': 'مرحبًا، رأيت «$title» في معرض منتجاتك وأريد أن أسأل عنه.',
+        'p_type': 'text',
+        'p_media_url': null,
+        'p_thumbnail_url': null,
+        'p_media_duration_seconds': null,
+        'p_reply_to_id': null,
+        'p_reply_to_preview': null,
+        'p_reply_to_sender_uid': null,
+        'p_metadata': {'mini_store_item': item['id']},
+      });
+    } catch (_) {
+      // إن تعذّرت الرسالة الجاهزة تبقى المحادثة تُفتح ليكتب بنفسه.
+    }
+    if (!context.mounted) return;
+    openPrivateChat(
+      context,
+      ref,
+      threadId: _profileVipThreadId(myUid, widget.profileUid),
+      peerUid: widget.profileUid,
+      peerName: 'صاحب المنتج',
+    );
+  }
+
   Future<void> _purchaseStoreItem(BuildContext context, WidgetRef ref, Map<String, dynamic> item) async {
     final points = (item['price_points'] as num?)?.toInt() ?? 0;
     final gems = (item['price_gems'] as num?)?.toInt() ?? 0;
@@ -879,7 +919,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('تأكيد الشراء'),
-        content: Text('سيتم شراء «${item['title'] ?? 'العنصر'}» مقابل $amount ${currency == 'points' ? 'نقطة' : 'جوهرة'} وحفظ العملية على الخادم. هل تريد المتابعة؟'),
+        content: Text('سيتم شراء «${item['title'] ?? 'العنصر'}» مقابل $amount ${currency == 'points' ? 'نقطة' : 'جوهرة'}. هل تريد المتابعة؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('شراء')),
@@ -897,7 +937,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم الشراء وتحويل المقابل لصاحب المتجر ✓')));
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر إتمام الشراء: $e')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -930,7 +970,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
         ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('لا توجد وسائط قابلة للعرض لهذا المنتج.')));
       }
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر فتح المنتج: $e')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -955,7 +995,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('تأكيد الشراء'),
-        content: Text('سيتم شراء «${product['title'] ?? product['name'] ?? 'المنتج'}» مقابل $amountLabel وحفظ العملية على الخادم. هل تريد المتابعة؟'),
+        content: Text('سيتم شراء «${product['title'] ?? product['name'] ?? 'المنتج'}» مقابل $amountLabel. هل تريد المتابعة؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('شراء')),
@@ -972,7 +1012,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
       ref.invalidate(profileVipContentProvider(widget.profileUid));
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم شراء المنتج وتحويل المقابل للبائع ✓')));
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر شراء المنتج: $e')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -997,7 +1037,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('تأكيد الشراء'),
-        content: Text('سيتم شراء الباترون مقابل $amountLabel وحفظ العملية على الخادم. هل تريد المتابعة؟'),
+        content: Text('سيتم شراء الباترون مقابل $amountLabel. هل تريد المتابعة؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('شراء')),
@@ -1014,7 +1054,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
       ref.invalidate(profileVipContentProvider(widget.profileUid));
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم شراء الباترون ✓')));
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر شراء الباترون: $e')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -1026,7 +1066,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
       final url = await _signedFromServer(raw);
       if (url != null && url.isNotEmpty) await _open(url);
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('يجب شراء الباترون أولًا: $e')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -1038,7 +1078,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
       });
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم تسجيل التصويت ✓')));
     } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر تسجيل التصويت: $e')));
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -1170,15 +1210,119 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
         ],
         if (store.isNotEmpty) ...[
           const SizedBox(height: 14),
-          const Text('المتجر المصغر', style: TextStyle(fontWeight: FontWeight.w900)),
+          const Text('معرض منتجاته', style: TextStyle(fontWeight: FontWeight.w900)),
           const SizedBox(height: 8),
+          // البند ١٠: كان المتجر المصغر سطرًا نصيًّا بلا صورة ولا فيديو
+          // (مع أنّ media_url موجود في الجدول ولم يكن يُكتب)، وبلا أي
+          // طريق لمن أعجبه منتج أن يسأل صاحبه عنه — زرّ «شراء» وحده.
+          // الآن: الوسائط تُعرَض وتُفتَح بالحجم الكامل، وزرّ تواصل يفتح
+          // محادثة برسالة تحمل اسم المنتج فلا يحتاج البائع أن يسأل.
           for (final item in store)
             Card(
-              child: ListTile(
-                title: Text('${item['title'] ?? 'عنصر'}'),
-                subtitle: Text('${item['description'] ?? ''}\n${item['price_points'] ?? 0} نقطة • ${item['price_gems'] ?? 0} جوهرة'),
-                isThreeLine: true,
-                trailing: widget.isOwner ? const Icon(Icons.inventory_2_outlined) : FilledButton(onPressed: () => _purchaseStoreItem(context, ref, item), child: const Text('شراء')),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if ((item['media_url']?.toString() ?? '').isNotEmpty)
+                    GestureDetector(
+                      onTap: () => _open('${item['media_url']}'),
+                      child: Stack(children: [
+                        if ((item['media_type']?.toString() ?? 'image') == 'video')
+                          Container(
+                            height: 170,
+                            color: Colors.black38,
+                            child: const Center(
+                              child: Icon(Icons.play_circle_fill_rounded,
+                                  size: 46, color: Colors.white70),
+                            ),
+                          )
+                        else
+                          Image.network(
+                            '${item['media_url']}',
+                            height: 170,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                                height: 170, color: Colors.white10),
+                          ),
+                        const Positioned(
+                          top: 8,
+                          left: 8,
+                          child: IgnorePointer(
+                            child: Chip(
+                              visualDensity: VisualDensity.compact,
+                              label: Text('اضغط للعرض',
+                                  style: TextStyle(fontSize: 9)),
+                            ),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${item['title'] ?? 'عنصر'}',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w900, fontSize: 15)),
+                          if ((item['description']?.toString() ?? '').isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 3),
+                              child: Text('${item['description']}',
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 12, color: Colors.white70)),
+                            ),
+                          const SizedBox(height: 6),
+                          Wrap(spacing: 8, runSpacing: 6, children: [
+                            if (((item['price_points'] as num?)?.toInt() ?? 0) > 0)
+                              Chip(
+                                  visualDensity: VisualDensity.compact,
+                                  label: Text('⭐ ${item['price_points']}',
+                                      style: const TextStyle(fontSize: 11))),
+                            if (((item['price_gems'] as num?)?.toInt() ?? 0) > 0)
+                              Chip(
+                                  visualDensity: VisualDensity.compact,
+                                  label: Text('💎 ${item['price_gems']}',
+                                      style: const TextStyle(fontSize: 11))),
+                          ]),
+                          const SizedBox(height: 8),
+                          if (widget.isOwner)
+                            const Align(
+                              alignment: AlignmentDirectional.centerEnd,
+                              child: Text('منتجك — يراه زوّار ملفك',
+                                  style: TextStyle(
+                                      fontSize: 11, color: Colors.white54)),
+                            )
+                          else
+                            Row(children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () =>
+                                      _askAboutStoreItem(context, ref, item),
+                                  icon: const Icon(
+                                      Icons.chat_bubble_outline_rounded,
+                                      size: 16),
+                                  label: const Text('أسأل عنه'),
+                                ),
+                              ),
+                              if (((item['price_points'] as num?)?.toInt() ?? 0) > 0 ||
+                                  ((item['price_gems'] as num?)?.toInt() ?? 0) > 0) ...[
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: FilledButton(
+                                    onPressed: () =>
+                                        _purchaseStoreItem(context, ref, item),
+                                    child: const Text('شراء'),
+                                  ),
+                                ),
+                              ],
+                            ]),
+                        ]),
+                  ),
+                ],
               ),
             ),
         ],
@@ -1616,7 +1760,7 @@ class _AdminEditToolsState extends State<_AdminEditTools> {
     } catch (e) {
       m.showSnackBarSfx(SnackBar(content: Text(e.toString().contains('FORBIDDEN')
           ? 'لا تملك صلاحية تعديل هذا العضو.'
-          : 'تعذّر التعديل: $e')));
+          : FailureText.of(e))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -1652,7 +1796,7 @@ class _AdminEditToolsState extends State<_AdminEditTools> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBarSfx(SnackBar(content: Text('تعذّر رفع الصورة: $e')));
+            .showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
       }
     } finally {
       if (mounted) setState(() => _busy = false);

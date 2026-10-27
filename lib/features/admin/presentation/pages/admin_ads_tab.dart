@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -49,7 +50,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = FailureText.of(e);
         _loading = false;
       });
     }
@@ -191,13 +192,13 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
         'p_sort_order': int.tryParse(days.text.trim()) ?? 0,
       });
       await _load();
-      _toast('حُفظ على الخادم ✓', ok: true);
+      _toast('تم الحفظ ✓', ok: true);
     } catch (e) {
       _toast(e.toString().contains('PLAN_MUST_BE_PRICED')
           ? 'لا يمكن أن تكون المدّة بلا سعر — اضبط نقاطًا أو جواهر.'
           : e.toString().contains('INVALID_DAYS')
               ? 'عدد الأيام يجب أن يكون بين 1 و 3650.'
-              : 'تعذّر الحفظ: $e');
+              : FailureText.action(e, action: 'الحفظ'));
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -232,13 +233,120 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
       await _load();
       _toast('عُطِّلت ✓', ok: true);
     } catch (e) {
-      _toast('تعذّر التعطيل: $e');
+      _toast(FailureText.of(e));
     } finally {
       if (mounted) setState(() => _busy = null);
     }
   }
 
   // ── إيقاف إعلان ──────────────────────────────────────────────────
+  /// تحكّم المالك الكامل بإعلان أي عضو: النصّ، المدّة، الظهور، الحذف.
+  ///
+  /// كل إجراء يمرّ بدالة الخادم التي تتحقّق من الملكية بنفسها وتكتب
+  /// في سجلّ التدقيق، فلا يكفي إخفاء القائمة لمنعه ولا يضيع أثره.
+  Future<void> _ownerAdAction(Map<String, dynamic> ad, String what) async {
+    final id = ad['id'];
+    Map<String, dynamic>? patch;
+    String okMsg = 'تمّ ✓';
+
+    if (what == 'text') {
+      final c = TextEditingController(text: ad['text']?.toString() ?? '');
+      final v = await showDialog<String>(
+        context: context,
+        builder: (d) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('تعديل نصّ الإعلان'),
+            content: TextField(
+                controller: c,
+                maxLines: 5,
+                maxLength: 500,
+                decoration: const InputDecoration(border: OutlineInputBorder())),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(d),
+                  child: const Text('إلغاء')),
+              FilledButton(
+                  onPressed: () => Navigator.pop(d, c.text.trim()),
+                  child: const Text('حفظ')),
+            ],
+          ),
+        ),
+      );
+      c.dispose();
+      if (v == null || v.isEmpty) return;
+      patch = {'text': v};
+      okMsg = 'حُدِّث النصّ ✓';
+    } else if (what == 'days') {
+      final days = await showDialog<int>(
+        context: context,
+        builder: (d) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: SimpleDialog(
+            title: const Text('مدّة ظهور الإعلان'),
+            children: [
+              for (final n in const [0, 3, 7, 15, 30, 90, 365])
+                SimpleDialogOption(
+                  onPressed: () => Navigator.pop(d, n),
+                  child: Text(n == 0
+                      ? 'بلا نهاية (ظهور دائم)'
+                      : '$n يومًا من الآن'),
+                ),
+            ],
+          ),
+        ),
+      );
+      if (days == null) return;
+      patch = {'extend_days': days};
+      okMsg = days == 0 ? 'صار الظهور دائمًا ✓' : 'صارت المدّة $days يومًا ✓';
+    } else if (what == 'visible') {
+      final show = ad['active'] != true;
+      patch = {'is_active': show};
+      okMsg = show ? 'أُظهر الإعلان ✓' : 'أُخفي الإعلان ✓';
+    }
+
+    setState(() => _busy = '${ad['id']}');
+    try {
+      if (what == 'delete') {
+        final go = await showDialog<bool>(
+          context: context,
+          builder: (d) => Directionality(
+            textDirection: TextDirection.rtl,
+            child: AlertDialog(
+              title: const Text('حذف الإعلان نهائيًّا'),
+              content: const Text(
+                  'سيُحذف الإعلان وتفاعلاته وتعليقاته نهائيًّا. لا رجوع.'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(d, false),
+                    child: const Text('إلغاء')),
+                FilledButton(
+                    onPressed: () => Navigator.pop(d, true),
+                    child: const Text('حذف')),
+              ],
+            ),
+          ),
+        );
+        if (go != true) {
+          if (mounted) setState(() => _busy = null);
+          return;
+        }
+        await _db.rpc('owner_delete_ad',
+            params: {'p_ad_id': id, 'p_reason': 'حذف من لوحة المالك'});
+        okMsg = 'حُذف الإعلان ✓';
+      } else {
+        await _db.rpc('owner_update_ad',
+            params: {'p_ad_id': id, 'p_patch': patch});
+      }
+      await _load();
+      _toast(okMsg, ok: true);
+    } catch (e) {
+      _toast(FailureText.action(e, action: 'التنفيذ'));
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
+  }
+
   Future<void> _togglePause(Map<String, dynamic> ad) async {
     final paused = ad['paused'] == true;
     String reason = '';
@@ -250,7 +358,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
           textDirection: TextDirection.rtl,
           child: AlertDialog(
             title: const Text('إيقاف الإعلان'),
-            content: Column(mainAxisSize: MainAxisSize.min, children: [
+            content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
               const Text(
                 'يتوقّف عرضه فورًا على كل الأجهزة. مدّته المدفوعة تستمر '
                 'بالعدّ، فإعادته لاحقًا تعيده لما بقي منها.',
@@ -263,7 +371,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
                     labelText: 'السبب (يُسجَّل في التدقيق)',
                     border: OutlineInputBorder()),
               ),
-            ]),
+            ])),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(c, false),
@@ -289,7 +397,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
       await _load();
       _toast(paused ? 'أُعيد العرض ✓' : 'أُوقف العرض ✓', ok: true);
     } catch (e) {
-      _toast('تعذّر التنفيذ: $e');
+      _toast(FailureText.action(e, action: 'التنفيذ'));
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -366,9 +474,9 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
         'p_is_active': active,
       });
       await _load();
-      _toast('حُفظ على الخادم ✓', ok: true);
+      _toast('تم الحفظ ✓', ok: true);
     } catch (e) {
-      _toast('تعذّر الحفظ: $e');
+      _toast(FailureText.action(e, action: 'الحفظ'));
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -457,7 +565,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: Text('${p['emoji'] ?? ''} ${p['label'] ?? key}'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             TextField(
               controller: every,
               keyboardType: TextInputType.number,
@@ -475,12 +583,12 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'الحدّ اليومي مفروض على الخادم: لا يستطيع أي جهاز تجاوزه. '
+              'الحدّ اليومي لا يستطيع أي جهاز تجاوزه. '
               'ورقم أصغر للتردّد يعني إعلانات أكثر — وقائمة مليئة '
               'بالإعلانات تُهجَر، فيذهب جمهور المعلن نفسه.',
               style: TextStyle(fontSize: 10.5, color: Colors.white60, height: 1.6),
             ),
-          ]),
+          ])),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(c, false),
@@ -509,13 +617,13 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
         'p_max_per_day': maxPerDay,
       });
       await _load();
-      _toast('حُفظ على الخادم ✓', ok: true);
+      _toast('تم الحفظ ✓', ok: true);
     } catch (e) {
       _toast(e.toString().contains('INVALID_FREQUENCY')
           ? 'التردّد يجب أن يكون بين 1 و 100.'
           : e.toString().contains('INVALID_DAILY_CAP')
               ? 'الحدّ اليومي بين 0 و 100.'
-              : 'تعذّر الحفظ: $e');
+              : FailureText.action(e, action: 'الحفظ'));
     } finally {
       if (mounted) setState(() => _busy = null);
     }
@@ -699,26 +807,55 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
                     ].join('  ·  '),
                     style: const TextStyle(fontSize: 11),
                   ),
+                  // كان الإيقاف هو الإجراء الوحيد المتاح على إعلان
+                  // عضو: لا تعديل نصٍّ مخالف، ولا تمديد لمن دفع
+                  // وانقطع ظهوره، ولا حذف. الثلاثة موجودة خادميًّا
+                  // (owner_update_ad / owner_delete_ad) ولم يكن لها
+                  // زرّ واحد في التطبيق.
                   trailing: _busy == '${ad['id']}'
                       ? const SizedBox(
                           width: 18,
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2))
-                      : IconButton(
-                          tooltip: ad['paused'] == true
-                              ? 'إعادة العرض'
-                              : 'إيقاف العرض',
-                          icon: Icon(
-                            ad['paused'] == true
-                                ? Icons.play_circle_outline
-                                : Icons.pause_circle_outline,
-                            color: ad['paused'] == true
-                                ? const Color(0xFF16A34A)
-                                : Colors.orangeAccent,
+                      : Row(mainAxisSize: MainAxisSize.min, children: [
+                          IconButton(
+                            tooltip: ad['paused'] == true
+                                ? 'إعادة العرض'
+                                : 'إيقاف العرض',
+                            icon: Icon(
+                              ad['paused'] == true
+                                  ? Icons.play_circle_outline
+                                  : Icons.pause_circle_outline,
+                              color: ad['paused'] == true
+                                  ? const Color(0xFF16A34A)
+                                  : Colors.orangeAccent,
+                            ),
+                            onPressed:
+                                _busy != null ? null : () => _togglePause(ad),
                           ),
-                          onPressed:
-                              _busy != null ? null : () => _togglePause(ad),
-                        ),
+                          PopupMenuButton<String>(
+                            tooltip: 'تحكّم المالك',
+                            enabled: _busy == null,
+                            onSelected: (v) => _ownerAdAction(ad, v),
+                            itemBuilder: (_) => [
+                              const PopupMenuItem(
+                                  value: 'text',
+                                  child: Text('تعديل النصّ')),
+                              const PopupMenuItem(
+                                  value: 'days', child: Text('تعديل المدّة')),
+                              PopupMenuItem(
+                                  value: 'visible',
+                                  child: Text(ad['active'] == true
+                                      ? 'إخفاء الإعلان'
+                                      : 'إظهار الإعلان')),
+                              const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text('حذف نهائي',
+                                      style: TextStyle(
+                                          color: Colors.redAccent))),
+                            ],
+                          ),
+                        ]),
                 ),
               ),
           ],

@@ -177,7 +177,7 @@ class _AdminChatBadgesTabState extends ConsumerState<AdminChatBadgesTab> {
         height: picked.metadata.height,
         sortOrder: form.sortOrder,
       );
-      if (mounted) _showMessage('تم إنشاء الشارة وحفظها في الخادم.');
+      if (mounted) _showMessage('تم إنشاء الشارة ✓');
       _reload();
     } catch (error) {
       if (path != null) {

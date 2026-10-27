@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -151,7 +152,7 @@ class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
       await _loadVisualSize();
       if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم تطبيق الحجم العام على الجميع ✓')));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر حفظ الحجم العام: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -164,7 +165,7 @@ class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
       await _loadVisualSize();
       if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم حفظ حجمك الخاص ✓')));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر حفظ حجمك: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -179,7 +180,7 @@ class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
       await _loadVisualSize();
       if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(enabled ? 'تم منح صلاحية التحكم العليا ✓' : 'تم سحب الصلاحية ✓')));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر تغيير الصلاحية: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -200,7 +201,7 @@ class _ChatFeatureSettingsPageState extends State<ChatFeatureSettingsPage> {
       await _loadVisualSize();
       if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم تطبيق الحجم على العضو المحدد ✓')));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text('تعذر تطبيق الحجم: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     } finally {
       if (mounted) setState(() => saving = false);
     }

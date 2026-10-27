@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/error/failure_text.dart';
 import '../../rbac/presentation/widgets/server_username_display.dart';
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -138,7 +139,7 @@ class _LeaderboardList extends ConsumerWidget {
 
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('تعذّر تحميل اللائحة: $e')),
+      error: (e, _) => Center(child: Text(FailureText.of(e, subject: 'اللائحة'))),
       data: (entries) {
         if (entries.isEmpty) {
           return Center(

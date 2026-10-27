@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -66,7 +67,7 @@ class _CreateListingPageState extends ConsumerState<CreateListingPage> {
         if (!mounted) return;
         setState(() => _isUploading = false);
         ScaffoldMessenger.of(context)
-            .showSnackBarSfx(SnackBar(content: Text('تعذّر رفع الصورة: $e')));
+            .showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
         return;
       }
       if (!mounted) return;

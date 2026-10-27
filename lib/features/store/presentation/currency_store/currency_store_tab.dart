@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -225,7 +226,7 @@ class _PackagesGrid extends ConsumerWidget {
         child: CircularProgressIndicator(color: Color(0xFFFFD700)),
       ),
       error: (e, _) =>
-          Center(child: Text('خطأ: $e', style: const TextStyle(color: Colors.red))),
+          Center(child: Text(FailureText.of(e), style: const TextStyle(color: Colors.red))),
     );
   }
 }
@@ -658,7 +659,7 @@ class _PackageEditorSheetState extends ConsumerState<_PackageEditorSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(FailureText.of(e)), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -689,7 +690,7 @@ class _PackageEditorSheetState extends ConsumerState<_PackageEditorSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          SnackBar(content: Text('خطأ: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(FailureText.of(e)), backgroundColor: Colors.red),
         );
       }
     }
@@ -963,7 +964,7 @@ class CurrencyStorePurchaseFlow {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: Text(name),
-          content: Column(
+          content: SingleChildScrollView(child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -981,10 +982,12 @@ class CurrencyStorePurchaseFlow {
               Text('السعر: $priceText',
                   style: const TextStyle(fontSize: 14)),
               const SizedBox(height: 10),
-              const Text('الدفع والشحن يتمّان مباشرة مع مالك المنصة.',
+              const Text(
+                  'الدفع والشحن يتمّان مع إدارة المنصة — المالك أو السوبر '
+                  'أدمن، وكلاهما يصله طلبك.',
                   style: TextStyle(fontSize: 11.5, color: Colors.white54)),
             ],
-          ),
+          )),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -992,7 +995,7 @@ class CurrencyStorePurchaseFlow {
             FilledButton.icon(
                 onPressed: () => Navigator.pop(ctx, true),
                 icon: const Icon(Icons.chat_bubble_rounded, size: 18),
-                label: const Text('تواصل مع المالك')),
+                label: const Text('تواصل مع الإدارة')),
           ],
         ),
       ),
@@ -1007,17 +1010,71 @@ class CurrencyStorePurchaseFlow {
       return;
     }
 
-    String? ownerUid;
+    // البند ١٢(ب): كان الطلب يذهب إلى المالك وحده، فإن كان نائمًا
+    // انتظر العضو — والسوبر أدمن قادر على الشحن فعلًا لكنّ العضو لا
+    // يعرفه. الآن يُعرَض من يستقبل الطلبات، والطرف الآخر يصله إشعار
+    // بما حدث على كل حال.
+    List<Map<String, dynamic>> contacts = const [];
     try {
-      final raw = await client.rpc('get_platform_owner_uid');
-      ownerUid = raw?.toString();
+      final raw = await client.rpc('get_sales_contacts');
+      if (raw is List) {
+        contacts =
+            raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
     } catch (_) {
-      ownerUid = null;
+      contacts = const [];
     }
-    if (ownerUid == null || ownerUid.isEmpty || ownerUid == myUid) {
+    if (contacts.isEmpty) {
+      // احتياط: المالك وحده إن تعذّرت القائمة.
+      try {
+        final raw = await client.rpc('get_platform_owner_uid');
+        final uid = raw?.toString();
+        if (uid != null && uid.isNotEmpty) {
+          contacts = [
+            {'uid': uid, 'name': 'مالك المنصة', 'role': 'مالك المنصة'}
+          ];
+        }
+      } catch (_) {/* تُعالَج أدناه */}
+    }
+    contacts = contacts
+        .where((c) => (c['uid']?.toString() ?? '').isNotEmpty &&
+            c['uid'].toString() != myUid)
+        .toList();
+    if (contacts.isEmpty) {
       messenger?.showSnackBarSfx(const SnackBar(
-          content: Text('تعذّر الوصول إلى المالك الآن. حاول مرة أخرى.')));
+          content: Text('تعذّر الوصول إلى الإدارة الآن. حاول مرة أخرى.')));
       return;
+    }
+
+    if (!context.mounted) return;
+    String? ownerUid = contacts.first['uid'].toString();
+    var ownerName = contacts.first['name']?.toString() ?? 'الإدارة';
+    if (contacts.length > 1) {
+      final chosen = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (ctx) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: SimpleDialog(
+            title: const Text('مع من تريد إتمام الشحن؟'),
+            children: [
+              for (final c in contacts)
+                SimpleDialogOption(
+                  onPressed: () => Navigator.pop(ctx, c),
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.verified_user_rounded),
+                    title: Text(c['name']?.toString() ?? 'الإدارة'),
+                    subtitle: Text(c['role']?.toString() ?? '',
+                        style: const TextStyle(fontSize: 11)),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+      if (chosen == null) return;
+      ownerUid = chosen['uid'].toString();
+      ownerName = chosen['name']?.toString() ?? 'الإدارة';
     }
 
     // رسالة جاهزة تحمل تفاصيل الطلب كاملة، فلا يحتاج المالك أن يسأل عنها.
@@ -1046,7 +1103,7 @@ class CurrencyStorePurchaseFlow {
       builder: (_) => ChatThreadPage(
         threadId: _threadIdFor(myUid, ownerUid!),
         otherUid: ownerUid!,
-        otherName: 'مالك المنصة',
+        otherName: ownerName,
       ),
     ));
   }

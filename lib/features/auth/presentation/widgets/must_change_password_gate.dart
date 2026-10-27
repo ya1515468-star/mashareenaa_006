@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -106,7 +107,7 @@ class _ChangePasswordScreenState
         backgroundColor: Color(0xFF16A34A),
       ));
     } catch (e) {
-      if (mounted) setState(() => _error = 'تعذّر التغيير: $e');
+      if (mounted) setState(() => _error = FailureText.action(e, action: 'التغيير'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/error/failure_text.dart';
 
 import '../../../../core/data/supabase_document_compat.dart';
 import '../../../../core/error/exceptions.dart';
@@ -44,7 +45,7 @@ class SocialGraphRemoteDataSourceImpl implements SocialGraphRemoteDataSource {
     } on ServerException {
       rethrow;
     } catch (e) {
-      throw ServerException(message: 'لم تكتمل المتابعة: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -64,7 +65,7 @@ class SocialGraphRemoteDataSourceImpl implements SocialGraphRemoteDataSource {
     } on ServerException {
       rethrow;
     } catch (e) {
-      throw ServerException(message: 'تعذّر إلغاء المتابعة: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -117,7 +118,7 @@ class SocialGraphRemoteDataSourceImpl implements SocialGraphRemoteDataSource {
         'createdAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      throw ServerException(message: 'لم يكتمل الحظر: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -127,7 +128,7 @@ class SocialGraphRemoteDataSourceImpl implements SocialGraphRemoteDataSource {
     try {
       await _account(blockerUid).collection('blocked').doc(targetUid).delete();
     } catch (e) {
-      throw ServerException(message: 'تعذّر إلغاء الحظر: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 
@@ -139,7 +140,7 @@ class SocialGraphRemoteDataSourceImpl implements SocialGraphRemoteDataSource {
           await _account(blockerUid).collection('blocked').doc(targetUid).get();
       return doc.exists;
     } catch (e) {
-      throw ServerException(message: 'تعذّر التحقق من الحظر: $e');
+      throw ServerException(message: FailureText.of(e));
     }
   }
 

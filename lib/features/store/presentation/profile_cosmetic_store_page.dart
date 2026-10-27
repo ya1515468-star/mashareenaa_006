@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../core/error/failure_text.dart';
 // ignore_for_file: prefer_const_constructors
 import 'currency_store/currency_store_tab.dart';
 import '../../../core/services/snack_sfx.dart';
@@ -26,6 +27,7 @@ import '../../admin/presentation/widgets/admin_gift_dialog.dart';
 import 'providers/chat_store_sections_provider.dart';
 import '../domain/chat_store_section_icons.dart';
 import 'widgets/message_style_preview_bar.dart';
+import 'staff_gift_page.dart';
 import 'widgets/chat_store_sections_settings_dialog.dart';
 import 'widgets/name_background_picker_dialog.dart';
 import '../../subscriptions/presentation/widgets/membership_store_tab.dart';
@@ -101,6 +103,14 @@ final nameTemplateCatalogProvider = FutureProvider<List<ProfileCosmeticItem>>((r
       .where((item) => item.category == 'name_template' && NameTemplateRegistry.get(item.key) != null)
       .toList(growable: false);
 });
+
+/// حجم خطّ القسم المعروض حاليًا (البند ٧).
+///
+/// تُقرأ مرّة من مزوّد واحد وتُستعمل في بطاقات المواد والأسعار
+/// والسمايلات، فتسري أرقام المالك على المتجر كلّه بلا إصدار جديد.
+ChatStoreSectionStyle _styleFor(WidgetRef ref, String sectionKey) =>
+    chatStoreStyleOf(
+        ref.watch(chatStoreSectionStylesProvider).valueOrNull, sectionKey);
 
 final chatStoreOwnerProvider = FutureProvider<bool>((ref) async {
   try { return await Supabase.instance.client.rpc('is_my_platform_owner') == true; } catch (_) { return false; }
@@ -215,7 +225,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
     final owner=ref.read(chatStoreOwnerProvider).valueOrNull==true;
     final free = item.pricePoints == 0 && item.priceGems == 0;
     if (owned || owner || free) {
-      final ok = await _confirmStoreAction(title: 'تأكيد التفعيل', action: 'تفعيل', itemName: item.nameAr, detail: 'سيتم تفعيل «${item.nameAr}» وحفظه على الخادم الآن. هل تريد المتابعة؟');
+      final ok = await _confirmStoreAction(title: 'تأكيد التفعيل', action: 'تفعيل', itemName: item.nameAr, detail: 'سيتم تفعيل «${item.nameAr}». هل تريد المتابعة؟');
       if (!ok) return;
     }
     if (!owned && !owner && !free) {
@@ -438,8 +448,8 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
     // Idempotency / request shape --------------------------------------------
     if (s.contains('REQUEST_ID_REPLAY_FORBIDDEN')) return 'تم رصد تكرار غير متطابق لعملية سابقة. أعد المحاولة من جديد.';
     if (s.contains('REQUEST_ID_REQUIRED')) return 'تعذر تجهيز معرّف العملية. أعد المحاولة.';
-    if (s.contains('METHOD_NOT_ALLOWED')) return 'طريقة الطلب غير مدعومة من الخادم.';
-    if (s.contains('SERVER_CONFIGURATION_ERROR')) return 'خطأ في إعدادات الخادم. تم تسجيل التفاصيل لفريق التطوير.';
+    if (s.contains('METHOD_NOT_ALLOWED')) return 'هذه العملية غير مدعومة حاليًا.';
+    if (s.contains('SERVER_CONFIGURATION_ERROR')) return 'خطأ في الإعداد، أُبلغ فريق التطوير.';
 
     // GIF validation (client + server share these exact codes) ---------------
     if (s.contains('GIF_TOO_COMPLEX')) return 'ملف GIF كبير/ثقيل جدًا للمعالجة الآمنة على الجهاز. قلّل عدد الإطارات أو الأبعاد ثم أعد الرفع.';
@@ -465,9 +475,9 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
     // Storage / Database / server-side failures -------------------------------
     if (s.contains('STORAGE_UPLOAD_FAILED')) return 'فشل رفع الملف إلى التخزين. تم تسجيل تفاصيل الخطأ.';
     if (s.contains('STORAGE')) return 'تعذر الوصول إلى التخزين الآن. تم تسجيل تفاصيل الخطأ.';
-    if (s.contains('DATABASE_WRITE_FAILED')) return 'تعذر حفظ بيانات العنصر في قاعدة البيانات. تم تسجيل تفاصيل الخطأ.';
-    if (s.contains('UPLOAD_VALIDATION_FAILED')) return 'الملف لم يجتز فحص الخادم.';
-    if (s.contains('SERVER_ERROR')) return 'حدث خطأ داخل الخادم وتم تسجيل السبب الحقيقي.';
+    if (s.contains('DATABASE_WRITE_FAILED')) return 'تعذّر حفظ بيانات العنصر، أعد المحاولة.';
+    if (s.contains('UPLOAD_VALIDATION_FAILED')) return 'الملف لم يجتز الفحص.';
+    if (s.contains('SERVER_ERROR')) return 'حدث خطأ غير متوقّع، أعد المحاولة.';
 
     // Real, detected network failures only — never assumed by default.
     final lower = s.toLowerCase();
@@ -478,7 +488,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
         lower.contains('connection refused') ||
         lower.contains('connection reset') ||
         lower.contains('timeoutexception');
-    if (looksLikeNetwork) return 'تعذر الاتصال بالخادم. تحقق من الشبكة ثم أعد المحاولة.';
+    if (looksLikeNetwork) return 'تعذّر الاتصال — تحقّق من الإنترنت وأعد المحاولة.';
 
     // Unknown: never blame the network without evidence. The real cause is
     // already logged above via debugPrint for the developer to trace.
@@ -530,6 +540,18 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                   ref.invalidate(storeCatalogProvider);
                 }
               },
+            ),
+          // البند ١٣: الإهداء للمالك وللسوبر أدمن معًا — والسوبر أدمن
+          // لا يرى لوحة الإدارة (لا يملك view_admin_dashboard)، فمدخله
+          // من المتجر نفسه. الصلاحية من الخادم لا من إخفاء الزر.
+          if (ref.watch(salesStaffProvider).valueOrNull == true)
+            IconButton(
+              tooltip: 'الإهداء من المتجر',
+              icon: const Icon(Icons.card_giftcard_rounded,
+                  color: Color(0xFF34D399)),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const StaffGiftPage()),
+              ),
             ),
           if (owner)
             IconButton(
@@ -815,7 +837,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
     final async = ref.watch(messageColorCatalogProvider);
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => Center(child: Text('تعذر تحميل ألوان الرسائل: $error')),
+      error: (error, _) => Center(child: Text(FailureText.of(error, subject: 'ألوان الرسائل'))),
       data: (items) {
         final free = items.where((e) => e.metadata['tier'] == 'free' || e.pricePoints == 0 && e.priceGems == 0).toList();
         final premium = items.where((e) => e.metadata['tier'] == 'premium' || e.pricePoints > 0 || e.priceGems > 0).toList();
@@ -871,9 +893,9 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                 MessageColorSwatch(item: item),
                 const SizedBox(width: 10),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Text(item.nameAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900)),
+                  Text(item.nameAr, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: _styleFor(ref, 'message_colors').item, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 3),
-                  Text(item.pricePoints == 0 && item.priceGems == 0 ? 'مجاني' : '${item.pricePoints} نقطة • ${item.priceGems} جوهرة', style: const TextStyle(fontSize: 9, color: Colors.white60)),
+                  Text(item.pricePoints == 0 && item.priceGems == 0 ? 'مجاني' : '${item.pricePoints} نقطة • ${item.priceGems} جوهرة', style: TextStyle(fontSize: _styleFor(ref, 'message_colors').price, color: Colors.white60)),
                 ])),
                 if (owner) _profileCosmeticOwnerMenu(item),
                 Icon(owned ? Icons.check_circle : Icons.lock_outline, size: 18),
@@ -929,9 +951,13 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
               children: [
                 SizedBox(width: 62, height: 62, child: FittedBox(child: frame)),
                 Text(item.nameAr, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
+                    style: TextStyle(
+                        fontSize: _styleFor(ref, 'frames').item,
+                        fontWeight: FontWeight.w800)),
                 Text(price <= 0 ? 'مجاني' : '$price نقطة',
-                    style: const TextStyle(fontSize: 9, color: Colors.white60)),
+                    style: TextStyle(
+                        fontSize: _styleFor(ref, 'frames').price,
+                        color: Colors.white60)),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
@@ -943,7 +969,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                                 title: 'تأكيد التفعيل',
                                 action: 'تفعيل',
                                 itemName: item.nameAr,
-                                detail: 'سيتم تفعيل الإطار «${item.nameAr}» وحفظه على الخادم. هل تريد المتابعة؟',
+                                detail: 'سيتم تفعيل الإطار «${item.nameAr}». هل تريد المتابعة؟',
                               );
                               if (!confirmed) return;
                               await EquippedItemsService.equip(uid: uid, category: item.category, itemId: item.id);
@@ -954,12 +980,12 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                                 title: 'تأكيد الشراء',
                                 action: 'شراء',
                                 itemName: item.nameAr,
-                                detail: 'سيتم شراء «${item.nameAr}» مقابل $price نقطة وحفظ الملكية على الخادم. هل تريد المتابعة؟',
+                                detail: 'سيتم شراء «${item.nameAr}» مقابل $price نقطة. هل تريد المتابعة؟',
                               );
                               if (!confirmed) return;
                               final result = await sl<PurchaseStoreItemUseCase>().call(uid: uid, item: item);
                               result.fold(
-                                (failure) { if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(failure.message))); },
+                                (failure) { if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(failure.message)))); },
                                 (_) { ref.invalidate(storeOwnedItemsProvider(uid)); if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم شراء الإطار الملون ✓'))); },
                               );
                             }
@@ -982,7 +1008,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       error: (error, _) => Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text('تعذر تحميل إطارات الصور من الخادم: $error'),
+          child: Text(FailureText.of(error, subject: 'إطارات الصور')),
         ),
       ),
       data: (frames) {
@@ -1192,7 +1218,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       ref.invalidate(serverUserIdentityInRoomProvider);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text('تم حذف الإطار من الخادم ✓ ${resultMap['cleared_profiles'] != null ? 'تم تنظيف ${resultMap['cleared_profiles']} بروفايل' : ''}')),
+        SnackBar(content: Text('تم حذف الإطار ✓ ${resultMap['cleared_profiles'] != null ? 'تم تنظيف ${resultMap['cleared_profiles']} بروفايل' : ''}')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -1211,7 +1237,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
 
   Future<void> _equipRemoteFrame(AvatarFrameDefinition frame, bool owned) async {
     if (owned) {
-      final ok = await _confirmStoreAction(title: 'تأكيد التفعيل', action: 'تفعيل', itemName: frame.nameAr, detail: 'سيتم تفعيل الإطار «${frame.nameAr}» وحفظه على الخادم. هل تريد المتابعة؟');
+      final ok = await _confirmStoreAction(title: 'تأكيد التفعيل', action: 'تفعيل', itemName: frame.nameAr, detail: 'سيتم تفعيل الإطار «${frame.nameAr}». هل تريد المتابعة؟');
       if (!ok) return;
     }
     if (!owned) {
@@ -1254,7 +1280,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       ref.invalidate(serverUserIdentityProvider);
       ref.invalidate(serverUserIdentityInRoomProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم تفعيل الإطار من الخادم ✓')));
+      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم تفعيل الإطار ✓')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
@@ -1429,18 +1455,18 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       barrierDismissible: false,
       builder: (_) => const AlertDialog(
         title: Text('جاري التفعيل'),
-        content: Column(
+        content: SingleChildScrollView(child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(height: 8),
             CircularProgressIndicator(),
             SizedBox(height: 18),
             Text(
-              'سيتم رفع الملف الأصلي كما هو والتحقق منه على الخادم.\n\nسيتم تفريغ المنطقة الدائرية الداخلية عند العرض وإضافة حركة وتأثير بصري للإطار.',
+              'سيُرفع الملف الأصلي كما هو ويُتحقَّق منه.\n\nسيتم تفريغ المنطقة الدائرية الداخلية عند العرض وإضافة حركة وتأثير بصري للإطار.',
               textAlign: TextAlign.center,
             ),
           ],
-        ),
+        )),
       ),
     );
     // Yield once so the progress dialog is painted before processing starts.
@@ -1690,7 +1716,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
             const SizedBox(height: 4),
             const SizedBox(height: 12),
             if (templates.length != 50)
-              Text('تحذير الخادم: تم تحميل ${templates.length}/50 قالبًا', textAlign: TextAlign.center, style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.w800)),
+              Text('تم تحميل ${templates.length}/50 قالبًا', textAlign: TextAlign.center, style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
             Builder(builder: (_) {
               final profile = ref.watch(currentProfileProvider).valueOrNull;
@@ -1721,7 +1747,8 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                     Center(child: SizedBox(width: 170, height: 50, child: FittedBox(fit: BoxFit.contain, child: NameTemplateHost(templateKey: item.key, name: _previewName, width: 145, height: 44, fontSize: 15)))),
                     const SizedBox(height: 2),
                     Text(item.nameAr, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900)),
-                    Text('${item.key} • قالب مستقل', textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: Colors.white54)),
+                    // كان يطبع المفتاح الخام («namebg_...») تحت الاسم.
+                    const Text('قالب مستقل', textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: Colors.white54)),
                     const SizedBox(height: 3),
                     Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.star, size: 14, color: Colors.amber), Text(' ${item.pricePoints}  '), const Icon(Icons.diamond, size: 14, color: Colors.cyan), Text(' ${item.priceGems}')]),
                     const SizedBox(height: 5),
@@ -1753,7 +1780,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
   Future<void> _buyOrEquipNameAnimation(NameAnimation item, bool owner) async {
     final own = ref.read(myNameAnimationOwnershipProvider).valueOrNull ?? const <String>{};
     if (own.contains(item.key) || owner || item.ownerFree) {
-      final ok = await _confirmStoreAction(title: 'تأكيد التفعيل', action: 'تفعيل', itemName: item.nameAr, detail: 'سيتم تفعيل الحيوان «${item.nameAr}» فوق الاسم وحفظه على الخادم. هل تريد المتابعة؟');
+      final ok = await _confirmStoreAction(title: 'تأكيد التفعيل', action: 'تفعيل', itemName: item.nameAr, detail: 'سيتم تفعيل الحيوان «${item.nameAr}» فوق الاسم. هل تريد المتابعة؟');
       if (!ok) return;
     }
     if (!own.contains(item.key) && !owner && !item.ownerFree) {
@@ -2534,7 +2561,7 @@ class _MessageTextStyleSectionState
       ref.invalidate(serverUserIdentityInRoomProvider);
       refreshMessageStylePreview(ref);
     } catch (e) {
-      messenger?.showSnackBarSfx(SnackBar(content: Text('تعذّر الحفظ: $e')));
+      messenger?.showSnackBarSfx(SnackBar(content: Text(FailureText.action(e, action: 'الحفظ'))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

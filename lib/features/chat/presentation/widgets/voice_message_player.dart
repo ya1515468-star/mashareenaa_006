@@ -1,4 +1,5 @@
 import 'package:audioplayers/audioplayers.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
 
@@ -60,7 +61,7 @@ class _VoiceMessagePlayerState extends State<VoiceMessagePlayer> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.maybeOf(context)
-            ?.showSnackBarSfx(SnackBar(content: Text('تعذّر تشغيل الصوت: $e')));
+            ?.showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
       }
     } finally {
       if (mounted) setState(() => _loading = false);

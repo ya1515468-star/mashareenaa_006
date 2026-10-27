@@ -101,7 +101,7 @@ class AiAssistantException implements Exception {
         'RATE_LIMITED' => 'أرسلت أسئلة كثيرة، حاول بعد قليل.',
         'AI_DISABLED' => 'المساعد الذكي متوقف مؤقتًا من الإدارة.',
         'AI_NOT_CONFIGURED' =>
-          'مفتاح الذكاء الاصطناعي غير مضبوط في الخادم (أضف السرّ GEMINI_API_KEY في Supabase ← Edge Functions ← Secrets).',
+          'خدمة الذكاء الاصطناعي غير مهيّأة بعد — راجع مالك المنصة.',
         'IMAGE_UNAVAILABLE' =>
           'توليد الصور غير متاح الآن على مفتاح الخدمة (قد يحتاج حسابًا مفوتَرًا في Google AI Studio). لم تُخصم أي نقاط.',
         'WEB_UNAVAILABLE' =>

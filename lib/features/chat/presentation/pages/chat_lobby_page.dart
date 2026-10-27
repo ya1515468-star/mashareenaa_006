@@ -1,4 +1,5 @@
 import 'package:mashareena/core/utils/safe_launch.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/widgets/mini_player_chip.dart';
 import '../../../../core/services/snack_sfx.dart';
 import '../widgets/room_mic_seats.dart';
@@ -1440,13 +1441,13 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
           textDirection: TextDirection.rtl,
           child: AlertDialog(
             title: const Text('كاتب الرسالة المجهولة'),
-            content: Column(mainAxisSize: MainAxisSize.min, children: [
+            content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
               Text('${m['display_name'] ?? m['username'] ?? 'عضو'}',
                   style: const TextStyle(fontWeight: FontWeight.w900)),
               const SizedBox(height: 6),
               Text('أُرسلت: ${m['sent_at'] ?? ''}',
                   style: const TextStyle(fontSize: 11)),
-            ]),
+            ])),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(c),
@@ -1466,7 +1467,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBarSfx(SnackBar(content: Text('تعذّر الكشف: $e')));
+          .showSnackBarSfx(SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -1627,7 +1628,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                   } catch (e) {
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBarSfx(
-                        SnackBar(content: Text('تعذر إرسال الهدية: $e')));
+                        SnackBar(content: Text(FailureText.of(e))));
                   }
                 });
               },
@@ -1710,7 +1711,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text('تعذّر حفظ الثيم: $e')),
+        SnackBar(content: Text(FailureText.of(e))),
       );
     }
   }
@@ -2805,7 +2806,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                       } catch (e) {
                         if (!dialogContext.mounted) return;
                         ScaffoldMessenger.of(dialogContext).showSnackBarSfx(
-                            SnackBar(content: Text('تعذر إنشاء الغرفة: $e')));
+                            SnackBar(content: Text(FailureText.of(e))));
                       }
                     },
                   ),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -115,7 +116,7 @@ class _MyLocationSectionState extends State<MyLocationSection> {
         if (mounted) await _editNeighborhood();
       }
     } catch (e) {
-      _say('تعذّر تحديد الموقع: $e');
+      _say(FailureText.of(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -131,7 +132,7 @@ class _MyLocationSectionState extends State<MyLocationSection> {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: const Text('🏘️ الحيّ والمدينة'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             TextField(
               controller: city,
               decoration: const InputDecoration(
@@ -145,10 +146,10 @@ class _MyLocationSectionState extends State<MyLocationSection> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'ما تكتبه هنا يتقدّم على ما يستنتجه الخادم من موقعك.',
+              'ما تكتبه هنا يتقدّم على الموقع المستنتَج تلقائيًّا.',
               style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
-          ]),
+          ])),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(c, false),
@@ -168,9 +169,9 @@ class _MyLocationSectionState extends State<MyLocationSection> {
         'p_city': city.text.trim().isEmpty ? null : city.text.trim(),
       });
       await _load();
-      _say('حُفظ على الخادم ✓', ok: true);
+      _say('تم الحفظ ✓', ok: true);
     } catch (e) {
-      _say('تعذّر الحفظ: $e');
+      _say(FailureText.action(e, action: 'الحفظ'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -182,7 +183,7 @@ class _MyLocationSectionState extends State<MyLocationSection> {
       await _db.rpc('set_my_location', params: {'p_sharing': v});
       await _load();
     } catch (e) {
-      _say('تعذّر الحفظ: $e');
+      _say(FailureText.action(e, action: 'الحفظ'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

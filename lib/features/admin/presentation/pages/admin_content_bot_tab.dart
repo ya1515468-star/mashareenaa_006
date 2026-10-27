@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../../core/error/failure_text.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -71,7 +72,7 @@ class _AdminContentBotTabState extends State<AdminContentBotTab> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = '$e';
+        _error = FailureText.of(e);
       });
     }
   }
@@ -93,10 +94,10 @@ class _AdminContentBotTabState extends State<AdminContentBotTab> {
     try {
       await _db.rpc('admin_set_content_bot_settings',
           params: {'p_enabled': _enabled, 'p_interval_minutes': mins});
-      _snack('تم الحفظ على الخادم ✓');
+      _snack('تم الحفظ ✓');
     } catch (e, st) {
       unawaited(ErrorMonitor.report(e, stack: st, screen: 'admin_content_bot', source: 'settings'));
-      _snack('فشل الحفظ: $e', ok: false);
+      _snack(FailureText.action(e, action: 'الحفظ'), ok: false);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -164,7 +165,7 @@ class _AdminContentBotTabState extends State<AdminContentBotTab> {
       await _load();
     } catch (e, st) {
       unawaited(ErrorMonitor.report(e, stack: st, screen: 'admin_content_bot', source: 'upsert'));
-      _snack('فشل الحفظ: $e', ok: false);
+      _snack(FailureText.action(e, action: 'الحفظ'), ok: false);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -182,7 +183,7 @@ class _AdminContentBotTabState extends State<AdminContentBotTab> {
       await _load();
     } catch (e, st) {
       unawaited(ErrorMonitor.report(e, stack: st, screen: 'admin_content_bot', source: 'toggle'));
-      _snack('فشل: $e', ok: false);
+      _snack(FailureText.of(e), ok: false);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -87,7 +88,7 @@ class MessageStylePreviewBar extends ConsumerWidget {
               ),
               error: (e, _) => Padding(
                 padding: const EdgeInsets.all(14),
-                child: Text('تعذّر جلب تنسيقك: $e',
+                child: Text(FailureText.of(e),
                     style: const TextStyle(
                         color: Colors.redAccent, fontSize: 11)),
               ),

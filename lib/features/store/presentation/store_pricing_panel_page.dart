@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../core/error/failure_text.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -107,7 +108,7 @@ class _StorePricingPanelPageState extends State<StorePricingPanelPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = '$e';
+        _error = FailureText.of(e);
       });
     }
   }
@@ -139,12 +140,12 @@ class _StorePricingPanelPageState extends State<StorePricingPanelPage> {
         'p_price_gems': g,
       });
       _changed = true;
-      _snack('تم الحفظ على الخادم ✓ (طُبّق على $n عنصر)');
+      _snack('تم الحفظ ✓ (طُبّق على $n عنصر)');
       await _load();
     } catch (e, st) {
       unawaited(ErrorMonitor.report(e,
           stack: st, screen: 'store_pricing_panel', source: 'save_tier'));
-      _snack('فشل الحفظ: $e', ok: false);
+      _snack(FailureText.action(e, action: 'الحفظ'), ok: false);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -170,7 +171,7 @@ class _StorePricingPanelPageState extends State<StorePricingPanelPage> {
     } catch (e, st) {
       unawaited(ErrorMonitor.report(e,
           stack: st, screen: 'store_pricing_panel', source: 'save_membership'));
-      _snack('فشل الحفظ: $e', ok: false);
+      _snack(FailureText.action(e, action: 'الحفظ'), ok: false);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -183,7 +184,7 @@ class _StorePricingPanelPageState extends State<StorePricingPanelPage> {
         title: const Text('تطبيق التسعير المقترح'),
         content: const SingleChildScrollView(
           child: Text(
-            'سيُعاد تسعير كل عناصر المتجر على الخادم بثلاث فئات منخفضة '
+            'سيُعاد تسعير كل عناصر المتجر بثلاث فئات منخفضة '
             'مناسبة لمرحلة جذب المستخدمين (الجوهرة ≈ 100 نقطة):\n\n'
             '• الإطارات: 400 / 900 / 1800 نقطة\n'
             '• الإطارات الملونة: 150 / 300 / 600\n'
@@ -209,12 +210,12 @@ class _StorePricingPanelPageState extends State<StorePricingPanelPage> {
       final raw = await _db.rpc('admin_apply_default_store_pricing');
       final n = raw is Map ? raw['items_priced'] : null;
       _changed = true;
-      _snack('تم تطبيق التسعير على الخادم ✓ (${n ?? '?'} عنصر)');
+      _snack('تم تطبيق التسعير ✓ (${n ?? '?'} عنصر)');
       await _load();
     } catch (e, st) {
       unawaited(ErrorMonitor.report(e,
           stack: st, screen: 'store_pricing_panel', source: 'apply_defaults'));
-      _snack('فشل التطبيق: $e', ok: false);
+      _snack(FailureText.of(e), ok: false);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -355,7 +356,7 @@ class _StorePricingPanelPageState extends State<StorePricingPanelPage> {
                           padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
                           child: Text(
                             'المرساة: 500 نقطة = 0.99\$ • 5 جواهر = 0.99\$ (الجوهرة ≈ 100 نقطة). '
-                            'حفظ سعر فئة يطبَّق فورًا على كل عناصرها في الخادم.',
+                            'حفظ سعر فئة يطبَّق فورًا على كل عناصرها.',
                             style: const TextStyle(fontSize: 12, color: Colors.white70),
                           ),
                         ),
@@ -468,7 +469,7 @@ class _AssignTierSheetState extends State<_AssignTierSheet> {
       if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text('تعذّر جلب العناصر: $e')));
+          SnackBar(content: Text(FailureText.of(e))));
     }
   }
 
@@ -494,7 +495,7 @@ class _AssignTierSheetState extends State<_AssignTierSheet> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text('تعذّر الإسناد: $e')));
+          SnackBar(content: Text(FailureText.of(e))));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

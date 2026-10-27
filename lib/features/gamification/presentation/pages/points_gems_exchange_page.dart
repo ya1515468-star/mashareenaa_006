@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -68,7 +69,7 @@ class _PointsGemsExchangePageState
     setState(() => _busy = false);
     result.fold(
       (failure) => ScaffoldMessenger.of(context)
-          .showSnackBarSfx(SnackBar(content: Text(failure.message))),
+          .showSnackBarSfx(SnackBar(content: Text(FailureText.of(failure.message)))),
       (converted) {
         _amountController.clear();
         ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(

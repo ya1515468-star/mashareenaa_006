@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -28,7 +29,7 @@ class AdminAuditLogTab extends ConsumerWidget {
 
     return logsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('تعذّر تحميل سجل التدقيق: $e')),
+      error: (e, _) => Center(child: Text(FailureText.of(e, subject: 'سجل التدقيق'))),
       data: (logs) {
         if (logs.isEmpty) {
           return Center(

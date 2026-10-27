@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../error/failure_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -104,7 +105,7 @@ class SupabaseService {
       debugPrint('[SupabaseService] upload successful, privatePath=$storedPath');
       return storedPath;
     } on StorageException catch (e) {
-      debugPrint('[SupabaseService] storage upload failed: ${e.message}');
+      debugPrint(FailureText.of(e));
       if (currentUploadIdIsActive(uploadId)) {
         await UploadProgressBus.failure(
           id: uploadId,
@@ -116,7 +117,7 @@ class SupabaseService {
       }
       throw StateError(_storageExceptionMessage(e));
     } catch (e) {
-      debugPrint('[SupabaseService] upload exception: ${e.toString()}');
+      debugPrint(FailureText.of(e));
       if (currentUploadIdIsActive(uploadId)) {
         await UploadProgressBus.failure(
           id: uploadId,
@@ -159,7 +160,7 @@ class SupabaseService {
   static String _storageExceptionMessage(StorageException error) {
     final status = error.statusCode.toString();
     if (status == '401' || status == '403') {
-      return 'ليس لديك صلاحية رفع هذا الملف إلى الخادم.';
+      return 'لا تملك صلاحية رفع هذا الملف.';
     }
     if (status == '413') {
       return 'حجم الملف أكبر من الحد المسموح به لهذا المخزن.';
@@ -168,7 +169,7 @@ class SupabaseService {
       return error.message.isEmpty ? 'ملف أو مسار الرفع غير صالح.' : error.message;
     }
     return error.message.isEmpty
-        ? 'تعذر رفع الملف إلى Supabase Storage.'
+        ? 'تعذّر رفع الملف، أعد المحاولة.'
         : error.message;
   }
 

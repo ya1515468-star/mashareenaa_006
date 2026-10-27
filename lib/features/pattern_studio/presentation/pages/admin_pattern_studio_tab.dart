@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -179,7 +180,7 @@ class _RequestCardState extends ConsumerState<_RequestCard> {
       if (!mounted) return;
       setState(() => _isUploading = false);
       ScaffoldMessenger.of(context)
-          .showSnackBarSfx(SnackBar(content: Text('فشل الرفع: $e')));
+          .showSnackBarSfx(SnackBar(content: Text(FailureText.action(e, action: 'الرفع'))));
       return;
     }
     setState(() => _isUploading = false);
