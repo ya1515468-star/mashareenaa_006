@@ -52,6 +52,20 @@ final globalServerRealtimeSyncProvider = Provider<void>((ref) {
     });
   }
 
+  // تسعير المالك وعضوياته: كانت تعديلاته لا تصل أحدًا حتى إعادة فتح
+  // التطبيق — الجداول خارج منشور Realtime أصلًا، والمزامن لا يستمع لها.
+  // 80ms بدل 150: الحزمة الواحدة من التعديلات تصل متتابعة فيكفي دمجها
+  // بنافذة أقصر، والفرق محسوس للمالك الذي يعدّل ويتوقّع أن يرى فورًا.
+  Timer? pricingTimer;
+  void schedulePricingRefresh() {
+    pricingTimer?.cancel();
+    pricingTimer = Timer(const Duration(milliseconds: 80), () {
+      ref.invalidate(profilePremiumServicesOwnedProvider);
+      ref.invalidate(profileCosmeticCatalogProvider);
+      ref.invalidate(serverAvatarFramesProvider);
+    });
+  }
+
   // كان .subscribe() يُستدعى بلا callback حالة إطلاقًا — فأي channelError
   // أو timedOut أو توكن منتهي الصلاحية (لا ينضم القناة بتوكن منعشٍ تلقائيًا؛
   // RealtimeResilience يحدّثه فقط عند عودة التطبيق من الخلفية) كان يصل
@@ -107,6 +121,40 @@ final globalServerRealtimeSyncProvider = Provider<void>((ref) {
         schema: 'public',
         table: 'user_inventory',
         callback: (_) => scheduleOwnershipRefresh(),
+      )
+      // كتالوج حركات الاسم كان ناقصًا رغم أنّه يُعرض في المتجر نفسه.
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'name_animation_catalog',
+        callback: (_) => scheduleStoreCatalogRefresh(),
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'profile_service_catalog',
+        callback: (_) => schedulePricingRefresh(),
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'store_price_tiers',
+        callback: (_) => schedulePricingRefresh(),
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'subscription_tier_service_rules',
+        callback: (_) => schedulePricingRefresh(),
+      )
+      // app_documents يحمل مستويات العضوية وحساب كل عضو: تغيّر العضوية
+      // يغيّر ما يملكه المستخدم من خدمات، فيلزم تحديث الاستحقاق لا
+      // التسعير وحده.
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'app_documents',
+        callback: (_) => schedulePricingRefresh(),
       );
 
     channel = fresh.subscribe((status, error) {
@@ -127,6 +175,7 @@ final globalServerRealtimeSyncProvider = Provider<void>((ref) {
     catalogTimer?.cancel();
     ownershipTimer?.cancel();
     premiumTimer?.cancel();
+    pricingTimer?.cancel();
     resubscribeTimer?.cancel();
     unawaited(channel?.unsubscribe());
   });
