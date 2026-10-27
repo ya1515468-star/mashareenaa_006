@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  منع استخراج بيانات التطبيق من الجهاز (Android 12+).
+  السبب: مجلد التطبيق يحتوي جلسة Supabase ورموز التحديث المخزَّنة محليًا.
+  بتركها قابلة للنسخ الاحتياطي يمكن سحبها عبر adb backup أو عبر النقل بين
+  الأجهزة على أجهزة معيّنة، فتُستعاد جلسة مستخدم على جهاز آخر.
+  بيانات المستخدم كلها على الخادم ومرتبطة بالحساب، فلا يخسر شيئًا بإيقافها.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

@@ -100,16 +100,28 @@ jobs:
           chmod 600 android/app/mashareena-upload.jks android/key.properties
 
       # ① Google Play — حزمة AAB هي الصيغة التي يقبلها متجر Play حصرًا.
+      # --obfuscate يُعيد تسمية رموز Dart في الملف الثنائي. منطق التطبيق
+      # كله بـDart، فبدونه يمكن استخراج أسماء الدوال والأصناف ومسارات
+      # النداءات بسهولة من libapp.so. R8 يُعتّم Kotlin/Java فقط ولا يمسّ Dart.
+      # --split-debug-info يستخرج خريطة الرموز خارج التطبيق؛ بدونها تصبح
+      # تقارير الأعطال غير قابلة للقراءة، لذا تُرفع كأثر بناء محفوظ.
       - name: Build Google Play bundle (AAB)
-        run: flutter build appbundle --release
+        run: |
+          flutter build appbundle --release \
+            --obfuscate --split-debug-info=build/symbols/aab
 
       # ② arm64 فقط — أصغر حجمًا لأجهزة 64-bit الحديثة (نفس بناء السابق).
       - name: Build signed ARM64 APK
-        run: flutter build apk --release --target-platform android-arm64 --split-per-abi
+        run: |
+          flutter build apk --release \
+            --target-platform android-arm64 --split-per-abi \
+            --obfuscate --split-debug-info=build/symbols/arm64
 
       # ③ شاملة — تعمل على أي جهاز، للتوزيع المباشر خارج المتجر.
       - name: Build universal APK
-        run: flutter build apk --release
+        run: |
+          flutter build apk --release \
+            --obfuscate --split-debug-info=build/symbols/universal
 
       - name: Verify outputs, architecture and signatures
         run: |
@@ -150,6 +162,10 @@ jobs:
             - MASHAREENA-arm64-${SHORT}.apk       (arm64-v8a فقط)
             - MASHAREENA-universal-${SHORT}.apk   (كل المعماريات)
           EOF2
+          # خريطة رموز التعتيم: بدونها لا تُقرأ تقارير الأعطال إطلاقًا.
+          # تُحفظ مع كل بناء ويجب الاحتفاظ بها ما دامت النسخة منشورة.
+          mkdir -p out/symbols && cp -R build/symbols/* out/symbols/ 2>/dev/null || true
+          (cd out && zip -qr "MASHAREENA-symbols-${SHORT}.zip" symbols && rm -rf symbols)
           (cd out && sha256sum ./*.aab ./*.apk > SHA256SUMS.txt)
           (cd out && zip -q "MASHAREENA-ANDROID-${SHORT}.zip" \
             "MASHAREENA-playstore-${SHORT}.aab" \
@@ -226,7 +242,9 @@ jobs:
           fi
 
       - name: Build iOS (unsigned)
-        run: flutter build ios --release --no-codesign
+        run: |
+          flutter build ios --release --no-codesign \
+            --obfuscate --split-debug-info=build/symbols/ios
 
       - name: Package unsigned app
         run: |
