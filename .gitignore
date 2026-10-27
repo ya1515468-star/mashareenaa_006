@@ -38,3 +38,6 @@ android/key.properties
 .DS_Store
 Thumbs.db
 *.log
+
+# مشروع iOS يولّده tool/ios_bootstrap.sh في البناء
+/ios/

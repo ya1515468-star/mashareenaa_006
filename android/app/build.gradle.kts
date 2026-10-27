@@ -76,4 +76,7 @@ flutter {
 
 dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
+    // Play Integrity: مكتبة Google الرسمية. تُنتج رمزًا موقَّعًا من Google
+    // يفكّه الخادم وحده — العميل لا يقرأ الحكم ولا يستطيع تزويره.
+    implementation("com.google.android.play:integrity:1.4.0")
 }

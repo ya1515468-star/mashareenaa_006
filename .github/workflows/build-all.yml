@@ -241,6 +241,13 @@ jobs:
             exit 1
           fi
 
+      # مشروع iOS غير مُلتزَم في المستودع: يولّده هذا السكربت ويضبط معرّف
+      # الحزمة والحد الأدنى للنظام وأوصاف الأذونات وأوضاع الخلفية والرابط
+      # العميق. ملف pbxproj يولّده Flutter بصيغة دقيقة يصعب كتابتها يدويًا،
+      # فالتوليد المكتوب أدقّ وأقبل للمراجعة من مجلّد ملتزَم.
+      - name: Bootstrap and configure iOS project
+        run: bash tool/ios_bootstrap.sh
+
       - name: Build iOS (unsigned)
         run: |
           flutter build ios --release --no-codesign \

@@ -15,6 +15,7 @@ import '../../features/gifts/domain/repositories/gift_repository.dart';
 import '../constants/app_constants.dart';
 import '../di/injection_container.dart';
 import 'dragon_bootstrap_service.dart';
+import 'integrity_service.dart';
 import 'server_sounds.dart';
 
 /// يضبط presence/{uid}.isOnline = true عند دخول المستخدم المصادَق
@@ -132,6 +133,10 @@ class _PresenceLifecycleObserverState
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _resumed = state == AppLifecycleState.resumed;
     _updatePresence(_resumed);
+    // تحقّق النزاهة عند العودة للمقدّمة، بحدّ أقصى مرّة كل 6 ساعات.
+    // صامت تمامًا: لا يمنع المستخدم من شيء ولا يُظهر رسالة — النتيجة
+    // تُخزَّن في الخادم وهو من يقرّر عند العمليات الحسّاسة.
+    if (_resumed) unawaited(IntegrityService.instance.attestIfDue());
   }
 
   Timer? _presenceTimer;
