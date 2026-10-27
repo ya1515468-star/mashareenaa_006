@@ -180,8 +180,8 @@ class _ProfilePremiumServicesTabState
       'INVALID_RECIPIENT': 'لا يمكن شراء منتجك من نفسك.',
       'AD_NOT_FOUND': 'الإعلان غير موجود.',
       'REQUEST_ID_REPLAY_FORBIDDEN': 'تعذر تكرار عملية شراء قديمة.',
-      'PLATFORM_OWNER_NOT_CONFIGURED': 'لم يتم إعداد مالك المنصة DRAGON على الخادم.',
-      'SERVICE_CHECK_FAILED': 'تعذر التحقق من أهلية خدمة VIP على الخادم.',
+      'PLATFORM_OWNER_NOT_CONFIGURED': 'لم يتم إعداد مالك المنصة بعد.',
+      'SERVICE_CHECK_FAILED': 'تعذّر التحقق من أهلية خدمة VIP.',
       'FEATURE_REQUIRED_VOICE_VIDEO': 'خدمة الاتصال الصوتي والمرئي غير مفعلة لهذا الحساب.',
       'PROFILE_SERVICE_REQUIRED': 'يجب تفعيل خدمة تصغير حجم اسم المستخدم أولًا.',
       'USERNAME_FONT_SIZE_OUT_OF_RANGE': 'حجم الاسم يجب أن يكون بين 10 و26.',
@@ -257,7 +257,7 @@ class _ProfilePremiumServicesTabState
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('تأكيد الشراء'),
-        content: Text('سيتم شراء خدمة «${item.nameAr}» مقابل $selectedPrice وحفظها على الخادم. هل تريد المتابعة؟'),
+        content: Text('سيتم شراء خدمة «${item.nameAr}» مقابل $selectedPrice. هل تريد المتابعة؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('شراء')),
@@ -279,7 +279,7 @@ class _ProfilePremiumServicesTabState
       ref.invalidate(profilePremiumRuntimeProvider(item.key));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text('تم تفعيل ${item.nameAr} على الخادم ✓')),
+        SnackBar(content: Text('تم تفعيل ${item.nameAr} ✓')),
       );
       await _openService(item);
     } catch (e) {
@@ -402,7 +402,7 @@ class _ProfilePremiumServicesTabState
       ref.invalidate(profilePremiumServicesCatalogProvider);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        const SnackBar(content: Text('تم تحديث السعر وحالة البيع على الخادم ✓')),
+        const SnackBar(content: Text('تم تحديث السعر وحالة البيع ✓')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -428,7 +428,7 @@ class _ProfilePremiumServicesTabState
                 min: 14, max: 34, divisions: 20, value: value,
                 onChanged: (v) => setState(() => value = v),
               ),
-              const Text('يُحفظ الحجم على الخادم ويُستخدم في البروفايل والشات.', style: TextStyle(fontSize: 11)),
+              const Text('الحجم يُستخدم في البروفايل والشات.', style: TextStyle(fontSize: 11)),
             ],
           ),
           actions: [
@@ -444,7 +444,7 @@ class _ProfilePremiumServicesTabState
       ref.invalidate(currentProfileProvider);
       ref.invalidate(serverUserIdentityProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم حفظ حجم الاسم على الخادم ✓')));
+      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم حفظ حجم الاسم ✓')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
     }
@@ -617,7 +617,7 @@ class _ProfilePremiumServicesTabState
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    runtime['enabled'] == true ? 'الخدمة مفعلة على الخادم ✓' : 'الخدمة غير مفعلة على الخادم',
+                    runtime['enabled'] == true ? 'الخدمة مفعّلة ✓' : 'الخدمة غير مفعّلة',
                     style: TextStyle(color: runtime['enabled'] == true ? Colors.greenAccent : Colors.orangeAccent, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 8),
@@ -672,7 +672,7 @@ class _ProfilePremiumServicesTabState
       ref.invalidate(profilePremiumRuntimeProvider(item.key));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text('تم حفظ ${item.nameAr} وربطه بحسابك على الخادم ✓')),
+        SnackBar(content: Text('تم حفظ ${item.nameAr} وربطه بحسابك ✓')),
       );
     } finally {
       controller.dispose();
@@ -714,7 +714,7 @@ class _ProfilePremiumServicesTabState
           'p_amount': result.$2,
           'p_idempotency_key': const Uuid().v4(),
         });
-        if (raw is! Map || raw['ok'] != true) throw StateError('لم يؤكد الخادم نجاح الدعم.');
+        if (raw is! Map || raw['ok'] != true) throw StateError('لم تكتمل عملية الدعم، أعد المحاولة.');
         if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم إرسال دعم المنشئ ✓')));
       } catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
@@ -777,7 +777,7 @@ class _ProfilePremiumServicesTabState
     return labels[key] ?? 'إعداد الخدمة';
   }
 
-  String _vipSettingHint(String key) => 'يُحفظ على الخادم ضمن إعدادات ${itemNameForKey(key)}';
+  String _vipSettingHint(String key) => 'يُضاف إلى إعدادات ${itemNameForKey(key)}';
 
   String itemNameForKey(String key) {
     const names = <String, String>{
@@ -1191,7 +1191,7 @@ class _ProfilePremiumServicesTabState
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'المرفق: ${file.name} • $mediaType\nبعد التأكيد سيتم رفع الملف ثم حفظ المنتج على الخادم.',
+                  'المرفق: ${file.name} • $mediaType\nبعد التأكيد يُرفع الملف ويُنشر المنتج.',
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -1251,7 +1251,7 @@ class _ProfilePremiumServicesTabState
       ref.invalidate(profilePremiumRuntimeProvider('profile_products'));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          const SnackBar(content: Text('تم رفع المنتج وحفظه على الخادم ✓')),
+          const SnackBar(content: Text('تم رفع المنتج ونشره ✓')),
         );
       }
     } finally {
@@ -1616,8 +1616,8 @@ class _ProfilePremiumServicesTabState
                         const SizedBox(height: 4),
                         Text(
                           owner
-                              ? 'أنت مالك المنصة: تتحكم بالأسعار وحالة البيع من الخادم، بينما باقي الأعضاء يشترون الخدمة فقط.'
-                              : 'كل خدمة تُفعل بعد شراء حقيقي من الخادم وتبقى مرتبطة بحسابك وحقوقك.',
+                              ? 'أنت مالك المنصة: تتحكّم بالأسعار وحالة البيع، وباقي الأعضاء يشترون الخدمة.'
+                              : 'كل خدمة تُفعَّل بعد شراء حقيقي وتبقى مرتبطة بحسابك وحقوقك.',
                           style: const TextStyle(color: Colors.white70, height: 1.35),
                         ),
                       ],

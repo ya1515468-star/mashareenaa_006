@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AdminPlatformRequestsTab extends StatefulWidget {
@@ -39,7 +40,7 @@ class _AdminPlatformRequestsTabState extends State<AdminPlatformRequestsTab> {
         }
         if (snapshot.hasError) {
           return Center(
-              child: Text('تعذر تحميل طلبات البث: ${snapshot.error}'));
+              child: Text(FailureText.of(snapshot.error, subject: 'طلبات البث')));
         }
         if (rows.isEmpty) {
           return const Center(

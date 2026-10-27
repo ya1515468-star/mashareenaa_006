@@ -115,7 +115,7 @@ class _AdminCallsTabState extends State<AdminCallsTab> {
       await _load();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('حُفظ على الخادم ✓'),
+          content: Text('تم الحفظ ✓'),
           backgroundColor: Color(0xFF16A34A)));
     } catch (e) {
       if (!mounted) return;

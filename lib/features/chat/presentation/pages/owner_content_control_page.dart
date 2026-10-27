@@ -391,7 +391,7 @@ class _OwnerContentControlPageState
                         ),
                       ),
                       IconButton(
-                        tooltip: 'حذف الخدمة من الخادم',
+                        tooltip: 'حذف الخدمة نهائيًّا',
                         icon: const Icon(Icons.delete_forever_rounded,
                             color: Colors.redAccent),
                         onPressed: () async {
@@ -412,7 +412,7 @@ class _OwnerContentControlPageState
                                   'p_feature_key': key,
                                   'p_reason': reason
                                 }),
-                            'حُذفت الخدمة من الخادم',
+                            'حُذفت الخدمة نهائيًّا',
                             then: () => ref.invalidate(_ownerVipProvider),
                           );
                         },

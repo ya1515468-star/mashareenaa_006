@@ -599,7 +599,7 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
 
     final call = result.fold((failure) {
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text(failure.message)),
+        SnackBar(content: Text(FailureText.of(failure.message))),
       );
       return null;
     }, (c) => c);

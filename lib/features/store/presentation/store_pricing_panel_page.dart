@@ -140,7 +140,7 @@ class _StorePricingPanelPageState extends State<StorePricingPanelPage> {
         'p_price_gems': g,
       });
       _changed = true;
-      _snack('تم الحفظ على الخادم ✓ (طُبّق على $n عنصر)');
+      _snack('تم الحفظ ✓ (طُبّق على $n عنصر)');
       await _load();
     } catch (e, st) {
       unawaited(ErrorMonitor.report(e,
@@ -184,7 +184,7 @@ class _StorePricingPanelPageState extends State<StorePricingPanelPage> {
         title: const Text('تطبيق التسعير المقترح'),
         content: const SingleChildScrollView(
           child: Text(
-            'سيُعاد تسعير كل عناصر المتجر على الخادم بثلاث فئات منخفضة '
+            'سيُعاد تسعير كل عناصر المتجر بثلاث فئات منخفضة '
             'مناسبة لمرحلة جذب المستخدمين (الجوهرة ≈ 100 نقطة):\n\n'
             '• الإطارات: 400 / 900 / 1800 نقطة\n'
             '• الإطارات الملونة: 150 / 300 / 600\n'
@@ -210,7 +210,7 @@ class _StorePricingPanelPageState extends State<StorePricingPanelPage> {
       final raw = await _db.rpc('admin_apply_default_store_pricing');
       final n = raw is Map ? raw['items_priced'] : null;
       _changed = true;
-      _snack('تم تطبيق التسعير على الخادم ✓ (${n ?? '?'} عنصر)');
+      _snack('تم تطبيق التسعير ✓ (${n ?? '?'} عنصر)');
       await _load();
     } catch (e, st) {
       unawaited(ErrorMonitor.report(e,
@@ -356,7 +356,7 @@ class _StorePricingPanelPageState extends State<StorePricingPanelPage> {
                           padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
                           child: Text(
                             'المرساة: 500 نقطة = 0.99\$ • 5 جواهر = 0.99\$ (الجوهرة ≈ 100 نقطة). '
-                            'حفظ سعر فئة يطبَّق فورًا على كل عناصرها في الخادم.',
+                            'حفظ سعر فئة يطبَّق فورًا على كل عناصرها.',
                             style: const TextStyle(fontSize: 12, color: Colors.white70),
                           ),
                         ),

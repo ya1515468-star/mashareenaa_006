@@ -297,6 +297,6 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     if (_sb.auth.currentUser?.id != uid) {
       throw const ServerException(message: 'غير مصرح');
     }
-    throw const ServerException(message: 'حالة التحقق تُدار من الخادم فقط');
+    throw const ServerException(message: 'حالة التحقق تُدار إداريًّا فقط');
   }
 }

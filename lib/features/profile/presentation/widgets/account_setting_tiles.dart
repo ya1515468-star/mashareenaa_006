@@ -169,7 +169,7 @@ class _AccountChoiceSettingTileState extends State<AccountChoiceSettingTile> {
           params: {'p_key': widget.field, 'p_value': selected.wire});
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(
-        content: Text('حُفظ على الخادم ✓'),
+        content: Text('تم الحفظ ✓'),
         backgroundColor: Color(0xFF16A34A),
       ));
     } catch (e) {

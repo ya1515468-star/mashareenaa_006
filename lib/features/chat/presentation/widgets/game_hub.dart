@@ -247,7 +247,7 @@ Future<void> showGameHub(BuildContext context,
                   fontWeight: FontWeight.w800)),
           const SizedBox(height: 4),
           const Text(
-              'ضد الكمبيوتر هنا: اللعب يُحسم في الخادم وللفائز جائزة نقاط. ضد لاعب حقيقي (رهان + جائزة نقاط وجواهر): اضغط صورته ← طلب لعبة.',
+              'ضد الكمبيوتر هنا: للفائز جائزة نقاط. ضد لاعب حقيقي (رهان + جائزة نقاط وجواهر): اضغط صورته ← طلب لعبة.',
               textAlign: TextAlign.center,
               textDirection: TextDirection.rtl,
               style: TextStyle(color: Colors.white54, fontSize: 12)),
@@ -651,7 +651,7 @@ class _GameResultBurstState extends State<GameResultBurst> with SingleTickerProv
                           boxShadow: const [BoxShadow(color: Color(0x88FFB300), blurRadius: 14)],
                         ),
                         child: Text(
-                          '🎁 جائزة الخادم: ${pts > 0 ? '+$pts نقطة' : ''}${gems > 0 ? '  +$gems 💎' : ''}',
+                          '🎁 الجائزة: ${pts > 0 ? '+$pts نقطة' : ''}${gems > 0 ? '  +$gems 💎' : ''}',
                           textDirection: TextDirection.rtl,
                           style: const TextStyle(color: Color(0xFF3E2700), fontWeight: FontWeight.w900),
                         ),
@@ -772,7 +772,7 @@ class _Connect4BotState extends State<_Connect4Bot> {
     if (_err != null) {
       line = _err!;
     } else if (r == null) {
-      line = 'جارٍ تجهيز اللوحة من الخادم…';
+      line = 'جارٍ تجهيز اللوحة…';
     } else if (finished) {
       line = result == 'win' ? 'فزت!' : (result == 'lose' ? 'فاز الكمبيوتر' : 'تعادل');
     } else {
@@ -802,7 +802,7 @@ class _Connect4BotState extends State<_Connect4Bot> {
             label: const Text('جولة جديدة')),
       const Padding(
         padding: EdgeInsets.only(top: 6),
-        child: Text('🎁 الفوز على الكمبيوتر: جائزة نقاط من الخادم (حسب الأهلية والحد اليومي).',
+        child: Text('🎁 الفوز على الكمبيوتر: جائزة نقاط (حسب الأهلية والحد اليومي).',
             textAlign: TextAlign.center,
             textDirection: TextDirection.rtl,
             style: TextStyle(color: Colors.white38, fontSize: 11)),

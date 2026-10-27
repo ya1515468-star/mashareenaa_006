@@ -225,7 +225,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
     final owner=ref.read(chatStoreOwnerProvider).valueOrNull==true;
     final free = item.pricePoints == 0 && item.priceGems == 0;
     if (owned || owner || free) {
-      final ok = await _confirmStoreAction(title: 'تأكيد التفعيل', action: 'تفعيل', itemName: item.nameAr, detail: 'سيتم تفعيل «${item.nameAr}» وحفظه على الخادم الآن. هل تريد المتابعة؟');
+      final ok = await _confirmStoreAction(title: 'تأكيد التفعيل', action: 'تفعيل', itemName: item.nameAr, detail: 'سيتم تفعيل «${item.nameAr}». هل تريد المتابعة؟');
       if (!ok) return;
     }
     if (!owned && !owner && !free) {
@@ -448,8 +448,8 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
     // Idempotency / request shape --------------------------------------------
     if (s.contains('REQUEST_ID_REPLAY_FORBIDDEN')) return 'تم رصد تكرار غير متطابق لعملية سابقة. أعد المحاولة من جديد.';
     if (s.contains('REQUEST_ID_REQUIRED')) return 'تعذر تجهيز معرّف العملية. أعد المحاولة.';
-    if (s.contains('METHOD_NOT_ALLOWED')) return 'طريقة الطلب غير مدعومة من الخادم.';
-    if (s.contains('SERVER_CONFIGURATION_ERROR')) return 'خطأ في إعدادات الخادم. تم تسجيل التفاصيل لفريق التطوير.';
+    if (s.contains('METHOD_NOT_ALLOWED')) return 'هذه العملية غير مدعومة حاليًا.';
+    if (s.contains('SERVER_CONFIGURATION_ERROR')) return 'خطأ في الإعداد، أُبلغ فريق التطوير.';
 
     // GIF validation (client + server share these exact codes) ---------------
     if (s.contains('GIF_TOO_COMPLEX')) return 'ملف GIF كبير/ثقيل جدًا للمعالجة الآمنة على الجهاز. قلّل عدد الإطارات أو الأبعاد ثم أعد الرفع.';
@@ -475,9 +475,9 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
     // Storage / Database / server-side failures -------------------------------
     if (s.contains('STORAGE_UPLOAD_FAILED')) return 'فشل رفع الملف إلى التخزين. تم تسجيل تفاصيل الخطأ.';
     if (s.contains('STORAGE')) return 'تعذر الوصول إلى التخزين الآن. تم تسجيل تفاصيل الخطأ.';
-    if (s.contains('DATABASE_WRITE_FAILED')) return 'تعذر حفظ بيانات العنصر في قاعدة البيانات. تم تسجيل تفاصيل الخطأ.';
-    if (s.contains('UPLOAD_VALIDATION_FAILED')) return 'الملف لم يجتز فحص الخادم.';
-    if (s.contains('SERVER_ERROR')) return 'حدث خطأ داخل الخادم وتم تسجيل السبب الحقيقي.';
+    if (s.contains('DATABASE_WRITE_FAILED')) return 'تعذّر حفظ بيانات العنصر، أعد المحاولة.';
+    if (s.contains('UPLOAD_VALIDATION_FAILED')) return 'الملف لم يجتز الفحص.';
+    if (s.contains('SERVER_ERROR')) return 'حدث خطأ غير متوقّع، أعد المحاولة.';
 
     // Real, detected network failures only — never assumed by default.
     final lower = s.toLowerCase();
@@ -488,7 +488,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
         lower.contains('connection refused') ||
         lower.contains('connection reset') ||
         lower.contains('timeoutexception');
-    if (looksLikeNetwork) return 'تعذر الاتصال بالخادم. تحقق من الشبكة ثم أعد المحاولة.';
+    if (looksLikeNetwork) return 'تعذّر الاتصال — تحقّق من الإنترنت وأعد المحاولة.';
 
     // Unknown: never blame the network without evidence. The real cause is
     // already logged above via debugPrint for the developer to trace.
@@ -969,7 +969,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                                 title: 'تأكيد التفعيل',
                                 action: 'تفعيل',
                                 itemName: item.nameAr,
-                                detail: 'سيتم تفعيل الإطار «${item.nameAr}» وحفظه على الخادم. هل تريد المتابعة؟',
+                                detail: 'سيتم تفعيل الإطار «${item.nameAr}». هل تريد المتابعة؟',
                               );
                               if (!confirmed) return;
                               await EquippedItemsService.equip(uid: uid, category: item.category, itemId: item.id);
@@ -980,12 +980,12 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                                 title: 'تأكيد الشراء',
                                 action: 'شراء',
                                 itemName: item.nameAr,
-                                detail: 'سيتم شراء «${item.nameAr}» مقابل $price نقطة وحفظ الملكية على الخادم. هل تريد المتابعة؟',
+                                detail: 'سيتم شراء «${item.nameAr}» مقابل $price نقطة. هل تريد المتابعة؟',
                               );
                               if (!confirmed) return;
                               final result = await sl<PurchaseStoreItemUseCase>().call(uid: uid, item: item);
                               result.fold(
-                                (failure) { if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(failure.message))); },
+                                (failure) { if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(FailureText.of(failure.message)))); },
                                 (_) { ref.invalidate(storeOwnedItemsProvider(uid)); if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم شراء الإطار الملون ✓'))); },
                               );
                             }
@@ -1008,7 +1008,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       error: (error, _) => Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text(FailureText.of(error, subject: 'إطارات الصور من الخادم')),
+          child: Text(FailureText.of(error, subject: 'إطارات الصور')),
         ),
       ),
       data: (frames) {
@@ -1218,7 +1218,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       ref.invalidate(serverUserIdentityInRoomProvider);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text('تم حذف الإطار من الخادم ✓ ${resultMap['cleared_profiles'] != null ? 'تم تنظيف ${resultMap['cleared_profiles']} بروفايل' : ''}')),
+        SnackBar(content: Text('تم حذف الإطار ✓ ${resultMap['cleared_profiles'] != null ? 'تم تنظيف ${resultMap['cleared_profiles']} بروفايل' : ''}')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -1237,7 +1237,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
 
   Future<void> _equipRemoteFrame(AvatarFrameDefinition frame, bool owned) async {
     if (owned) {
-      final ok = await _confirmStoreAction(title: 'تأكيد التفعيل', action: 'تفعيل', itemName: frame.nameAr, detail: 'سيتم تفعيل الإطار «${frame.nameAr}» وحفظه على الخادم. هل تريد المتابعة؟');
+      final ok = await _confirmStoreAction(title: 'تأكيد التفعيل', action: 'تفعيل', itemName: frame.nameAr, detail: 'سيتم تفعيل الإطار «${frame.nameAr}». هل تريد المتابعة؟');
       if (!ok) return;
     }
     if (!owned) {
@@ -1280,7 +1280,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       ref.invalidate(serverUserIdentityProvider);
       ref.invalidate(serverUserIdentityInRoomProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم تفعيل الإطار من الخادم ✓')));
+      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم تفعيل الإطار ✓')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
@@ -1462,7 +1462,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
             CircularProgressIndicator(),
             SizedBox(height: 18),
             Text(
-              'سيتم رفع الملف الأصلي كما هو والتحقق منه على الخادم.\n\nسيتم تفريغ المنطقة الدائرية الداخلية عند العرض وإضافة حركة وتأثير بصري للإطار.',
+              'سيُرفع الملف الأصلي كما هو ويُتحقَّق منه.\n\nسيتم تفريغ المنطقة الدائرية الداخلية عند العرض وإضافة حركة وتأثير بصري للإطار.',
               textAlign: TextAlign.center,
             ),
           ],
@@ -1716,7 +1716,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
             const SizedBox(height: 4),
             const SizedBox(height: 12),
             if (templates.length != 50)
-              Text('تحذير الخادم: تم تحميل ${templates.length}/50 قالبًا', textAlign: TextAlign.center, style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.w800)),
+              Text('تم تحميل ${templates.length}/50 قالبًا', textAlign: TextAlign.center, style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
             Builder(builder: (_) {
               final profile = ref.watch(currentProfileProvider).valueOrNull;
@@ -1780,7 +1780,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
   Future<void> _buyOrEquipNameAnimation(NameAnimation item, bool owner) async {
     final own = ref.read(myNameAnimationOwnershipProvider).valueOrNull ?? const <String>{};
     if (own.contains(item.key) || owner || item.ownerFree) {
-      final ok = await _confirmStoreAction(title: 'تأكيد التفعيل', action: 'تفعيل', itemName: item.nameAr, detail: 'سيتم تفعيل الحيوان «${item.nameAr}» فوق الاسم وحفظه على الخادم. هل تريد المتابعة؟');
+      final ok = await _confirmStoreAction(title: 'تأكيد التفعيل', action: 'تفعيل', itemName: item.nameAr, detail: 'سيتم تفعيل الحيوان «${item.nameAr}» فوق الاسم. هل تريد المتابعة؟');
       if (!ok) return;
     }
     if (!own.contains(item.key) && !owner && !item.ownerFree) {

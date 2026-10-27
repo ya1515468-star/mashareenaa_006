@@ -457,7 +457,7 @@ class MembershipStoreTab extends ConsumerWidget {
     } on SupabaseFunctionException catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBarSfx(SnackBar(content: Text(e.message ?? 'تعذّر الإهداء')));
+          .showSnackBarSfx(SnackBar(content: Text(FailureText.action(e.message, action: 'الإهداء'))));
     }
   }
 
@@ -842,7 +842,7 @@ class MembershipStoreTab extends ConsumerWidget {
                             onChanged: (v) => setLocal(() => autoRenew = v)),
                         sectionTitle('مزايا العضوية الفعلية'),
                         const Text(
-                          'هذه هي المزايا التي يحصل عليها المشترك فعليًا — تُقرأ وتُحفظ من الخادم مباشرة.',
+                          'هذه هي المزايا التي يحصل عليها المشترك فعليًا.',
                           style: TextStyle(fontSize: 10.5, color: Colors.white38),
                         ),
                         ...featureLabelsAr.entries.map((entry) => CheckboxListTile(

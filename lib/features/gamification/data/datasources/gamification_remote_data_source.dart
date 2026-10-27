@@ -398,7 +398,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
 
       if (session == null) {
         throw const ServerException(
-          message: 'جلسة Supabase غير موجودة.',
+          message: 'لا توجد جلسة دخول — سجّل الدخول ثم أعد المحاولة.',
           code: 'AUTH_REQUIRED',
         );
       }
@@ -465,7 +465,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
 
       if (session == null) {
         throw const ServerException(
-          message: 'جلسة Supabase غير موجودة.',
+          message: 'لا توجد جلسة دخول — سجّل الدخول ثم أعد المحاولة.',
           code: 'AUTH_REQUIRED',
         );
       }
@@ -505,7 +505,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
 
       if (session == null) {
         throw const ServerException(
-          message: 'جلسة Supabase غير موجودة.',
+          message: 'لا توجد جلسة دخول — سجّل الدخول ثم أعد المحاولة.',
           code: 'AUTH_REQUIRED',
         );
       }
@@ -562,7 +562,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
   @override
   Future<List<PointsPackageEntity>> listPointsPackages() async {
     throw const ServerException(
-      message: 'حزم النقاط لم تُنقل إلى Supabase بعد.',
+      message: 'حزم النقاط غير متاحة بعد.',
       code: 'SUPABASE_MIGRATION_PENDING',
     );
   }
@@ -602,7 +602,7 @@ class GamificationRemoteDataSourceImpl implements GamificationRemoteDataSource {
     required String packageId,
   }) async {
     throw const ServerException(
-      message: 'شراء حزم النقاط لم يُنقل إلى Supabase بعد.',
+      message: 'شراء حزم النقاط غير متاح بعد.',
       code: 'SUPABASE_MIGRATION_PENDING',
     );
   }

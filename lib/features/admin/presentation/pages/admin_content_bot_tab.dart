@@ -94,7 +94,7 @@ class _AdminContentBotTabState extends State<AdminContentBotTab> {
     try {
       await _db.rpc('admin_set_content_bot_settings',
           params: {'p_enabled': _enabled, 'p_interval_minutes': mins});
-      _snack('تم الحفظ على الخادم ✓');
+      _snack('تم الحفظ ✓');
     } catch (e, st) {
       unawaited(ErrorMonitor.report(e, stack: st, screen: 'admin_content_bot', source: 'settings'));
       _snack(FailureText.action(e, action: 'الحفظ'), ok: false);

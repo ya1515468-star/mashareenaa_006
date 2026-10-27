@@ -254,7 +254,7 @@ class AccountSettingsContent extends ConsumerWidget {
           final ok = await save(liveProfile.copyWith(visibility: selected));
           if (ok && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(
-                content: Text('حُفظت الخصوصية على الخادم ✓'),
+                content: Text('تم حفظ الخصوصية ✓'),
                 backgroundColor: Color(0xFF16A34A)));
           }
         },

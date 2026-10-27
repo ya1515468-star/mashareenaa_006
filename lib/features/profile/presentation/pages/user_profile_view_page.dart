@@ -505,7 +505,7 @@ class _FollowButton extends ConsumerWidget {
           if (!success && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBarSfx(
               const SnackBar(
-                content: Text('فشل تحديث المتابعة في قاعدة البيانات'),
+                content: Text('تعذّر تحديث المتابعة، أعد المحاولة.'),
               ),
             );
           }
@@ -821,7 +821,7 @@ class _ProfileVipSurface extends ConsumerWidget {
         'p_idempotency_key': const Uuid().v4(),
       });
       if (raw is! Map || raw['ok'] != true) {
-        throw StateError('لم يؤكد الخادم نجاح الدعم.');
+        throw StateError('لم تكتمل عملية الدعم، أعد المحاولة.');
       }
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
@@ -919,7 +919,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('تأكيد الشراء'),
-        content: Text('سيتم شراء «${item['title'] ?? 'العنصر'}» مقابل $amount ${currency == 'points' ? 'نقطة' : 'جوهرة'} وحفظ العملية على الخادم. هل تريد المتابعة؟'),
+        content: Text('سيتم شراء «${item['title'] ?? 'العنصر'}» مقابل $amount ${currency == 'points' ? 'نقطة' : 'جوهرة'}. هل تريد المتابعة؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('شراء')),
@@ -995,7 +995,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('تأكيد الشراء'),
-        content: Text('سيتم شراء «${product['title'] ?? product['name'] ?? 'المنتج'}» مقابل $amountLabel وحفظ العملية على الخادم. هل تريد المتابعة؟'),
+        content: Text('سيتم شراء «${product['title'] ?? product['name'] ?? 'المنتج'}» مقابل $amountLabel. هل تريد المتابعة؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('شراء')),
@@ -1037,7 +1037,7 @@ class _VipProfileContentState extends ConsumerState<_VipProfileContent> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('تأكيد الشراء'),
-        content: Text('سيتم شراء الباترون مقابل $amountLabel وحفظ العملية على الخادم. هل تريد المتابعة؟'),
+        content: Text('سيتم شراء الباترون مقابل $amountLabel. هل تريد المتابعة؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('شراء')),

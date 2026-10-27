@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -50,7 +51,7 @@ class _ErrorMonitorPageState extends ConsumerState<ErrorMonitorPage> {
     final msg = (e['message'] ?? '').toString().toLowerCase();
     final src = (e['source'] ?? '').toString().toLowerCase();
     if (msg.contains('agora_server_not_configured')) {
-      return 'أسرار Agora غير مضبوطة على الخادم. اضبط AGORA_APP_ID و AGORA_APP_CERTIFICATE.';
+      return 'مفاتيح المكالمات غير مضبوطة. اضبط AGORA_APP_ID و AGORA_APP_CERTIFICATE.';
     }
     if (msg.contains('does not exist') && msg.contains('column')) {
       return 'الاستعلام يطلب عمودًا غير موجود. صحّح اسم العمود في الاستعلام.';
@@ -59,7 +60,7 @@ class _ErrorMonitorPageState extends ConsumerState<ErrorMonitorPage> {
       return 'صلاحية ناقصة على جدول أو دالة. راجع منح الصلاحيات لهذا المورد.';
     }
     if (msg.contains('row-level security') || msg.contains('violates row-level')) {
-      return 'سياسة RLS تمنع العملية. راجع سياسة الجدول المعني.';
+      return 'صلاحيات الوصول تمنع هذه العملية. راجع صلاحية هذا القسم.';
     }
     if (src.contains('_empty')) {
       return 'لا يوجد خطأ تقني — المصدر أعاد صفر عنصر. تحقق من وجود البيانات وتفعيلها.';
@@ -74,7 +75,7 @@ class _ErrorMonitorPageState extends ConsumerState<ErrorMonitorPage> {
           'وستختفي هذه تلقائيًا.';
     }
     if (msg.contains('Agora') || msg.contains('AGORA')) {
-      return 'أسرار Agora غير مضبوطة على الخادم: AGORA_APP_ID و AGORA_APP_CERTIFICATE.';
+      return 'مفاتيح المكالمات غير مضبوطة: AGORA_APP_ID و AGORA_APP_CERTIFICATE.';
     }
     if (msg.contains('الملف الشخصي غير موجود') || msg.contains('PROFILE_NOT_FOUND')) {
       return 'العضو مفعّل خدمة إخفاء الملف الشخصي — هذا سلوك صحيح لا خلل.';
@@ -83,7 +84,7 @@ class _ErrorMonitorPageState extends ConsumerState<ErrorMonitorPage> {
       return 'الميزة تتطلب خدمة VIP غير مملوكة — سلوك صحيح، لا خلل.';
     }
     if (msg.contains('FORBIDDEN')) {
-      return 'الخادم رفض العملية لنقص صلاحية — تحقق أن المستخدم يملك الصلاحية فعلًا.';
+      return 'رُفضت العملية لنقص صلاحية — تحقّق أنّ المستخدم يملك الصلاحية فعلًا.';
     }
     return null;
   }
@@ -143,7 +144,7 @@ ${e['details'] ?? '—'}
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBarSfx(SnackBar(content: Text('تعذر التحديث: $e')));
+            .showSnackBarSfx(SnackBar(content: Text(FailureText.action(e, action: 'التحديث'))));
       }
     }
   }
@@ -163,7 +164,7 @@ ${e['details'] ?? '—'}
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBarSfx(SnackBar(content: Text('تعذر التغيير: $e')));
+            .showSnackBarSfx(SnackBar(content: Text(FailureText.action(e, action: 'التغيير'))));
       }
     }
   }
@@ -204,7 +205,7 @@ ${e['details'] ?? '—'}
               padding: EdgeInsets.all(12),
               child: Center(child: CircularProgressIndicator()),
             ),
-            error: (e, _) => Text('تعذر تحميل المفاتيح: $e',
+            error: (e, _) => Text(FailureText.of(e, subject: 'المفاتيح'),
                 style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
             data: (flags) => Column(
               children: [

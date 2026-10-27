@@ -432,7 +432,7 @@ class _StoreItemCardState extends ConsumerState<_StoreItemCard> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('تأكيد الشراء'),
-        content: Text('سيتم شراء «${widget.item.nameAr}» مقابل ${_priceLabel(widget.item)} وحفظ الملكية على الخادم. هل تريد المتابعة؟'),
+        content: Text('سيتم شراء «${widget.item.nameAr}» مقابل ${_priceLabel(widget.item)}. هل تريد المتابعة؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('شراء')),
@@ -445,7 +445,7 @@ class _StoreItemCardState extends ConsumerState<_StoreItemCard> {
     if (!mounted) return;
     result.fold(
       (failure) => ScaffoldMessenger.of(context)
-          .showSnackBarSfx(SnackBar(content: Text(failure.message))),
+          .showSnackBarSfx(SnackBar(content: Text(FailureText.of(failure.message)))),
       (_) => ScaffoldMessenger.of(context)
           .showSnackBarSfx(const SnackBar(content: Text('تم الشراء ✓'))),
     );
@@ -457,7 +457,7 @@ class _StoreItemCardState extends ConsumerState<_StoreItemCard> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('تأكيد التجهيز'),
-        content: Text('سيتم تجهيز «${widget.item.nameAr}» وحفظه على ملفك في الخادم. هل تريد المتابعة؟'),
+        content: Text('سيتم تجهيز «${widget.item.nameAr}»  وتجهيزه في ملفك. هل تريد المتابعة؟'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('تجهيز')),

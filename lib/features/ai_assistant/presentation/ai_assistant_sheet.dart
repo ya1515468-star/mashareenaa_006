@@ -282,7 +282,7 @@ class _AiAssistantSheetState extends State<AiAssistantSheet> {
           ..sources = r.sources
           ..photos = r.photos
           ..note = r.photosMissing && _status?.isOwner == true
-              ? 'لتفعيل الصور الحقيقية أضف السرّين GOOGLE_CSE_KEY و GOOGLE_CSE_CX في Supabase.'
+              ? 'لتفعيل الصور الحقيقية اضبط مفاتيح البحث GOOGLE_CSE_KEY و GOOGLE_CSE_CX.'
               : null
           ..text = r.answer;
       });

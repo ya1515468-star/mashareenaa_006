@@ -2758,7 +2758,7 @@ class _TrixScreenState extends State<TrixScreen> with TickerProviderStateMixin {
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Text(
-                            '🎁 جائزة الخادم: ${pts > 0 ? '+$pts نقطة' : ''}${gems > 0 ? '  +$gems 💎' : ''}',
+                            '🎁 الجائزة: ${pts > 0 ? '+$pts نقطة' : ''}${gems > 0 ? '  +$gems 💎' : ''}',
                             style: const TextStyle(color: Color(0xFF3E2700), fontWeight: FontWeight.w900),
                           ),
                         ),

@@ -711,7 +711,7 @@ Future<bool> _confirmProfileUpload(
     builder: (dialogContext) => AlertDialog(
       title: Text('تأكيد رفع $label'),
       content: Text(
-        'الملف: $fileName\nالحجم: ${mb.toStringAsFixed(2)} MB\n\nهل تريد رفعه وحفظه على الخادم الآن؟',
+        'الملف: $fileName\nالحجم: ${mb.toStringAsFixed(2)} MB\n\nهل تريد رفعه الآن؟',
         textDirection: TextDirection.rtl,
       ),
       actions: [
@@ -749,7 +749,7 @@ Future<void> _showUploadResult(
       ),
       content: Text(
         success
-            ? 'تم رفع $label وحفظه على الخادم، وتم تحديث البروفايل.'
+            ? 'تم رفع $label وتحديث البروفايل ✓'
             : (error ?? 'فشل تنفيذ العملية.'),
         textDirection: TextDirection.rtl,
       ),
@@ -842,7 +842,7 @@ Future<void> _pickAndUploadProfileImage(
         success: false,
         label: label,
         error: ref.read(profileControllerProvider).error?.toString() ??
-            'فشل حفظ التغيير على الخادم.',
+            'تعذّر حفظ التغيير، أعد المحاولة.',
       );
       return;
     }

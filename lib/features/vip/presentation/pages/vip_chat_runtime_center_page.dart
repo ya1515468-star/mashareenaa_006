@@ -163,7 +163,7 @@ class _VipChatRuntimeCenterPageState
       child: ListTile(
         leading: CircleAvatar(child: Icon(_icon)),
         title: Text(_title, style: const TextStyle(fontWeight: FontWeight.w900)),
-        subtitle: Text(enabled ? 'مفعلة على الخادم ✓' : 'غير مفعلة على الخادم'),
+        subtitle: Text(enabled ? 'مفعّلة ✓' : 'غير مفعّلة'),
         trailing: Icon(
           enabled ? Icons.verified : Icons.error_outline,
           color: enabled ? Colors.greenAccent : Colors.orangeAccent,
@@ -223,7 +223,7 @@ class _VipChatRuntimeCenterPageState
           ),
           const SizedBox(height: 8),
           const Text(
-            'الرفع الفعلي يبقى عبر بوابة الوسائط الحالية وحماية Storage/RLS؛ هذا الفحص لا يكتب على الخادم.',
+            'هذا فحص للقراءة فقط ولا يُغيّر شيئًا.',
             style: TextStyle(fontSize: 12),
           ),
         ],
@@ -274,7 +274,7 @@ class _VipChatRuntimeCenterPageState
         VipPresencePlus(uid: uid),
         const SizedBox(height: 8),
         const Text(
-          'البيانات تُقرأ من user_presence على الخادم، وليست حالة محلية وهمية.',
+          'البيانات حقيقية وليست حالة محلية وهمية.',
           style: TextStyle(fontSize: 12),
         ),
       ],
@@ -345,7 +345,7 @@ class _VipChatRuntimeCenterPageState
         FilledButton.icon(
           onPressed: _busy ? null : _saveTipSettings,
           icon: const Icon(Icons.save_outlined),
-          label: const Text('حفظ الإعدادات على الخادم'),
+          label: const Text('حفظ الإعدادات'),
         ),
       ],
     );
@@ -376,7 +376,7 @@ class _VipChatRuntimeCenterPageState
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  'تعذر قراءة حالة الخدمة من الخادم: ${snapshot.error}',
+                  'تعذّر قراءة حالة الخدمة — تحقّق من الإنترنت وأعد المحاولة.',
                   textAlign: TextAlign.center,
                 ),
               ),

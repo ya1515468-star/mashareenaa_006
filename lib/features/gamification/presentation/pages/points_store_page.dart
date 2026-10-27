@@ -44,7 +44,7 @@ class _PointsStorePageState extends State<PointsStorePage>
 
     return catalogResult.fold(
       (failure) => throw Exception(
-        'تعذّر تحميل كتالوج المتجر من الخادم: ${failure.message}',
+        'تعذّر تحميل كتالوج المتجر — تحقّق من الإنترنت وأعد المحاولة.',
       ),
       (items) {
         final result = <String, BigStoreProduct>{};
@@ -156,7 +156,7 @@ class _PointsStorePageState extends State<PointsStorePage>
                   ),
                   _SectionGrid(
                     products: _products(catalog, 'frame'),
-                    title: 'إطارات GIF من الخادم',
+                    title: 'إطارات GIF متحركة',
                     sectionAsset: 'assets/store_gifs/glow/glow_01.gif',
                   ),
                   _SectionGrid(
@@ -267,7 +267,7 @@ class _SectionGrid extends StatelessWidget {
               const SizedBox(height: 12),
               Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900), textAlign: TextAlign.center),
               const SizedBox(height: 8),
-              const Text('لا توجد إطارات محلية. الإطارات الجديدة تُرفع من مالك المنصة كملفات GIF إلى الخادم.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60)),
+              const Text('لا إطارات بعد. يرفع مالك المنصة الإطارات الجديدة كملفات GIF.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60)),
             ],
           ),
         ),
@@ -423,7 +423,7 @@ class _ProductCardState extends State<_ProductCard> {
 
     final confirmed = await _confirmPurchase(
       title: 'تأكيد الشراء',
-      detail: 'سيتم شراء «${widget.product.nameAr}» مقابل ${widget.product.pricePoints} نقطة وحفظ العملية على الخادم. هل تريد المتابعة؟',
+      detail: 'سيتم شراء «${widget.product.nameAr}» مقابل ${widget.product.pricePoints} نقطة. هل تريد المتابعة؟',
     );
     if (!confirmed) return;
 
@@ -466,7 +466,7 @@ class _ProductCardState extends State<_ProductCard> {
       result.fold(
         (failure) {
           ScaffoldMessenger.of(context).showSnackBarSfx(
-            SnackBar(content: Text(failure.message)),
+            SnackBar(content: Text(FailureText.of(failure.message))),
           );
         },
         (_) {
@@ -496,7 +496,7 @@ class _ProductCardState extends State<_ProductCard> {
     if (_busy) return;
     final confirmed = await _confirmPurchase(
       title: 'تأكيد الاشتراك',
-      detail: 'سيتم شراء «${widget.product.nameAr}» وتثبيت العضوية عبر الخادم. هل تريد المتابعة؟',
+      detail: 'سيتم شراء «${widget.product.nameAr}»  وتثبيت العضوية. هل تريد المتابعة؟',
       action: 'تأكيد',
     );
     if (!confirmed) return;
@@ -517,7 +517,7 @@ class _ProductCardState extends State<_ProductCard> {
 
       ScaffoldMessenger.of(context).showSnackBarSfx(
         const SnackBar(
-          content: Text('تم تأكيد العملية من الخادم.'),
+          content: Text('تم تأكيد العملية ✓'),
         ),
       );
     } on SupabaseFunctionException catch (e) {
@@ -576,7 +576,7 @@ class _ProductCardState extends State<_ProductCard> {
     } on SupabaseFunctionException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBarSfx(
-        SnackBar(content: Text(e.message ?? 'تعذر الإهداء.')),
+        SnackBar(content: Text(FailureText.action(e.message, action: 'الإهداء'))),
       );
     }
   }
@@ -625,7 +625,7 @@ class _ProductCardState extends State<_ProductCard> {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: Text(
               p.section == 'membership'
-                  ? 'عضوية ${p.membershipTier ?? 'premium'} — السعر من الخادم'
+                  ? 'عضوية ${p.membershipTier ?? 'premium'}'
                   : '${p.pricePoints} نقطة',
               style: const TextStyle(
                 color: Color(0xFFFFD43B),

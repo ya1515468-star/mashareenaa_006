@@ -558,7 +558,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
 
     if (code.contains('weak_password')) {
-      return 'كلمة المرور لا تستوفي متطلبات Supabase الحالية';
+      return 'كلمة المرور لا تستوفي الشروط المطلوبة';
     }
 
     if (code.contains('user_not_found')) {

@@ -192,7 +192,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
         'p_sort_order': int.tryParse(days.text.trim()) ?? 0,
       });
       await _load();
-      _toast('حُفظ على الخادم ✓', ok: true);
+      _toast('تم الحفظ ✓', ok: true);
     } catch (e) {
       _toast(e.toString().contains('PLAN_MUST_BE_PRICED')
           ? 'لا يمكن أن تكون المدّة بلا سعر — اضبط نقاطًا أو جواهر.'
@@ -315,7 +315,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
             child: AlertDialog(
               title: const Text('حذف الإعلان نهائيًّا'),
               content: const Text(
-                  'سيُحذف الإعلان وتفاعلاته وتعليقاته من الخادم. لا رجوع.'),
+                  'سيُحذف الإعلان وتفاعلاته وتعليقاته نهائيًّا. لا رجوع.'),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(d, false),
@@ -474,7 +474,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
         'p_is_active': active,
       });
       await _load();
-      _toast('حُفظ على الخادم ✓', ok: true);
+      _toast('تم الحفظ ✓', ok: true);
     } catch (e) {
       _toast(FailureText.action(e, action: 'الحفظ'));
     } finally {
@@ -583,7 +583,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'الحدّ اليومي مفروض على الخادم: لا يستطيع أي جهاز تجاوزه. '
+              'الحدّ اليومي لا يستطيع أي جهاز تجاوزه. '
               'ورقم أصغر للتردّد يعني إعلانات أكثر — وقائمة مليئة '
               'بالإعلانات تُهجَر، فيذهب جمهور المعلن نفسه.',
               style: TextStyle(fontSize: 10.5, color: Colors.white60, height: 1.6),
@@ -617,7 +617,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
         'p_max_per_day': maxPerDay,
       });
       await _load();
-      _toast('حُفظ على الخادم ✓', ok: true);
+      _toast('تم الحفظ ✓', ok: true);
     } catch (e) {
       _toast(e.toString().contains('INVALID_FREQUENCY')
           ? 'التردّد يجب أن يكون بين 1 و 100.'

@@ -37,7 +37,7 @@ class AvatarFramePickerSheet extends ConsumerWidget {
         decoration: const BoxDecoration(color: Color(0xFF10131B),borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         child: ref.watch(availableAvatarFramesProvider).when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Padding(padding: const EdgeInsets.all(24),child: Text(FailureText.of(e, subject: 'إطارات الخادم')))),
+          error: (e, _) => Center(child: Padding(padding: const EdgeInsets.all(24),child: Text(FailureText.of(e, subject: 'الإطارات')))),
           data: (frames) {
             if (frames.isEmpty) {
               return const Center(child: Padding(padding: EdgeInsets.all(28),child: Text('لا توجد إطارات متاحة حاليًا.',textAlign: TextAlign.center,style: TextStyle(fontWeight: FontWeight.w800,color: Colors.white70))));
@@ -47,7 +47,7 @@ class AvatarFramePickerSheet extends ConsumerWidget {
                 const SizedBox(height: 10),
                 Container(width:42,height:4,decoration:BoxDecoration(color:Colors.white24,borderRadius:BorderRadius.circular(8))),
                 const SizedBox(height: 10),
-                const Text('إطارات من الخادم',style:TextStyle(fontSize:18,fontWeight:FontWeight.w900)),
+                const Text('الإطارات المتاحة',style:TextStyle(fontSize:18,fontWeight:FontWeight.w900)),
                 const SizedBox(height: 8),
                 const SizedBox(height: 10),
                 Expanded(child: GridView.builder(

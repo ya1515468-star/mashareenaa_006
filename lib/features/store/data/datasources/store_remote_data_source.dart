@@ -278,7 +278,7 @@ class StoreRemoteDataSourceImpl implements StoreRemoteDataSource {
 
       if (session == null) {
         throw const ServerException(
-          message: 'جلسة Supabase غير موجودة.',
+          message: 'لا توجد جلسة دخول — سجّل الدخول ثم أعد المحاولة.',
           code: 'AUTH_REQUIRED',
         );
       }

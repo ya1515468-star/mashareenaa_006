@@ -146,7 +146,7 @@ class _MyLocationSectionState extends State<MyLocationSection> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'ما تكتبه هنا يتقدّم على ما يستنتجه الخادم من موقعك.',
+              'ما تكتبه هنا يتقدّم على الموقع المستنتَج تلقائيًّا.',
               style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
           ]),
@@ -169,7 +169,7 @@ class _MyLocationSectionState extends State<MyLocationSection> {
         'p_city': city.text.trim().isEmpty ? null : city.text.trim(),
       });
       await _load();
-      _say('حُفظ على الخادم ✓', ok: true);
+      _say('تم الحفظ ✓', ok: true);
     } catch (e) {
       _say(FailureText.action(e, action: 'الحفظ'));
     } finally {

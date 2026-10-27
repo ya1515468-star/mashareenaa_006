@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../profile/presentation/pages/user_profile_view_page.dart';
 import '../../../rbac/presentation/widgets/server_username_display.dart';
@@ -34,7 +35,7 @@ class DirectoryListPage extends StatelessWidget {
           }
           if (snapshot.hasError) {
             return Center(
-              child: Text('تعذّر التحميل: ${snapshot.error}',
+              child: Text(FailureText.of(snapshot.error),
                   style: const TextStyle(color: AppColors.textSecondary)),
             );
           }

@@ -517,7 +517,7 @@ class MiniProfilePopup extends ConsumerWidget {
         },
       );
       if (result is! Map || result['ok'] != true) {
-        throw StateError('لم يؤكد الخادم نجاح التحويل.');
+        throw StateError('لم يكتمل التحويل، أعد المحاولة.');
       }
       if (!context.mounted) return;
       playServerSound('success');
