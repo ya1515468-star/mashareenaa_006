@@ -1,6 +1,8 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dartz/dartz.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/error/failures.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/reset_password_usecase.dart';
@@ -102,11 +104,24 @@ class AuthController extends AsyncNotifier<UserEntity?> {
     );
   }
 
+  /// الفشل لم يكن يُلاحَظ: الناتج Either يُتجاهَل وتُصفَّر الحالة على
+  /// أي حال، فتظهر شاشة الدخول بينما جلسة Supabase ما تزال قائمة —
+  /// فيعود المستخدم داخلًا عند التشغيل التالي.
+  ///
+  /// الحالة تُصفَّر دائمًا (الخروج محليًّا مطلوب حتى لو تعذّر إبلاغ
+  /// الخادم) لكنّ السبب يُرفَع ليُعرَض، ويُكرَّر محاولة محلية صريحة.
   Future<void> signOut() async {
     final useCase = sl<SignOutUseCase>();
-    await useCase();
+    final result = await useCase();
     _pendingVerification = null;
     state = const AsyncData(null);
+    final failure = result.fold<Failure?>((f) => f, (_) => null);
+    if (failure != null) {
+      try {
+        await Supabase.instance.client.auth.signOut(scope: SignOutScope.local);
+      } catch (_) {}
+      throw Exception(failure.message);
+    }
   }
 
   Future<bool> sendPasswordResetEmail(String email) async {

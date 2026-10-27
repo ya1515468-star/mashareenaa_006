@@ -3,6 +3,7 @@ import '../../../../core/services/snack_sfx.dart';
 import '../../../../core/services/media_upload_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
+import '../../../../core/widgets/served_ad_slot.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -622,11 +623,24 @@ class _ServiceAdsTab extends ConsumerWidget {
                 title: 'لا إعلانات خدمات',
               );
             }
+            // موضع «صفحات القطاعات»: استهداف طبيعي — معلن الأقمشة
+            // يصل لمن يتصفّح الأقمشة. فتحه وإغلاقه وتردّده بيد المالك.
+            final placements =
+                ref.watch(adPlacementsProvider).valueOrNull ?? const {};
+            final slots = AdInterleave(
+                adEveryN(placements, 'garment_sector'), list.length);
             return ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-              itemCount: list.length,
+              itemCount: slots.rowCount,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (_, i) => _ServiceAdCard(
+              itemBuilder: (_, row) {
+                if (slots.isAd(row)) {
+                  return const ServedAdSlot(
+                      placement: 'garment_sector',
+                      margin: EdgeInsets.zero);
+                }
+                final i = slots.itemIndex(row);
+                return _ServiceAdCard(
                 ad: list[i],
                 isOwner: isOwner,
                 onModerate: (status) async {
@@ -652,7 +666,8 @@ class _ServiceAdsTab extends ConsumerWidget {
                     m?.showSnackBarSfx(SnackBar(content: Text('تعذّر: $e')));
                   }
                 },
-              ),
+              );
+              },
             );
           },
         ),
@@ -741,6 +756,19 @@ class _PublishServiceAdSheetState
   }
   String? _service;
   late String? _sector = widget.defaultSector;
+
+  /// اسم القطاع المعروض. يُقرأ من الكتالوج لا يُمرَّر: الورقة تُفتَح
+  /// بمفتاح القطاع وحده، والاسم العربي في الخادم.
+  String _sectorName(WidgetRef ref) {
+    final sectors = ref.watch(garmentSectorsProvider).valueOrNull ??
+        const <Map<String, dynamic>>[];
+    for (final e in sectors) {
+      if (e['sector_key']?.toString() == _sector) {
+        return e['name_ar']?.toString() ?? _sector!;
+      }
+    }
+    return _sector ?? '';
+  }
   String _currency = 'points';
   bool _busy = false;
 
@@ -755,9 +783,14 @@ class _PublishServiceAdSheetState
   }
 
   Future<void> _submit() async {
-    if (_title.text.trim().isEmpty || _service == null || _sector == null) {
+    if (_sector == null) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBarSfx(const SnackBar(
-          content: Text('اختر الخدمة والقطاع واكتب عنوانًا')));
+          content: Text('لم يُحدَّد القطاع — أعد الفتح من شاشة القطاع')));
+      return;
+    }
+    if (_title.text.trim().isEmpty || _service == null) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBarSfx(const SnackBar(
+          content: Text('اختر نوع الخدمة واكتب عنوان الإعلان')));
       return;
     }
     final fees = await ref.read(garmentPublicationFeesProvider.future);
@@ -817,9 +850,17 @@ class _PublishServiceAdSheetState
                 ? 'استنفدت حصة النشر لعضويتك.'
                 : s.contains('ACCESS_REVOKED')
                     ? 'أوقف المالك صلاحية نشر الخدمات لحسابك.'
-                    : s.contains('INVALID_SERVICE')
-                        ? 'هذه الخدمة لا تتبع القطاع المختار.'
-                        : 'تعذّر النشر: $s'),
+                    : s.contains('INVALID_SECTOR')
+                        ? 'هذا القطاع غير مفعَّل حاليًا — راجع الإدارة.'
+                        : s.contains('INVALID_SERVICE')
+                            ? 'هذه الخدمة لا تتبع هذا القطاع.'
+                            : s.contains('SERVICE_REQUIRED')
+                                ? 'اختر نوع الخدمة أوّلًا.'
+                                : s.contains('PUBLICATION_FEE_NOT_CONFIGURED')
+                                    ? 'لم تُضبَط رسوم النشر بعد — راجع الإدارة.'
+                                    : s.contains('INVALID_TITLE')
+                                        ? 'العنوان مطلوب ولا يزيد على 180 حرفًا.'
+                                        : 'تعذّر النشر: $s'),
         backgroundColor: const Color(0xFFDC2626),
       ));
     } finally {
@@ -893,31 +934,28 @@ class _PublishServiceAdSheetState
                   );
                 }),
                 const SizedBox(height: 10),
-                Builder(builder: (context) {
-                  final sectors =
-                      ref.watch(garmentSectorsProvider).valueOrNull ??
-                          const <Map<String, dynamic>>[];
-                  final keys = sectors
-                      .map((e) => e['sector_key']?.toString() ?? '')
-                      .toSet();
-                  return DropdownButtonFormField<String>(
-                    initialValue: keys.contains(_sector) ? _sector : null,
-                    dropdownColor: const Color(0xFF1A0F33),
-                    decoration: const InputDecoration(labelText: 'القطاع'),
-                    items: [
-                      for (final e in sectors)
-                        DropdownMenuItem(
-                          value: e['sector_key'].toString(),
-                          child: Text(e['name_ar']?.toString() ??
-                              e['sector_key'].toString()),
-                        ),
-                    ],
-                    onChanged: (v) => setState(() {
-                      _sector = v;
-                      _service = null;
-                    }),
-                  );
-                }),
+                // أُزيل منتقي القطاع: القطاع مُحدَّد أصلًا من الشاشة التي
+                // فُتحت منها هذه الورقة، فإعادة سؤاله تسمح باختيار قطاع
+                // غير الذي يتصفّحه العضو ثم خدمةٍ لا تتبعه — فيرفض
+                // الخادم بـINVALID_SERVICE ويبدو النشر معطَّلًا.
+                if (_sector != null)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: .05),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.category_rounded,
+                          size: 16, color: Color(0xFFFFD700)),
+                      const SizedBox(width: 8),
+                      Text('القطاع: ${_sectorName(ref)}',
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 12.5)),
+                    ]),
+                  ),
                 const SizedBox(height: 10),
                 TextField(
                     controller: _title,

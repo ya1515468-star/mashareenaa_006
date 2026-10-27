@@ -5,28 +5,47 @@ part of 'chat_lobby_page.dart';
 
 class _MentionRichText extends StatelessWidget {
   final String text;
-  final Color baseColor;
   final Set<String> mentionNames;
   final bool showMentionBadge;
 
-  /// تنسيق الخط الذي اختاره المُرسِل. كان الحجم والوزن مثبّتين
-  /// (15 / w600) فيتجاهلان اختيار العضو تمامًا.
-  final FontWeight fontWeight;
-  final FontStyle fontStyle;
-  final double fontSize;
-  // خط الرسائل الخادمي للمرسِل (cairo, rakkas…). null = الافتراضي.
-  final String? fontFamily;
+  /// تنسيق المُرسِل كاملًا من مصدر واحد: اللون (مسطّحًا أو متدرّجًا)،
+  /// والغامق والمائل وتحته خط والتعريض والحجم والخط الخادمي.
+  ///
+  /// كان هذا الموضع يستقبل الوزن والميل والحجم والعائلة أربعًا متفرّقة،
+  /// فكلّما أُضيف تنسيق جديد (تحته خط، التعريض) وجب تمريره عبر ثلاث
+  /// طبقات — وهو ما جعله يُنسى فيُحفَظ على الخادم ولا يظهر.
+  final MessageTextStyle style;
+
+  /// حجم الأساس قبل مقياس العضو.
+  final double baseFontSize;
 
   const _MentionRichText({
-    this.fontWeight = FontWeight.w600,
-    this.fontStyle = FontStyle.normal,
-    this.fontSize = 15,
-    this.fontFamily,
     required this.text,
-    required this.baseColor,
+    required this.style,
+    this.baseFontSize = 14,
     this.mentionNames = const <String>{},
     this.showMentionBadge = false,
   });
+
+  TextStyle get _ts =>
+      style.toTextStyle(baseFontSize: baseFontSize, height: 1.4);
+
+  /// التدرّج يُرسَم على النص المكتمل: ShaderMask على RichText يُلوّن كل
+  /// ما فيه، فتُستثنى شارة المنشن بإبقاء لونها الأصلي عبر رسمها فوق
+  /// الطبقة لا داخلها — ولذلك لا يُطبَّق التدرّج حين تظهر الشارة.
+  Widget _withGradient(Widget child) {
+    final to = style.gradientTo;
+    if (to == null) return child;
+    return ShaderMask(
+      blendMode: BlendMode.srcIn,
+      shaderCallback: (bounds) => LinearGradient(
+        colors: [style.color, to],
+        begin: Alignment.centerRight,
+        end: Alignment.centerLeft,
+      ).createShader(bounds),
+      child: child,
+    );
+  }
 
   static final RegExp _wordChar = RegExp(r'[\w\u0600-\u06FF._-]');
 
@@ -100,20 +119,16 @@ class _MentionRichText extends StatelessWidget {
   Widget build(BuildContext context) {
     final matches = _findMentionRanges();
     if (matches.isEmpty) {
-      return Text(
+      return _withGradient(Text(
         text,
         textAlign: TextAlign.right,
         textDirection: _chatMessageDirection(text),
         softWrap: true,
-        style: TextStyle(
-          color: baseColor,
-          fontSize: fontSize,
-          fontWeight: fontWeight,
-          fontStyle: fontStyle,
-          height: 1.4,
-          fontFamily: fontFamily,
-        ),
-      );
+        style: style.gradientTo == null
+            ? _ts
+            : _ts.copyWith(
+                color: Colors.white, decorationColor: Colors.white),
+      ));
     }
 
     final spans = <InlineSpan>[];
@@ -136,14 +151,7 @@ class _MentionRichText extends StatelessWidget {
               // = هو المُنشَن). بقية الأعضاء يرون الاسم نصًّا عاديًا بلون الرسالة.
               : Text(
                   text.substring(match.start, match.end),
-                  style: TextStyle(
-                    color: baseColor,
-                    fontSize: fontSize,
-                    fontWeight: fontWeight,
-                    fontStyle: fontStyle,
-                    height: 1.4,
-          fontFamily: fontFamily,
-                  ),
+                  style: _ts,
                 ),
         ),
       );
@@ -154,22 +162,21 @@ class _MentionRichText extends StatelessWidget {
     }
 
     final direction = _chatMessageDirection(text);
-    return RichText(
+    // مع شارة منشن داخل النص لا يُطبَّق التدرّج: ShaderMask سيُلوّن
+    // الشارة أيضًا فتفقد تمييزها، وتمييزها تنبيهٌ شخصي أهمّ من التدرّج.
+    final gradientSafe = !showMentionBadge;
+    final body = RichText(
       textAlign: TextAlign.right,
       textDirection: direction,
       softWrap: true,
       text: TextSpan(
-        style: TextStyle(
-          color: baseColor,
-          fontSize: fontSize,
-          fontWeight: fontWeight,
-          fontStyle: fontStyle,
-          height: 1.4,
-          fontFamily: fontFamily,
-        ),
+        style: (style.gradientTo != null && gradientSafe)
+            ? _ts.copyWith(color: Colors.white, decorationColor: Colors.white)
+            : _ts,
         children: spans,
       ),
     );
+    return gradientSafe ? _withGradient(body) : body;
   }
 }
 

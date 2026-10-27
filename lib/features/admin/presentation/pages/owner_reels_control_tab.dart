@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/animated_gold.dart';
 import '../../../../core/services/snack_sfx.dart';
@@ -78,6 +79,10 @@ class _OwnerReelsControlTabState extends ConsumerState<OwnerReelsControlTab> {
             ),
           ),
           const Divider(height: 1, color: Colors.white12),
+          // المدّة الافتراضية لكل ريل جديد. كانت موجودة في الخادم بلا
+          // أي واجهة، والنشر لا يطبّقها أصلًا — فكل ريل أبديّ.
+          const _DefaultDurationBar(),
+          const Divider(height: 1, color: Colors.white12),
           Expanded(
             child: reels.when(
               loading: () =>
@@ -111,6 +116,141 @@ class _OwnerReelsControlTabState extends ConsumerState<OwnerReelsControlTab> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// شريط المدّة الافتراضية لظهور الريلز الجديدة.
+///
+/// صفر = ظهور دائم (وهو ما كان عليه كل شيء). وأي رقم أكبر يجعل كل ريل
+/// يُنشَر بعدها ينتهي ظهوره تلقائيًّا — والريلز المنشورة قبله لا
+/// تتأثّر، فتغيير السياسة لا يُخفي ما نُشر على أساس سياسة أخرى.
+class _DefaultDurationBar extends StatefulWidget {
+  const _DefaultDurationBar();
+  @override
+  State<_DefaultDurationBar> createState() => _DefaultDurationBarState();
+}
+
+class _DefaultDurationBarState extends State<_DefaultDurationBar> {
+  int? _days;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    try {
+      final raw = await Supabase.instance.client
+          .rpc('get_reel_publish_settings');
+      final m = raw is Map ? Map<String, dynamic>.from(raw) : const {};
+      if (mounted) {
+        setState(() => _days =
+            (m['default_visible_days'] as num?)?.toInt() ?? 0);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _days = 0);
+    }
+  }
+
+  Future<void> _edit() async {
+    final ctrl = TextEditingController(text: '${_days ?? 0}');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('⏳ مدّة ظهور الريلز الجديدة'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(
+              controller: ctrl,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: const InputDecoration(
+                  labelText: 'عدد الأيام', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'صفر = ظهور دائم بلا انتهاء.\n\n'
+              'ينطبق على ما يُنشَر بعد الحفظ فقط؛ الريلز المنشورة لا '
+              'تتأثّر. ولك أن تضبط مدّة مختلفة لأي ريل بعينه من زرّ '
+              'التعديل عليه.',
+              style: TextStyle(fontSize: 11.5, height: 1.7,
+                  color: Colors.white60),
+            ),
+          ]),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('إلغاء')),
+            FilledButton(
+                onPressed: () => Navigator.pop(c, true),
+                child: const Text('حفظ')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+
+    final v = int.tryParse(ctrl.text.trim());
+    if (v == null || v < 0 || v > 3650) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('أدخل عددًا بين 0 و 3650')));
+      }
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await Supabase.instance.client.rpc('owner_set_reel_publish_settings',
+          params: {'p_default_visible_days': v});
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('حُفظ على الخادم ✓'),
+        backgroundColor: Color(0xFF16A34A),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('تعذّر الحفظ: $e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final d = _days;
+    return InkWell(
+      onTap: _busy ? null : _edit,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+        child: Row(children: [
+          const Icon(Icons.timer_outlined,
+              size: 17, color: Color(0xFFFFD700)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              d == null
+                  ? 'مدّة ظهور الريلز الجديدة…'
+                  : d == 0
+                      ? 'مدّة ظهور الريلز الجديدة: دائم بلا انتهاء'
+                      : 'مدّة ظهور الريلز الجديدة: $d يومًا',
+              style: const TextStyle(fontSize: 12.5, color: Colors.white70),
+            ),
+          ),
+          if (_busy)
+            const SizedBox(
+                width: 15,
+                height: 15,
+                child: CircularProgressIndicator(strokeWidth: 2))
+          else
+            const Icon(Icons.edit_rounded, size: 15, color: Colors.white38),
+        ]),
       ),
     );
   }

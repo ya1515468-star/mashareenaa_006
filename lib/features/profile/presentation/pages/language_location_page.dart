@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../widgets/account_setting_tiles.dart';
+import '../widgets/my_location_section.dart';
 
 /// "اللغة / الموقع" — اختيار لغة الواجهة ومشاركة الموقع الجغرافي
 /// (يُستخدم لعرض المستخدمين القريبين ولا يعني تتبعًا مستمرًا).
@@ -97,12 +98,15 @@ class _LanguageLocationPageState extends State<LanguageLocationPage> {
                 const Divider(
                   color: AppColors.divider,
                 ),
-                AccountSwitchSettingTile(
-                  uid: widget.uid,
-                  field: 'locationSharingEnabled',
-                  icon: Icons.location_on_outlined,
-                  title: 'مشاركة موقعي الجغرافي',
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Text('📍 الموقع والحيّ',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w900, fontSize: 15)),
                 ),
+                // القسم كامل: تحديد الحيّ، تصحيحه يدويًّا، ومفتاح إظهاره.
+                // المفتاح القديم كان يكتب في accounts التي لا يقرأها شيء.
+                const MyLocationSection(),
               ],
             ),
     );

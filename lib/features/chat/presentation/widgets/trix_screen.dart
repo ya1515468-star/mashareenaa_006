@@ -2766,6 +2766,13 @@ class _TrixScreenState extends State<TrixScreen> with TickerProviderStateMixin {
                     else if (outcome > 0 && !resigned)
                       const Text('لم تُمنح جائزة (الحد اليومي أو شروط الأهلية).',
                           textAlign: TextAlign.center, style: TextStyle(color: Colors.white54, fontSize: 11)),
+                    // موضع «بعد نتيجة اللعبة» — مغلق افتراضيًّا بطلبي
+                    // ويفتحه المالك متى شاء. يُرسَم تحت النتيجة وفوق
+                    // الأزرار: لا يحجب الجائزة ولا يسبق خبر الفوز.
+                    const ServedAdSlot(
+                        placement: 'game_result',
+                        height: 78,
+                        margin: EdgeInsets.only(top: 10)),
                     const SizedBox(height: 12),
                     Row(children: [
                       Expanded(

@@ -113,11 +113,8 @@ class _ChatMessageRow extends ConsumerWidget {
     );
   }
 
-  Widget _content(double smileySize, Color textColor,
-      {bool bold = false, bool italic = false, double scale = 1.0, String? fontFamily}) {
-    final fw = bold ? FontWeight.w800 : FontWeight.w500;
-    final fs = italic ? FontStyle.italic : FontStyle.normal;
-    final sz = (14.0 * scale).clamp(11.0, 22.0);
+  Widget _content(double smileySize, MessageTextStyle msgStyle) {
+    final textColor = msgStyle.color;
     final body = (row['body'] ?? row['message'])?.toString() ?? '';
     final type = row['kind']?.toString() ?? 'text';
     final url = row['attachment_url']?.toString() ?? '';
@@ -309,11 +306,8 @@ class _ChatMessageRow extends ConsumerWidget {
 
     return _MentionRichText(
       text: body.isEmpty ? 'رسالة فارغة' : body,
-      baseColor: textColor,
-      fontFamily: fontFamily,
-      fontWeight: fw,
-      fontStyle: fs,
-      fontSize: sz.toDouble(),
+      style: msgStyle,
+      baseFontSize: 14,
       showMentionBadge: showMentionBadge,
       mentionNames: (metadata['mention_user_names'] is List)
           ? (metadata['mention_user_names'] as List<dynamic>)
@@ -359,38 +353,20 @@ class _ChatMessageRow extends ConsumerWidget {
     // set_my_message_color فعليًا) وmessage_color (bigint قديم).
     // 4294967295 = أبيض افتراضي أي "بلا اختيار" فيُترك اللون الأساسي.
     final senderUid = row['user_id']?.toString().trim() ?? '';
-    Color messageTextColor = const Color(0xFF1E293B);
-    // تنسيق الخط الذي اختاره المُرسِل (غامق/مائل/حجم) — يُحفظ على
-    // profiles ويصل مع اللون في نداء الهوية نفسه.
-    bool msgBold = false;
-    bool msgItalic = false;
-    double msgScale = 1.0;
+    Map<String, dynamic>? senderIdentity;
     if (!isSystemBot && senderUid.isNotEmpty) {
-      final identity = (roomId == null || roomId!.isEmpty)
+      senderIdentity = (roomId == null || roomId!.isEmpty)
           ? ref.watch(serverUserIdentityProvider(senderUid)).valueOrNull
           : ref
               .watch(serverUserIdentityInRoomProvider(
                   (uid: senderUid, roomId: roomId!)))
               .valueOrNull;
-      if (identity != null) {
-        final hex = (identity['message_color_1'] ?? '')
-            .toString()
-            .replaceAll('#', '')
-            .trim();
-        final legacy =
-            int.tryParse(identity['message_color']?.toString() ?? '');
-        if (hex.length == 6) {
-          final n = int.tryParse('FF$hex', radix: 16);
-          if (n != null) messageTextColor = Color(n);
-        } else if (legacy != null && legacy != 4294967295) {
-          messageTextColor = Color(legacy);
-        }
-        msgBold = identity['message_bold'] == true;
-        msgItalic = identity['message_italic'] == true;
-        msgScale = double.tryParse(
-                identity['message_font_scale']?.toString() ?? '') ??
-            1.0;
-      }
+    }
+    // تنزيل خط المُرسِل وتسجيله. الهوية تحمل المفتاح لكنها لا تُنزّل،
+    // وMessageTextStyle لا يُطبّق خطًّا غير محمَّل — فبلا هذا المزوّد
+    // يبقى الخط المختار افتراضيًّا أبدًا.
+    if (!isSystemBot && senderUid.isNotEmpty) {
+      ref.watch(serverMessageFontKeyProvider(senderUid));
     }
     // Username size is profile-owned and rendered at its exact server value.
     // The frame/smiley visual-size control must not distort the user's name.
@@ -619,17 +595,20 @@ class _ChatMessageRow extends ConsumerWidget {
                                     // ServerChatInlineMessage التي لا تستعملها
                                     // الغرف أصلًا (الخاص وحده). الخط هنا من مفتاح
                                     // المرسِل الخادمي، ويُعاد البناء حين يجهز.
+                                    // التنسيق يُحسَب داخل المستمع لا خارجه:
+                                    // الخط يجهز بعد أول بناء، وقيمة
+                                    // محسوبة في الأعلى تبقى قديمة فلا
+                                    // يظهر الخط إلا بعد خروج ودخول.
                                     child: ValueListenableBuilder<int>(
                                       valueListenable: ServerFonts.revision,
                                       builder: (_, __, ___) => _content(
-                                          smileySize, messageTextColor,
-                                          bold: msgBold,
-                                          italic: msgItalic,
-                                          scale: msgScale,
-                                          fontFamily: loadedServerFontFamily(ref
-                                              .watch(serverMessageFontKeyProvider(
-                                                  row['user_id']?.toString() ?? ''))
-                                              .valueOrNull)),
+                                        smileySize,
+                                        MessageTextStyle.fromIdentity(
+                                          senderIdentity,
+                                          fallbackColor:
+                                              const Color(0xFF1E293B),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),

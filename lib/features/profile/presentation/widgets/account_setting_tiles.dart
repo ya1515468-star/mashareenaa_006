@@ -1,9 +1,11 @@
 import '../../../../core/data/supabase_document_compat.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/sound_preferences.dart';
 
 enum VisibilityChoice { everyone, friendsOnly, nobody }
 
@@ -66,6 +68,15 @@ class AccountSettingsStore {
   }
 }
 
+/// خيار خصوصية: الجميع / الأصدقاء فقط / لا أحد.
+///
+/// كانت هذه المفاتيح الخمسة (من يرى أصدقائي، نقاطي، من يراسلني خاصًّا،
+/// من يطلب الحديث، من يتحدّاني بالنرد) تُكتَب في مجموعة `accounts`
+/// التي لا يقرأها أيّ شيء في التطبيق — فيضبطها العضو وتُحفَظ ولا تحكم
+/// شيئًا. وخصوصيةٌ تبدو مضبوطة وهي غير نافذة أسوأ من غيابها: يظنّ
+/// صاحبها أنّه محميّ.
+///
+/// الآن تُحفَظ في أعمدة خادمية ويُفرَض القرار في الخادم.
 class AccountChoiceSettingTile extends StatefulWidget {
   final String uid;
   final String field;
@@ -99,17 +110,18 @@ class _AccountChoiceSettingTileState extends State<AccountChoiceSettingTile> {
   }
 
   Future<void> _load() async {
-    final raw = await AccountSettingsStore.readField(
-      widget.uid,
-      widget.field,
-    );
-
-    if (!mounted) return;
-
-    setState(() {
-      _value = VisibilityChoiceX.fromWire(raw as String?);
-      _loaded = true;
-    });
+    try {
+      final raw = await Supabase.instance.client
+          .rpc('get_my_privacy_preferences');
+      final m = raw is Map ? Map<String, dynamic>.from(raw) : const {};
+      if (!mounted) return;
+      setState(() {
+        _value = VisibilityChoiceX.fromWire(m[widget.field] as String?);
+        _loaded = true;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loaded = true);
+    }
   }
 
   Future<void> _openPicker() async {
@@ -150,14 +162,20 @@ class _AccountChoiceSettingTileState extends State<AccountChoiceSettingTile> {
       _value = selected;
     });
 
+    final previous = _value;
     try {
-      await AccountSettingsStore.writeField(
-        widget.uid,
-        widget.field,
-        selected.wire,
-      );
+      await Supabase.instance.client.rpc('set_my_privacy_preference',
+          params: {'p_key': widget.field, 'p_value': selected.wire});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(
+        content: Text('حُفظ على الخادم ✓'),
+        backgroundColor: Color(0xFF16A34A),
+      ));
     } catch (e) {
       if (!mounted) return;
+      // يُعاد الاختيار الظاهر إلى ما هو محفوظ فعلًا: إبقاؤه على ما
+      // فشل حفظه يُري العضو خصوصيةً لا وجود لها.
+      setState(() => _value = previous);
       ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(content: Text('تعذر حفظ الإعداد: $e')),
       );
@@ -193,6 +211,13 @@ class AccountSwitchSettingTile extends StatefulWidget {
   final String? subtitle;
   final bool defaultValue;
 
+  /// مفتاح التفضيل على الخادم في `chat_notification_preferences`.
+  ///
+  /// مفاتيح الأصوات كانت تُكتَب في مجموعة `accounts` التي لا يقرأها
+  /// أيّ شيء، فيبدو الإطفاء ناجحًا وتبقى الأصوات تُشتغل. تمريره هنا
+  /// يحوّل المفتاح إلى الجدول الخادمي الذي يقرأه مشغّل الأصوات فعلًا.
+  final String? soundPrefKey;
+
   const AccountSwitchSettingTile({
     super.key,
     required this.uid,
@@ -201,6 +226,7 @@ class AccountSwitchSettingTile extends StatefulWidget {
     required this.title,
     this.subtitle,
     this.defaultValue = false,
+    this.soundPrefKey,
   });
 
   @override
@@ -218,6 +244,14 @@ class _AccountSwitchSettingTileState extends State<AccountSwitchSettingTile> {
   }
 
   Future<void> _load() async {
+    final key = widget.soundPrefKey;
+    if (key != null) {
+      final v = await SoundPreferences.instance
+          .flag(key, defaultValue: widget.defaultValue);
+      if (!mounted) return;
+      setState(() => _value = v);
+      return;
+    }
     final raw = await AccountSettingsStore.readField(
       widget.uid,
       widget.field,
@@ -254,11 +288,16 @@ class _AccountSwitchSettingTileState extends State<AccountSwitchSettingTile> {
               });
 
               try {
-                await AccountSettingsStore.writeField(
-                  widget.uid,
-                  widget.field,
-                  v,
-                );
+                final key = widget.soundPrefKey;
+                if (key != null) {
+                  await SoundPreferences.instance.setFlag(key, v);
+                } else {
+                  await AccountSettingsStore.writeField(
+                    widget.uid,
+                    widget.field,
+                    v,
+                  );
+                }
               } catch (e) {
                 if (!context.mounted) return;
                 setState(() => _value = !v);

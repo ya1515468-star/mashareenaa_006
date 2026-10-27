@@ -8,6 +8,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
+import 'package:share_plus/share_plus.dart';
+import '../../../../core/widgets/served_ad_slot.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../providers/producers_market_provider.dart';
@@ -139,18 +141,38 @@ class _ProducersMarketPageState extends ConsumerState<ProducersMarketPage>
                       if (reels.isEmpty) {
                         return _EmptyMarketState(onPublish: _showPublishSheet);
                       }
+                      // موضع «سوق المنتجين»: صفحة إعلان كاملة بين كل
+                      // عدد من الريلات يضبطه المالك. مغلقًا = لا صفحة
+                      // إعلان إطلاقًا، فالقائمة كما كانت بالضبط.
+                      final placements = ref
+                              .watch(adPlacementsProvider)
+                              .valueOrNull ??
+                          const {};
+                      final slots = AdInterleave(
+                          adEveryN(placements, 'producers_market'),
+                          reels.length);
                       return PageView.builder(
                         controller: _pageController,
                         scrollDirection: Axis.vertical,
                         onPageChanged: (i) =>
                             setState(() => _currentIndex = i),
-                        itemCount: reels.length,
-                        itemBuilder: (context, i) => _ReelPlayer(
-                          reel: reels[i],
-                          isActive: i == _currentIndex,
-                          glowAnim: _glowAnim,
-                          isOwner: _isOwner,
-                        ),
+                        itemCount: slots.rowCount,
+                        itemBuilder: (context, i) {
+                          if (slots.isAd(i)) {
+                            return const ServedAdSlot(
+                                placement: 'producers_market',
+                                fullPage: true);
+                          }
+                          final index = slots.itemIndex(i);
+                          return _ReelPlayer(
+                            reel: reels[index],
+                            // المقارنة بصفّ الصفحة لا بفهرس الريل:
+                            // خلطهما يُشغّل فيديو صفحةٍ أخرى.
+                            isActive: i == _currentIndex,
+                            glowAnim: _glowAnim,
+                            isOwner: _isOwner,
+                          );
+                        },
                       );
                     },
                     loading: () => const Center(
@@ -465,9 +487,7 @@ class _ReelPlayerState extends ConsumerState<_ReelPlayer>
               onShare: () => ref
                   .read(producerMarketControllerProvider.notifier)
                   .shareReel(widget.reel.id),
-              onDownload: () => ref
-                  .read(producerMarketControllerProvider.notifier)
-                  .downloadReel(widget.reel.id),
+              onDownload: _download,
             ),
           ),
 
@@ -494,6 +514,44 @@ class _ReelPlayerState extends ConsumerState<_ReelPlayer>
         ],
       ),
     );
+  }
+
+  bool _downloading = false;
+
+  /// التحميل: الخادم يتحقّق ويعطي الرابط، ثم يُكتَب الملف ويُعرَض
+  /// زرّ مشاركة ليصل المستخدم إلى الملف بسهولة.
+  ///
+  /// التقدّم والنتيجة كلاهما ظاهر: الزرّ كان صامتًا تمامًا من قبل، فلا
+  /// يُعرَف أعَمِل أم لا.
+  Future<void> _download() async {
+    if (_downloading) return;
+    setState(() => _downloading = true);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.showSnackBar(const SnackBar(
+        content: Text('جارٍ تنزيل الفيديو…'), duration: Duration(seconds: 2)));
+    try {
+      final path = await ref
+          .read(producerMarketControllerProvider.notifier)
+          .downloadReel(widget.reel.id);
+      if (!mounted) return;
+      messenger?.showSnackBar(SnackBar(
+        content: const Text('نُزّل الفيديو ✓'),
+        backgroundColor: const Color(0xFF16A34A),
+        action: SnackBarAction(
+          label: 'مشاركة',
+          textColor: Colors.white,
+          onPressed: () => Share.shareXFiles([XFile(path)]),
+        ),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      messenger?.showSnackBar(SnackBar(
+        content: Text(ProducerMarketController.downloadError(e)),
+        backgroundColor: const Color(0xFFDC2626),
+      ));
+    } finally {
+      if (mounted) setState(() => _downloading = false);
+    }
   }
 
   void _showComments() {

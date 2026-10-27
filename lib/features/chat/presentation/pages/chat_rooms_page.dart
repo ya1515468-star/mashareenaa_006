@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'chat_lobby_page.dart';
+import '../../../../core/widgets/served_ad_slot.dart';
 
 class ChatRoomsPage extends ConsumerWidget {
   const ChatRoomsPage({super.key});
@@ -25,11 +26,20 @@ class ChatRoomsPage extends ConsumerWidget {
           if (rows.isEmpty) {
             return const Center(child: Text('لا توجد غرف نشطة'));
           }
+          // موضع «بهو الشات وقائمة الغرف» — أكثر شاشة تُدخَل يوميًّا.
+          // تردّده وفتحه وإغلاقه كلّها بيد المالك.
+          final placements =
+              ref.watch(adPlacementsProvider).valueOrNull ?? const {};
+          final slots =
+              AdInterleave(adEveryN(placements, 'chat_lobby'), rows.length);
           return ListView.separated(
-            itemCount: rows.length,
+            itemCount: slots.rowCount,
             separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (_, i) {
-              final r = rows[i];
+              if (slots.isAd(i)) {
+                return const ServedAdSlot(placement: 'chat_lobby');
+              }
+              final r = rows[slots.itemIndex(i)];
               final roomId = r['id']?.toString();
               if (roomId == null || roomId.isEmpty) {
                 return const SizedBox.shrink();

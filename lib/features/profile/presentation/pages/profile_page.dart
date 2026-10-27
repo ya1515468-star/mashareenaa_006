@@ -12,9 +12,7 @@ import '../../../../core/widgets/embedded_media_player.dart';
 import '../../../../core/widgets/error_view.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-import '../../../feedback/presentation/submit_feedback_page.dart';
 import '../../../gamification/presentation/providers/gamification_provider.dart';
-import '../../../gamification/presentation/widgets/mystery_spin_dialog.dart';
 import '../../../rbac/presentation/widgets/server_chat_badge_above_name.dart';
 import '../../../rbac/presentation/widgets/server_username_display.dart';
 import '../../../store/domain/entities/store_item_entity.dart';
@@ -43,6 +41,48 @@ class ProfilePage extends ConsumerStatefulWidget {
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
 
+  bool _signingOut = false;
+
+  /// لماذا كان الزرّ يبدو ميتًا: هذه الصفحة **مدفوعة** على المُوجِّه
+  /// (Navigator.push من بهو الشات)، وقرار التوجيه كلّه في AppRouter
+  /// الذي يقع **تحتها**. فعند الخروج تُمسح الجلسة ويُعاد بناء AppRouter
+  /// إلى شاشة الدخول — لكن أسفل هذه الصفحة التي تبقى معروضة، وقد صار
+  /// ملفها الشخصي null فتُظهر مؤشّر تحميل لا ينتهي. أي أنّ الخروج كان
+  /// ينجح فعلًا ولا يراه المستخدم.
+  ///
+  /// فلزم إغلاق كل المسارات المدفوعة بعد الخروج حتى تظهر شاشة الدخول.
+  Future<void> _signOut() async {
+    if (_signingOut) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('تسجيل الخروج'),
+        content: const Text('سيتم إنهاء جلستك على هذا الجهاز. متابعة؟'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('إلغاء')),
+          FilledButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('خروج')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _signingOut = true);
+    final navigator = Navigator.of(context, rootNavigator: true);
+    try {
+      await ref.read(authControllerProvider.notifier).signOut();
+      navigator.popUntil((r) => r.isFirst);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _signingOut = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('تعذّر تسجيل الخروج: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(currentProfileProvider);
@@ -54,8 +94,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'تسجيل الخروج',
-            onPressed: () =>
-                ref.read(authControllerProvider.notifier).signOut(),
+            onPressed: _signOut,
           ),
         ],
       ),
@@ -415,32 +454,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      // المستخدمون المحظورون، ومن زار ملفي.
-                      const SizedBox(height: 16),
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          OutlinedButton.icon(
-                            icon: const Icon(Icons.lightbulb_outline),
-                            label: const Text('اقترح فكرة'),
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const SubmitFeedbackPage(),
-                              ),
-                            ),
-                          ),
-                          OutlinedButton.icon(
-                            icon: const Icon(Icons.donut_large),
-                            label: const Text('عجلة الحظ'),
-                            onPressed: () => MysterySpinDialog.show(
-                              context,
-                              profile.uid,
-                            ),
-                          ),
-                        ],
-                      ),
+                      // أُزيل زرّا «اقترح فكرة» و«عجلة الحظ» من البروفايل
+                      // بالكامل بطلب المالك.
                       if (profile.profileMusicUrl != null &&
                           profile.profileMusicUrl!.isNotEmpty)
                         Consumer(

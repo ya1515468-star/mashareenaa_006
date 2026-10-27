@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -233,11 +237,52 @@ class ProducerMarketController extends StateNotifier<AsyncValue<void>> {
     return 'تعذّر النشر: $s';
   }
 
-  Future<void> downloadReel(String reelId) async {
-    try {
-      await _db.rpc('reel_interact',
-          params: {'p_reel_id': reelId, 'p_action': 'download'});
-    } catch (_) {}
+  /// ينزّل الفيديو فعلًا إلى الجهاز.
+  ///
+  /// كان هذا التابع يُسجّل حدثًا في الخادم ولا يُنزّل شيئًا، ثم يبتلع
+  /// أي خطأ بـ`catch (_) {}` — فلا ملف ولا رسالة: الزرّ لا يفعل شيئًا
+  /// بالمرّة. وهو ما وُصف بـ«زر التحميل لا يعمل».
+  ///
+  /// الإذن خادمي (allow_download يضبطه الناشر والمالك)، فالخادم هو من
+  /// يتحقّق ويعطي الرابط ويعدّ التحميل في نداء واحد.
+  ///
+  /// يُعيد مسار الملف عند النجاح، ويرمي رسالة عربية عند الرفض.
+  Future<String> downloadReel(String reelId) async {
+    final raw = await _db.rpc('reel_download_url', params: {'p_reel_id': reelId});
+    final data = raw is Map ? Map<String, dynamic>.from(raw) : const {};
+    final url = data['url']?.toString() ?? '';
+    if (url.isEmpty) throw 'لم يُعطِ الخادم رابطًا للفيديو';
+
+    final res = await http.get(Uri.parse(url));
+    if (res.statusCode != 200 || res.bodyBytes.isEmpty) {
+      throw 'تعذّر تنزيل الفيديو (${res.statusCode})';
+    }
+
+    // يُكتَب في مجلّد المستندات لا في المؤقّت: المؤقّت يُمحى بلا إشعار،
+    // فيجد المستخدم ما «نزّله» مفقودًا.
+    final dir = await getApplicationDocumentsDirectory();
+    final safe = (data['title']?.toString() ?? 'reel')
+        .replaceAll(RegExp(r'[^\w\u0600-\u06FF ]'), '')
+        .trim();
+    final name = '${safe.isEmpty ? 'reel' : safe}_'
+        '${DateTime.now().millisecondsSinceEpoch}.mp4';
+    final file = File('${dir.path}/$name');
+    await file.writeAsBytes(res.bodyBytes);
+    return file.path;
+  }
+
+  /// رسالة عربية لكل رفض خادمي، فلا يرى المستخدم رمزًا.
+  static String downloadError(Object e) {
+    final s = e.toString();
+    if (s.contains('DOWNLOAD_NOT_ALLOWED')) {
+      return 'صاحب الفيديو لم يسمح بتحميله.';
+    }
+    if (s.contains('REEL_EXPIRED')) return 'انتهت مدّة ظهور هذا الفيديو.';
+    if (s.contains('REEL_UNAVAILABLE')) return 'هذا الفيديو غير متاح حاليًا.';
+    if (s.contains('REEL_NOT_FOUND')) return 'لم يُعثر على الفيديو.';
+    if (s.contains('VIDEO_MISSING')) return 'لا ملف فيديو مرفق بهذا المنشور.';
+    if (s.contains('AUTH_REQUIRED')) return 'سجّل الدخول أوّلًا.';
+    return 'تعذّر التحميل: $s';
   }
 
   // مالك المنصة فقط

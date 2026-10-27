@@ -25,6 +25,7 @@ import '../../../core/widgets/avatar_frame_compositor.dart';
 import '../../admin/presentation/widgets/admin_gift_dialog.dart';
 import 'providers/chat_store_sections_provider.dart';
 import '../domain/chat_store_section_icons.dart';
+import 'widgets/message_style_preview_bar.dart';
 import 'widgets/chat_store_sections_settings_dialog.dart';
 import 'widgets/name_background_picker_dialog.dart';
 import '../../subscriptions/presentation/widgets/membership_store_tab.dart';
@@ -115,6 +116,25 @@ final serverAvatarFramesProvider = FutureProvider<List<AvatarFrameDefinition>>((
       .toList(growable: false);
 });
 
+
+/// مقاسات بطاقات المواد التجميلية في متجر الشات، في مكان واحد.
+///
+/// كانت كل شبكة تحمل مقاسها الخاص (175×188، 185×168، 160×166، 260 بنسبة
+/// 2.6…) فظهرت البطاقات متفاوتة الأحجام وكبيرة، وتصغيرها يعني تعديل كل
+/// شبكة على حدة — فتُنسى واحدة. الآن رقم واحد يحكمها كلها.
+class _CosmeticCard {
+  const _CosmeticCard._();
+
+  /// بطاقة مربّعة (إطارات، خلفيات، تأثيرات، حيوانات).
+  static const double tileWidth = 124;
+  static const double tileHeight = 134;
+
+  /// بطاقة صفّية عريضة (ألوان الرسائل: عيّنة + اسم + سعر).
+  static const double rowWidth = 196;
+  static const double rowAspect = 3.1;
+
+  static const double gap = 7;
+}
 
 final messageColorCatalogProvider = FutureProvider<List<ProfileCosmeticItem>>((ref) async {
   final raw = await Supabase.instance.client.rpc('get_message_color_catalog');
@@ -239,6 +259,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       ref.invalidate(serverUserIdentityProvider);
       ref.invalidate(serverUserIdentityInRoomProvider);
       ref.invalidate(currentProfileProvider);
+      refreshMessageStylePreview(ref);
       final uid = Supabase.instance.client.auth.currentUser?.id;
       if (uid != null) ref.invalidate(profileByIdProvider(uid));
       if (!mounted) return; ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم الحفظ وتحديث البروفايل')));
@@ -705,10 +726,10 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
           padding: const EdgeInsets.fromLTRB(10, 10, 10, 24),
           gridDelegate:
               const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 175,
-            mainAxisExtent: 188,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
+            maxCrossAxisExtent: _CosmeticCard.tileWidth,
+            mainAxisExtent: _CosmeticCard.tileHeight,
+            crossAxisSpacing: _CosmeticCard.gap,
+            mainAxisSpacing: _CosmeticCard.gap,
           ),
           itemCount: items.length + 1,
           itemBuilder: (context, rawIndex) {
@@ -801,8 +822,11 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
         return ListView(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 90),
           children: [
-            // الخادم set_my_message_style جاهز منذ إضافته لتنسيق الرسائل
-            // (غامق/مائل) لكنه كان بلا أي واجهة تصل إليه إطلاقًا.
+            // الشريط أعلى القسم: الخط وشكله ولونه ومتدرّجه وتفاصيله كما
+            // ستظهر في الغرف والخاص، بالمُفسِّر نفسه الذي ترسم به الغرف.
+            // بلا معاينة كان العضو يختار ثم يخرج ليتحقّق، فإن لم يرَ فرقًا
+            // لم يعرف أهو عطل في الحفظ أم في العرض.
+            const MessageStylePreviewBar(),
             const _MessageTextStyleSection(),
             const SizedBox(height: 18),
             const _ServerFontPicker(),
@@ -829,7 +853,11 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: items.length,
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 260, childAspectRatio: 2.6, crossAxisSpacing: 8, mainAxisSpacing: 8),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: _CosmeticCard.rowWidth,
+          childAspectRatio: _CosmeticCard.rowAspect,
+          crossAxisSpacing: _CosmeticCard.gap,
+          mainAxisSpacing: _CosmeticCard.gap),
       itemBuilder: (_, index) {
         final item = items[index];
         final owned = owner || ref.watch(myProfileCosmeticOwnershipProvider).valueOrNull?.contains(item.key) == true || item.pricePoints == 0 && item.priceGems == 0;
@@ -874,8 +902,8 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(10, 12, 10, 90),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 160,
-        mainAxisExtent: 166,
+        maxCrossAxisExtent: _CosmeticCard.tileWidth,
+        mainAxisExtent: _CosmeticCard.tileHeight,
         crossAxisSpacing: 9,
         mainAxisSpacing: 9,
       ),
@@ -995,10 +1023,10 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
               GridView.builder(
                 padding: const EdgeInsets.fromLTRB(10, 12, 10, 90),
                 gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 185,
-                  mainAxisExtent: 168,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
+                  maxCrossAxisExtent: _CosmeticCard.tileWidth,
+                  mainAxisExtent: _CosmeticCard.tileHeight,
+                  crossAxisSpacing: _CosmeticCard.gap,
+                  mainAxisSpacing: _CosmeticCard.gap,
                 ),
                 itemCount: frames.length,
                 itemBuilder: (_, index) {
@@ -1864,8 +1892,17 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
   Widget _nameAnimalsSection(bool owner, {String displayMode = 'details'}) {
     final catalog = ref.watch(nameAnimationCatalogProvider);
     final own = ref.watch(myNameAnimationOwnershipProvider).valueOrNull ?? const <String>{};
-    final gridExtent = switch (displayMode) { 'small_icons' => 108.0, 'large_icons' => 225.0, _ => 175.0 };
-    final gridMainExtent = switch (displayMode) { 'small_icons' => 128.0, 'large_icons' => 215.0, _ => 166.0 };
+    // الافتراضي صار المقاس المضغوط نفسه؛ ومن أراد أكبر يختاره صراحةً.
+    final gridExtent = switch (displayMode) {
+      'small_icons' => 96.0,
+      'large_icons' => 180.0,
+      _ => _CosmeticCard.tileWidth,
+    };
+    final gridMainExtent = switch (displayMode) {
+      'small_icons' => 108.0,
+      'large_icons' => 176.0,
+      _ => _CosmeticCard.tileHeight,
+    };
     return catalog.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (_, __) => const Center(child: Text('تعذر تحميل حيوانات الاسم الآن.')),
@@ -2397,10 +2434,11 @@ class _AddRemoteFrameDialogState extends State<_AddRemoteFrameDialog> {
   );
 }
 
-/// غامق ومائل لنص الرسائل — الخادم (set_my_message_style) جاهز
-/// منذ إضافته لكن بلا أي واجهة، فبقيت الميزة غير قابلة للوصول.
-/// المقياس محدود خادميًا بين 0.80 و1.60 أصلًا (الحدّ الفعلي هناك
-/// لا هنا)، فالواجهة تكتفي بغامق/مائل فقط دون منزلق حجم إضافي.
+/// تنسيق نص الرسائل: غامق، مائل، تحته خط، تعريض، وحجم.
+///
+/// تحته خط والتعريض لم يكونا موجودين لا في الخادم ولا في الواجهة.
+/// والحدود كلها خادمية (0.80–1.60 للحجم، 0–4 للتعريض): خطّ ضخم أو
+/// تباعد مفرط يفسد تخطيط الغرفة على كلّ من فيها لا على صاحبه.
 class _MessageTextStyleSection extends ConsumerStatefulWidget {
   const _MessageTextStyleSection();
   @override
@@ -2412,47 +2450,89 @@ class _MessageTextStyleSectionState
     extends ConsumerState<_MessageTextStyleSection> {
   bool? _bold;
   bool? _italic;
+  bool? _underline;
+  double _spacing = 0;
+  double _scale = 1;
   bool _busy = false;
-
-  Future<void> _load() async {
-    final uid = Supabase.instance.client.auth.currentUser?.id;
-    if (uid == null) return;
-    final row = await Supabase.instance.client
-        .from('profiles')
-        .select('message_bold, message_italic')
-        .eq('id', uid)
-        .maybeSingle();
-    if (mounted) {
-      setState(() {
-        _bold = row?['message_bold'] == true;
-        _italic = row?['message_italic'] == true;
-      });
-    }
-  }
 
   @override
   void initState() {
     super.initState();
-    _load();
+    unawaited(_load());
   }
 
-  Future<void> _apply({bool? bold, bool? italic}) async {
+  Future<void> _load() async {
+    try {
+      final raw =
+          await Supabase.instance.client.rpc('get_my_message_style');
+      final m = raw is Map ? Map<String, dynamic>.from(raw) : const {};
+      if (!mounted) return;
+      setState(() {
+        _bold = m['bold'] == true;
+        _italic = m['italic'] == true;
+        _underline = m['underline'] == true;
+        _spacing =
+            (double.tryParse('${m['letter_spacing'] ?? 0}') ?? 0).clamp(0, 4);
+        _scale =
+            (double.tryParse('${m['font_scale'] ?? 1}') ?? 1).clamp(0.8, 1.6);
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _bold ??= false;
+          _italic ??= false;
+          _underline ??= false;
+        });
+      }
+    }
+  }
+
+  Future<void> _apply({
+    bool? bold,
+    bool? italic,
+    bool? underline,
+    double? spacing,
+    double? scale,
+  }) async {
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.maybeOf(context);
     try {
-      await Supabase.instance.client.rpc('set_my_message_style', params: {
+      final res =
+          await Supabase.instance.client.rpc('set_my_message_style', params: {
         'p_bold': bold,
         'p_italic': italic,
+        'p_underline': underline,
+        'p_letter_spacing': spacing,
+        'p_font_scale': scale,
       });
-      setState(() {
-        if (bold != null) _bold = bold;
-        if (italic != null) _italic = italic;
-      });
+      // القيم المعروضة تُؤخَذ من ردّ الخادم لا من النقرة: الخادم يقصّ ما
+      // يتجاوز حدّه، فعرض ما طُلب يُظهر للعضو قيمة لم تُحفَظ.
+      final m = res is Map ? Map<String, dynamic>.from(res) : const {};
+      if (mounted) {
+        setState(() {
+          if (m.isEmpty) {
+            if (bold != null) _bold = bold;
+            if (italic != null) _italic = italic;
+            if (underline != null) _underline = underline;
+            if (spacing != null) _spacing = spacing;
+            if (scale != null) _scale = scale;
+          } else {
+            _bold = m['bold'] == true;
+            _italic = m['italic'] == true;
+            _underline = m['underline'] == true;
+            _spacing = (double.tryParse('${m['letter_spacing'] ?? 0}') ?? 0)
+                .clamp(0, 4);
+            _scale = (double.tryParse('${m['font_scale'] ?? 1}') ?? 1)
+                .clamp(0.8, 1.6);
+          }
+        });
+      }
       // العائلتان كاملتين: الغرفة تقرأ النسخة المفهرَسة بـroomId، وهي
-      // غير معروفة هنا، فإبطال نسخة الـuid وحدها يترك الغامق/المائل
-      // قديمًا في الشات حتى خروج ودخول.
+      // غير معروفة هنا، فإبطال نسخة الـuid وحدها يترك التنسيق قديمًا
+      // في الشات حتى خروج ودخول.
       ref.invalidate(serverUserIdentityProvider);
       ref.invalidate(serverUserIdentityInRoomProvider);
+      refreshMessageStylePreview(ref);
     } catch (e) {
       messenger?.showSnackBarSfx(SnackBar(content: Text('تعذّر الحفظ: $e')));
     } finally {
@@ -2462,29 +2542,102 @@ class _MessageTextStyleSectionState
 
   @override
   Widget build(BuildContext context) {
-    if (_bold == null || _italic == null) {
+    if (_bold == null || _italic == null || _underline == null) {
       return const SizedBox(height: 40);
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Row(
-        children: [
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
           _styleToggle(
             icon: Icons.format_bold_rounded,
             label: 'غامق',
             active: _bold!,
             onTap: _busy ? null : () => _apply(bold: !_bold!),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           _styleToggle(
             icon: Icons.format_italic_rounded,
             label: 'مائل',
             active: _italic!,
             onTap: _busy ? null : () => _apply(italic: !_italic!),
           ),
-        ],
-      ),
+          const SizedBox(width: 8),
+          _styleToggle(
+            icon: Icons.format_underlined_rounded,
+            label: 'تحته خط',
+            active: _underline!,
+            onTap: _busy ? null : () => _apply(underline: !_underline!),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        _slider(
+          icon: Icons.compare_arrows_rounded,
+          label: 'تعريض الحروف',
+          value: _spacing,
+          min: 0,
+          max: 4,
+          divisions: 8,
+          display: _spacing == 0 ? 'بلا' : _spacing.toStringAsFixed(1),
+          onChanged: _busy ? null : (v) => setState(() => _spacing = v),
+          onDone: _busy ? null : () => _apply(spacing: _spacing),
+        ),
+        _slider(
+          icon: Icons.format_size_rounded,
+          label: 'حجم النص',
+          value: _scale,
+          min: 0.8,
+          max: 1.6,
+          divisions: 8,
+          display: '×${_scale.toStringAsFixed(2)}',
+          onChanged: _busy ? null : (v) => setState(() => _scale = v),
+          onDone: _busy ? null : () => _apply(scale: _scale),
+        ),
+      ]),
     );
+  }
+
+  /// الحفظ عند رفع الإصبع لا عند كل حركة: نداء خادمي لكل كسر عشري
+  /// يُغرق الخادم ويجعل المنزلق متقطّعًا.
+  Widget _slider({
+    required IconData icon,
+    required String label,
+    required double value,
+    required double min,
+    required double max,
+    required int divisions,
+    required String display,
+    required ValueChanged<double>? onChanged,
+    required VoidCallback? onDone,
+  }) {
+    return Row(children: [
+      Icon(icon, size: 16, color: Colors.white54),
+      const SizedBox(width: 6),
+      SizedBox(
+        width: 86,
+        child: Text(label,
+            style: const TextStyle(fontSize: 11.5, color: Colors.white70)),
+      ),
+      Expanded(
+        child: Slider(
+          value: value.clamp(min, max),
+          min: min,
+          max: max,
+          divisions: divisions,
+          activeColor: const Color(0xFFFFD700),
+          onChanged: onChanged,
+          onChangeEnd: onDone == null ? null : (_) => onDone(),
+        ),
+      ),
+      SizedBox(
+        width: 46,
+        child: Text(display,
+            textAlign: TextAlign.left,
+            style: const TextStyle(
+                fontSize: 11, color: Color(0xFFFFD700),
+                fontWeight: FontWeight.w900)),
+      ),
+    ]);
   }
 
   Widget _styleToggle({
@@ -2504,20 +2657,18 @@ class _MessageTextStyleSectionState
                 : Colors.white10,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-                color: active
-                    ? const Color(0xFFFFD700)
-                    : Colors.white24),
+                color: active ? const Color(0xFFFFD700) : Colors.white24),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon,
                   size: 18,
                   color: active ? const Color(0xFFFFD700) : Colors.white60),
-              const SizedBox(width: 6),
+              const SizedBox(height: 2),
               Text(label,
                   style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w800,
                       color: active
                           ? const Color(0xFFFFD700)
@@ -2530,9 +2681,6 @@ class _MessageTextStyleSectionState
   }
 }
 
-/// تلوين شارة الرتبة بمؤثر من مؤثرات الاسم وخلفية من خلفيات إطار الاسم. يُستعمل
-/// ما يملكه العضو من المتجر (أو يشتريه من هنا)؛ التطبيق عبر set_my_role_style
-/// التي تتحقق من الملكية خادميًا، والمالك بلا شراء.
 class _RoleColorTab extends StatefulWidget {
   /// قائمة المالك (تعديل شامل/إهداء/حذف) المشتركة مع بقية تبويبات المتجر.
   final Widget Function(ProfileCosmeticItem item) ownerMenu;
@@ -2828,6 +2976,7 @@ class _ServerFontPickerState extends ConsumerState<_ServerFontPicker> {
     setState(() => _busyKey = key ?? '');
     try {
       await Supabase.instance.client.rpc('set_my_message_font', params: {'p_font_key': key});
+      refreshMessageStylePreview(ref);
       // يُنتظَر تنزيل الخط وتسجيله قبل الإبطال، لا unawaited: الإبطال
       // الفوري يُعيد البناء والخط لم يُسجَّل بعد، فيسقط العرض إلى الخط
       // الافتراضي ولا يظهر المختار إلا بعد خروج ودخول.
@@ -2842,6 +2991,7 @@ class _ServerFontPickerState extends ConsumerState<_ServerFontPicker> {
       ref.invalidate(serverUserIdentityProvider);
       ref.invalidate(serverUserIdentityInRoomProvider);
       ref.invalidate(currentProfileProvider);
+      refreshMessageStylePreview(ref);
       if (mounted) setState(() => _current = key);
     } catch (_) {
       if (mounted) {

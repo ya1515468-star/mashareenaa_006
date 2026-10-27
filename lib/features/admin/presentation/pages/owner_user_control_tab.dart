@@ -2,6 +2,7 @@ import 'dart:async';
 import '../../../../core/widgets/animated_gold.dart';
 import '../../../../core/services/snack_sfx.dart';
 
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/geo_location_service.dart';
@@ -719,6 +720,19 @@ class _UserDetailSheet extends ConsumerWidget {
                   onPressed: () => _clearAll(context, ref),
                 ),
               ),
+            const Divider(height: 24, color: Colors.white12),
+            // استعادة كلمة المرور: أخطر إجراء هنا، فله زرّه الخاصّ
+            // وتأكيده الخاصّ ولا يُخلَط بأزرار القيود.
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.key_rounded, size: 18),
+                label: const Text('استعادة كلمة المرور'),
+                style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFFBBF24)),
+                onPressed: () => _resetPassword(context, ref),
+              ),
+            ),
           ],
         ),
 
@@ -853,6 +867,136 @@ class _UserDetailSheet extends ConsumerWidget {
       await Supabase.instance.client.rpc('owner_clear_user_restrictions',
           params: {'p_user_id': userId, 'p_reason': 'إلغاء شامل'});
     }, 'أُلغيت كل القيود');
+  }
+
+  /// استعادة كلمة مرور عضو.
+  ///
+  /// الطريقتان مُقدَّمتان بترتيب الأمان لا بترتيب السهولة: رابط البريد
+  /// أوّلًا لأنّ الكلمة فيه لا يعرفها أحد غير صاحب الحساب. والكلمة
+  /// المؤقّتة لمن لا يصل إلى بريده — وتُعرَض مرّة واحدة ويُلزَم صاحبها
+  /// بتغييرها عند أول دخول.
+  ///
+  /// التصريح كلّه خادمي: المالك والسوبر أدمن فقط، ولا أحد يمسّ حساب
+  /// المالك إلّا هو، ولا يمسّ السوبر أدمن نظيره. وكل محاولة — ناجحة
+  /// أو مرفوضة — تُسجَّل في التدقيق.
+  Future<void> _resetPassword(BuildContext context, WidgetRef ref) async {
+    final method = await showDialog<String>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('🔑 استعادة كلمة المرور'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: const [
+            Text(
+              'اختر الطريقة:',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+            SizedBox(height: 10),
+            Text(
+              '📧 رابط بالبريد — يصل العضو رابطًا يضبط به كلمته بنفسه. '
+              'الأفضل: لا أحد غيره يعرف الكلمة.\n\n'
+              '🔐 كلمة مؤقّتة — تُولَّد وتُعرَض لك مرّة واحدة لتُبلّغه '
+              'بها، ويُلزَم بتغييرها عند أول دخول. استعملها إن تعذّر '
+              'وصوله إلى بريده.',
+              style: TextStyle(fontSize: 12, height: 1.7),
+            ),
+          ]),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('إلغاء')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, 'temp_password'),
+                child: const Text('كلمة مؤقّتة')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, 'email_link'),
+                child: const Text('رابط بالبريد')),
+          ],
+        ),
+      ),
+    );
+    if (method == null || !context.mounted) return;
+
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      final res = await Supabase.instance.client.functions
+          .invoke('admin-password-reset', body: {
+        'target': userId,
+        'method': method,
+      });
+      final data = res.data is Map
+          ? Map<String, dynamic>.from(res.data as Map)
+          : const <String, dynamic>{};
+
+      if (data['error'] != null) throw data['error'].toString();
+
+      if (method == 'email_link') {
+        messenger?.showSnackBar(SnackBar(
+          content: Text('أُرسل رابط الاستعادة إلى ${data['email_masked'] ?? 'بريده'} ✓'),
+          backgroundColor: const Color(0xFF16A34A),
+        ));
+        return;
+      }
+
+      if (!context.mounted) return;
+      final pwd = data['password']?.toString() ?? '';
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('🔐 الكلمة المؤقّتة'),
+            content: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Text(
+                'تُعرَض مرّة واحدة فقط. انسخها وسلّمها للعضو، وسيُطلَب '
+                'منه تغييرها فور دخوله.',
+                style: TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              SelectableText(
+                pwd,
+                style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                    fontFamily: 'monospace'),
+              ),
+              if (data['warning'] != null) ...[
+                const SizedBox(height: 10),
+                Text('⚠️ ${data['warning']}',
+                    style: const TextStyle(
+                        fontSize: 11, color: Colors.orangeAccent)),
+              ],
+            ]),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: pwd));
+                  Navigator.pop(ctx);
+                },
+                child: const Text('نسخ وإغلاق'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      final s = e.toString();
+      messenger?.showSnackBar(SnackBar(
+        content: Text(
+          s.contains('CANNOT_RESET_OWNER')
+              ? 'لا يمكن إعادة ضبط كلمة مرور المالك من حساب آخر.'
+              : s.contains('TARGET_RANK_TOO_HIGH')
+                  ? 'لا تملك صلاحية على حساب بهذه الرتبة.'
+                  : s.contains('FORBIDDEN')
+                      ? 'هذا الإجراء للمالك والسوبر أدمن فقط.'
+                      : s.contains('TARGET_NOT_FOUND')
+                          ? 'لم يُعثر على الحساب أو لا بريد له.'
+                          : 'تعذّر التنفيذ: $s',
+        ),
+        backgroundColor: const Color(0xFFDC2626),
+      ));
+    }
   }
 
   Future<bool?> _confirm(

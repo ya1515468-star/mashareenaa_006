@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/served_ad_slot.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -113,15 +114,27 @@ class ConversationsPage extends ConsumerWidget {
                 ]),
               );
             }
+            // التردّد يضبطه المالك لكل موضع، ومغلقٌ يعني لا خانة
+            // إطلاقًا. والقرار خادمي أيضًا: لو تجاهل عميلٌ الإعداد
+            // وطلب إعلانًا لموضع مغلق لم يُعطَ شيئًا.
+            final placements =
+                ref.watch(adPlacementsProvider).valueOrNull ?? const {};
+            final slots =
+                AdInterleave(adEveryN(placements, 'conversations'), list.length);
             return ListView.separated(
               controller: scrollController,
-              itemCount: list.length,
+              itemCount: slots.rowCount,
               separatorBuilder: (_, __) =>
                   const Divider(height: 1, color: Colors.white10, indent: 76),
-              itemBuilder: (_, i) => _ThreadTile(
-                thread: list[i],
-                onChanged: () => ref.invalidate(myThreadsProvider),
-              ),
+              itemBuilder: (_, i) {
+                if (slots.isAd(i)) {
+                  return const ServedAdSlot(placement: 'conversations');
+                }
+                return _ThreadTile(
+                  thread: list[slots.itemIndex(i)],
+                  onChanged: () => ref.invalidate(myThreadsProvider),
+                );
+              },
             );
           },
             ),

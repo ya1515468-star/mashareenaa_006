@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/config/realtime_tuning.dart';
 import '../../../../core/navigation/app_navigator.dart';
 import '../../../../core/services/resilient_realtime_channel.dart';
+import '../../../../core/widgets/served_ad_slot.dart';
 import '../../../../core/services/server_sounds.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'game_hub.dart' show gameErrorText;

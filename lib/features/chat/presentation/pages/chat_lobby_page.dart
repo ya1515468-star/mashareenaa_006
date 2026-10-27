@@ -74,6 +74,7 @@ import 'chat_rooms_page.dart';
 import '../../../../core/widgets/animated_gold.dart';
 import '../../../../core/services/server_font_for_user.dart';
 import '../../../../core/services/server_fonts.dart';
+import '../../../../core/chat/message_text_style.dart';
 import 'chat_feature_settings_page.dart';
 import 'chat_notification_settings_page.dart';
 import 'directory_list_page.dart';

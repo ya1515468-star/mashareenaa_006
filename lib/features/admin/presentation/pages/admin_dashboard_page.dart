@@ -20,6 +20,7 @@ import 'admin_producers_market_tab.dart';
 import 'admin_content_bot_tab.dart';
 import 'admin_notifications_tab.dart';
 import 'admin_calls_tab.dart';
+import 'admin_ads_tab.dart';
 
 /// لوحة الإدارة — يجب ألا يصل إليها المستخدم إطلاقًا إلا عبر
 /// [PermissionGate] الذي يغلّف زر الوصول إليها (انظر HomeDashboardPage)؛
@@ -39,7 +40,7 @@ class AdminDashboardPage extends ConsumerWidget {
         ),
       ),
       child: DefaultTabController(
-        length: 18,
+        length: 19,
         child: Scaffold(
           appBar: AppBar(
             title: const Text('لوحة الإدارة'),
@@ -67,10 +68,11 @@ class AdminDashboardPage extends ConsumerWidget {
                 Tab(text: '🤖 بوت المحتوى'),
                 Tab(text: '🔔 الإشعارات والمنح'),
                 Tab(text: '📞 المكالمات'),
+                Tab(text: '📣 الإعلانات'),
               ],
             ),
           ),
-          // TabBarView يبني كل أبنائه فور الإنشاء — 18 شاشة إدارية
+          // TabBarView يبني كل أبنائه فور الإنشاء — 19 شاشة إدارية
           // تفتح استعلاماتها واشتراكاتها الحيّة معًا لحظة الدخول،
           // فتتجمّد اللوحة. _LazyTab يؤجّل بناء كل تبويب إلى أول
           // مرة يُفتح فيها فعلًا، ثم يحتفظ به.
@@ -94,6 +96,7 @@ class AdminDashboardPage extends ConsumerWidget {
               _LazyTab(builder: () => const AdminContentBotTab()),
               _LazyTab(builder: () => const AdminNotificationsTab()),
               _LazyTab(builder: () => const AdminCallsTab()),
+              _LazyTab(builder: () => const AdminAdsTab()),
             ],
           ),
         ),
@@ -104,7 +107,7 @@ class AdminDashboardPage extends ConsumerWidget {
 
 /// يؤجّل بناء محتوى التبويب حتى أول ظهور، ثم يُبقيه حيًّا.
 ///
-/// بلا هذا تُبنى الشاشات الثمانية عشرة كلها عند فتح اللوحة، فتنطلق
+/// بلا هذا تُبنى الشاشات التسعة عشرة كلها عند فتح اللوحة، فتنطلق
 /// عشرات الاستعلامات واشتراكات Realtime في اللحظة نفسها — وهو سبب
 /// تجمّد لوحة المالك عند الدخول.
 class _LazyTab extends StatefulWidget {
