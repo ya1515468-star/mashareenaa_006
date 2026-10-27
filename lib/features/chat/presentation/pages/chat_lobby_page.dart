@@ -1441,13 +1441,13 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
           textDirection: TextDirection.rtl,
           child: AlertDialog(
             title: const Text('كاتب الرسالة المجهولة'),
-            content: Column(mainAxisSize: MainAxisSize.min, children: [
+            content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
               Text('${m['display_name'] ?? m['username'] ?? 'عضو'}',
                   style: const TextStyle(fontWeight: FontWeight.w900)),
               const SizedBox(height: 6),
               Text('أُرسلت: ${m['sent_at'] ?? ''}',
                   style: const TextStyle(fontSize: 11)),
-            ]),
+            ])),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(c),

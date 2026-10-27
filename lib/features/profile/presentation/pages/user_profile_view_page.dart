@@ -581,11 +581,11 @@ class _ProfileVipSurface extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('بطاقة QR للبروفايل'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           Image.network(qrUrl, width: 220, height: 220, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.qr_code_2, size: 180)),
           const SizedBox(height: 8),
           SelectableText(link, textAlign: TextAlign.center),
-        ]),
+        ])),
         actions: [
           TextButton(onPressed: () async { await Clipboard.setData(ClipboardData(text: link)); if (dialogContext.mounted) Navigator.pop(dialogContext); }, child: const Text('نسخ الرابط')),
           FilledButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إغلاق')),
@@ -607,7 +607,7 @@ class _ProfileVipSurface extends ConsumerWidget {
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text('إحصائيات البروفايل Plus'),
-          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text('المتابعون: ${ref.read(followersCountProvider(profile.uid)).valueOrNull ?? 0}'),
             Text('يتابع: ${ref.read(followingCountProvider(profile.uid)).valueOrNull ?? 0}'),
             Text('الزوار المسجلون: ${count(visitorsRaw)}'),
@@ -615,7 +615,7 @@ class _ProfileVipSurface extends ConsumerWidget {
             Text('عناصر المتجر المصغر: ${count(content['mini_store'])}'),
             Text('الاستطلاعات الفعالة: ${count(content['polls'])}'),
             Text('الإعلانات النشطة/المسودة: ${count(content['ads'])}'),
-          ]),
+          ])),
           actions: [FilledButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إغلاق'))],
         ),
       );
@@ -781,7 +781,7 @@ class _ProfileVipSurface extends ConsumerWidget {
         builder: (dialogContext) => StatefulBuilder(
           builder: (dialogContext, setState) => AlertDialog(
             title: Text('دعم ${profile.displayName}'),
-            content: Column(
+            content: SingleChildScrollView(child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
@@ -799,7 +799,7 @@ class _ProfileVipSurface extends ConsumerWidget {
                   onSelectionChanged: (v) => setState(() => currency = v.first),
                 ),
               ],
-            ),
+            )),
             actions: [
               TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
               FilledButton(

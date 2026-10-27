@@ -165,7 +165,7 @@ class _DefaultDurationBarState extends State<_DefaultDurationBar> {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: const Text('⏳ مدّة ظهور الريلز الجديدة'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             TextField(
               controller: ctrl,
               keyboardType: TextInputType.number,
@@ -182,7 +182,7 @@ class _DefaultDurationBarState extends State<_DefaultDurationBar> {
               style: TextStyle(fontSize: 11.5, height: 1.7,
                   color: Colors.white60),
             ),
-          ]),
+          ])),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(c, false),
@@ -476,13 +476,13 @@ class _ReelAdminCard extends StatelessWidget {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: const Text('حذف نهائي'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             const Text('سيُحذف الفيديو وتعليقاته نهائيًا ولا يمكن التراجع.'),
             const SizedBox(height: 10),
             TextField(
                 controller: c,
                 decoration: const InputDecoration(labelText: 'السبب')),
-          ]),
+          ])),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),

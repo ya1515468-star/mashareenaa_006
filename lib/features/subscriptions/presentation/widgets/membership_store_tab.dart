@@ -320,7 +320,7 @@ class MembershipStoreTab extends ConsumerWidget {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: Text('طلب ${tier.name} بالكاش'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             const Text(
                 'سيصل طلبك إلى المالك والسوبر أدمن معًا، ويتواصل معك أوّل '
                 'من يراه لإتمام الدفع.',
@@ -335,7 +335,7 @@ class MembershipStoreTab extends ConsumerWidget {
                   hintText: 'مثال: أدفع كاش في حلب',
                   border: OutlineInputBorder()),
             ),
-          ]),
+          ])),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(d, false),
@@ -385,7 +385,7 @@ class MembershipStoreTab extends ConsumerWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('إيقاف عضوية مستخدم'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           TextField(
               controller: controller,
               decoration: const InputDecoration(labelText: 'UID المستخدم')),
@@ -393,7 +393,7 @@ class MembershipStoreTab extends ConsumerWidget {
           const Text(
               'تتوقف مزايا العضوية والخدمات المضمّنة فيها فورًا، وتبقى الخدمات التي اشتراها المستخدم بنفسه.',
               style: TextStyle(fontSize: 12)),
-        ]),
+        ])),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(dialogContext),

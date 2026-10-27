@@ -390,10 +390,10 @@ class _SectorsTab extends ConsumerWidget {
       context: context,
       builder: (d) => AlertDialog(
         title: const Text('إدارة القطاع'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           TextField(controller: name, decoration: const InputDecoration(labelText: 'الاسم')),
           TextField(controller: emoji, decoration: const InputDecoration(labelText: 'الرمز (إيموجي)')),
-        ]),
+        ])),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(d, 'delete'),
@@ -434,10 +434,10 @@ class _SectorsTab extends ConsumerWidget {
       context: context,
       builder: (d) => AlertDialog(
         title: const Text('قطاع جديد'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           TextField(controller: name, autofocus: true, decoration: const InputDecoration(labelText: 'الاسم (مثال: الجلود)')),
           TextField(controller: emoji, decoration: const InputDecoration(labelText: 'الرمز (إيموجي)')),
-        ]),
+        ])),
         actions: [
           TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('إلغاء')),
           FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('إنشاء')),

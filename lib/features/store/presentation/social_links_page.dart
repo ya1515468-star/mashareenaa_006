@@ -69,7 +69,7 @@ class _SocialLinksPageState extends ConsumerState<SocialLinksPage> {
         child: StatefulBuilder(
           builder: (d, setD) => AlertDialog(
             title: Text(index == null ? 'رابط جديد' : 'تعديل الرابط'),
-            content: Column(mainAxisSize: MainAxisSize.min, children: [
+            content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
               DropdownButtonFormField<String>(
                 initialValue:
                     _platforms.containsKey(platform) ? platform : 'website',
@@ -98,7 +98,7 @@ class _SocialLinksPageState extends ConsumerState<SocialLinksPage> {
                   border: OutlineInputBorder(),
                 ),
               ),
-            ]),
+            ])),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(d, false),

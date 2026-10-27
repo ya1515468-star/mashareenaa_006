@@ -964,7 +964,7 @@ class CurrencyStorePurchaseFlow {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: Text(name),
-          content: Column(
+          content: SingleChildScrollView(child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -987,7 +987,7 @@ class CurrencyStorePurchaseFlow {
                   'أدمن، وكلاهما يصله طلبك.',
                   style: TextStyle(fontSize: 11.5, color: Colors.white54)),
             ],
-          ),
+          )),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),

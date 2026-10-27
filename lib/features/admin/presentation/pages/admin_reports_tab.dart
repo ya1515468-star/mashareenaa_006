@@ -82,7 +82,7 @@ class _AdminReportsTabState extends ConsumerState<AdminReportsTab> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('نشر تحذير أمان'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           TextField(
               controller: title,
               decoration: const InputDecoration(labelText: 'العنوان')),
@@ -90,7 +90,7 @@ class _AdminReportsTabState extends ConsumerState<AdminReportsTab> {
               controller: details,
               maxLines: 4,
               decoration: const InputDecoration(labelText: 'التفاصيل')),
-        ]),
+        ])),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),

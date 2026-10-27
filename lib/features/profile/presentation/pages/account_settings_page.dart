@@ -486,7 +486,7 @@ class AccountSettingsContent extends ConsumerWidget {
         builder: (context, setState) => AlertDialog(
           backgroundColor: AppColors.surfaceElevated,
           title: const Text('تنسيق الحالة'),
-          content: Column(
+          content: SingleChildScrollView(child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               SwitchListTile(
@@ -532,7 +532,7 @@ class AccountSettingsContent extends ConsumerWidget {
                     .toList(),
               ),
             ],
-          ),
+          )),
           actions: [
             TextButton(
                 onPressed: () => Navigator.of(context).pop(),
@@ -621,7 +621,7 @@ Future<ProfileVisibility?> _chooseProfileVisibility(
     context: context,
     builder: (_) => AlertDialog(
       title: const Text('خصوصية الحساب'),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
         SegmentedButton<ProfileVisibility>(
           segments: const [
             ButtonSegment(
@@ -648,7 +648,7 @@ Future<ProfileVisibility?> _chooseProfileVisibility(
           '«عام» و«الأصدقاء» متاحان للجميع.',
           style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
         ),
-      ]),
+      ])),
     ),
   );
 }
@@ -1056,7 +1056,7 @@ class _ProfileSliderTile extends StatelessWidget {
           builder: (dialogContext) => StatefulBuilder(
             builder: (context, setState) => AlertDialog(
               title: Text(title),
-              content: Column(
+              content: SingleChildScrollView(child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(draft.toStringAsFixed(1)),
@@ -1069,7 +1069,7 @@ class _ProfileSliderTile extends StatelessWidget {
                     onChanged: (v) => setState(() => draft = v),
                   ),
                 ],
-              ),
+              )),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogContext),

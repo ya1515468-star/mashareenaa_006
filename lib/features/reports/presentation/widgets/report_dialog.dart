@@ -113,7 +113,7 @@ class _ReportDialogBodyState extends State<_ReportDialogBody> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('تقديم بلاغ'),
-      content: Column(
+      content: SingleChildScrollView(child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
@@ -148,7 +148,7 @@ class _ReportDialogBodyState extends State<_ReportDialogBody> {
               label: const Text('إرفاق صورة للتوثيق (اختياري)'),
             ),
         ],
-      ),
+      )),
       actions: [
         TextButton(
             onPressed: _uploading ? null : () => Navigator.pop(context),

@@ -1455,7 +1455,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       barrierDismissible: false,
       builder: (_) => const AlertDialog(
         title: Text('جاري التفعيل'),
-        content: Column(
+        content: SingleChildScrollView(child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(height: 8),
@@ -1466,7 +1466,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
               textAlign: TextAlign.center,
             ),
           ],
-        ),
+        )),
       ),
     );
     // Yield once so the progress dialog is painted before processing starts.

@@ -358,7 +358,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
           textDirection: TextDirection.rtl,
           child: AlertDialog(
             title: const Text('إيقاف الإعلان'),
-            content: Column(mainAxisSize: MainAxisSize.min, children: [
+            content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
               const Text(
                 'يتوقّف عرضه فورًا على كل الأجهزة. مدّته المدفوعة تستمر '
                 'بالعدّ، فإعادته لاحقًا تعيده لما بقي منها.',
@@ -371,7 +371,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
                     labelText: 'السبب (يُسجَّل في التدقيق)',
                     border: OutlineInputBorder()),
               ),
-            ]),
+            ])),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(c, false),
@@ -565,7 +565,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: Text('${p['emoji'] ?? ''} ${p['label'] ?? key}'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             TextField(
               controller: every,
               keyboardType: TextInputType.number,
@@ -588,7 +588,7 @@ class _AdminAdsTabState extends State<AdminAdsTab> {
               'بالإعلانات تُهجَر، فيذهب جمهور المعلن نفسه.',
               style: TextStyle(fontSize: 10.5, color: Colors.white60, height: 1.6),
             ),
-          ]),
+          ])),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(c, false),

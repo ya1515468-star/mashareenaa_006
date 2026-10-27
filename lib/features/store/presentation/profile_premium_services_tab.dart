@@ -342,7 +342,7 @@ class _ProfilePremiumServicesTabState
         builder: (dialogContext) => StatefulBuilder(
           builder: (dialogContext, setState) => AlertDialog(
             title: Text(item.nameAr),
-            content: Column(
+            content: SingleChildScrollView(child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
@@ -364,7 +364,7 @@ class _ProfilePremiumServicesTabState
                   onChanged: (value) => setState(() => active = value),
                 ),
               ],
-            ),
+            )),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
@@ -420,7 +420,7 @@ class _ProfilePremiumServicesTabState
       builder: (dialogContext) => StatefulBuilder(
         builder: (dialogContext, setState) => AlertDialog(
           title: const Text('تصغير/تكبير اسم المستخدم'),
-          content: Column(
+          content: SingleChildScrollView(child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text('${value.toStringAsFixed(1)} px', style: const TextStyle(fontWeight: FontWeight.w900)),
@@ -430,7 +430,7 @@ class _ProfilePremiumServicesTabState
               ),
               const Text('الحجم يُستخدم في البروفايل والشات.', style: TextStyle(fontSize: 11)),
             ],
-          ),
+          )),
           actions: [
             TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
             FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('حفظ')),
@@ -689,7 +689,7 @@ class _ProfilePremiumServicesTabState
         builder: (dialogContext) => StatefulBuilder(
           builder: (dialogContext, setState) => AlertDialog(
             title: const Text('دعم المنشئ'),
-            content: Column(mainAxisSize: MainAxisSize.min, children: [
+            content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(controller: recipient, decoration: const InputDecoration(labelText: 'UID صاحب المحتوى')),
               TextField(controller: amount, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'مقدار الدعم')),
               const SizedBox(height: 8),
@@ -698,7 +698,7 @@ class _ProfilePremiumServicesTabState
                 selected: {currency},
                 onSelectionChanged: (v) => setState(() => currency = v.first),
               ),
-            ]),
+            ])),
             actions: [
               TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
               FilledButton(onPressed: () { final n=int.tryParse(amount.text.trim())??0; if(recipient.text.trim().isEmpty||n<=0)return; Navigator.pop(dialogContext,(recipient.text.trim(),n)); }, child: const Text('إرسال الدعم')),
@@ -1057,14 +1057,14 @@ class _ProfilePremiumServicesTabState
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('استطلاع متقدم'),
-        content: Column(
+        content: SingleChildScrollView(child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(controller: q, decoration: const InputDecoration(labelText: 'السؤال')),
             TextField(controller: o1, decoration: const InputDecoration(labelText: 'الخيار الأول')),
             TextField(controller: o2, decoration: const InputDecoration(labelText: 'الخيار الثاني')),
           ],
-        ),
+        )),
         actions: [
           FilledButton(
             onPressed: () async {
@@ -1503,7 +1503,7 @@ class _ProfilePremiumServicesTabState
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text('باترون جديد'),
-          content: Column(
+          content: SingleChildScrollView(child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
@@ -1526,7 +1526,7 @@ class _ProfilePremiumServicesTabState
                 decoration: const InputDecoration(labelText: 'سعر الجواهر'),
               ),
             ],
-          ),
+          )),
           actions: [
             FilledButton(
               onPressed: () async {

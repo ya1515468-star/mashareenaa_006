@@ -95,7 +95,7 @@ class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: Text(isCap ? 'سقف الساعة' : 'نافذة الدمج (دقائق)'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             TextField(
               controller: c,
               keyboardType: TextInputType.number,
@@ -112,7 +112,7 @@ class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
                       'يُدمَج ولا يُرسَل. صفر = بلا دمج.',
               style: const TextStyle(fontSize: 11, color: Colors.white60),
             ),
-          ]),
+          ])),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
@@ -138,7 +138,7 @@ class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: Text(title),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             TextField(
                 controller: c,
                 keyboardType: TextInputType.number,
@@ -147,7 +147,7 @@ class _AdminNotificationsTabState extends State<AdminNotificationsTab> {
             const SizedBox(height: 8),
             Text(hint,
                 style: const TextStyle(fontSize: 11, color: Colors.white60)),
-          ]),
+          ])),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),

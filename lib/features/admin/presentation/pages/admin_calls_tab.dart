@@ -69,7 +69,7 @@ class _AdminCallsTabState extends State<AdminCallsTab> {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: Text('دقائق ${t['name'] ?? t['tier_id']}'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             TextField(
               controller: voice,
               keyboardType: TextInputType.number,
@@ -91,7 +91,7 @@ class _AdminCallsTabState extends State<AdminCallsTab> {
               'نفادها يُحاسَب بسعر الدقيقة أدناه. صفر = بلا دقائق مرفقة.',
               style: TextStyle(fontSize: 11, color: Colors.white60),
             ),
-          ]),
+          ])),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(c, false),
@@ -139,7 +139,7 @@ class _AdminCallsTabState extends State<AdminCallsTab> {
             title: Text(p['call_type'] == 'video'
                 ? 'سعر المكالمة المرئية'
                 : 'سعر المكالمة الصوتية'),
-            content: Column(mainAxisSize: MainAxisSize.min, children: [
+            content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(
                 controller: pts,
                 keyboardType: TextInputType.number,
@@ -165,7 +165,7 @@ class _AdminCallsTabState extends State<AdminCallsTab> {
                 'إطفاء المحاسبة يجعل المكالمات مجانية للجميع بلا حدّ.',
                 style: TextStyle(fontSize: 11, color: Colors.white60),
               ),
-            ]),
+            ])),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(c, false),

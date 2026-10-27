@@ -261,7 +261,7 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
       builder: (d) => StatefulBuilder(
         builder: (d, setLocal) => AlertDialog(
           title: const Text('سعر الصعود إلى المايك'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('تفعيل الدفع عند كل صعود'),
@@ -272,7 +272,7 @@ class _RoomMicSeatsState extends State<RoomMicSeats> {
                 decoration: const InputDecoration(labelText: 'جواهر 💎')),
             TextField(controller: points, keyboardType: TextInputType.number,
                 decoration: const InputDecoration(labelText: 'نقاط ⭐ (تُستعمل إن كانت الجواهر 0)')),
-          ]),
+          ])),
           actions: [
             TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('إلغاء')),
             FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('حفظ')),

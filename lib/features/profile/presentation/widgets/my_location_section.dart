@@ -132,7 +132,7 @@ class _MyLocationSectionState extends State<MyLocationSection> {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: const Text('🏘️ الحيّ والمدينة'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             TextField(
               controller: city,
               decoration: const InputDecoration(
@@ -149,7 +149,7 @@ class _MyLocationSectionState extends State<MyLocationSection> {
               'ما تكتبه هنا يتقدّم على الموقع المستنتَج تلقائيًّا.',
               style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
-          ]),
+          ])),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(c, false),

@@ -887,7 +887,7 @@ class _UserDetailSheet extends ConsumerWidget {
         textDirection: TextDirection.rtl,
         child: AlertDialog(
           title: const Text('🔑 استعادة كلمة المرور'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: const [
+          content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: const [
             Text(
               'اختر الطريقة:',
               style: TextStyle(fontWeight: FontWeight.w800),
@@ -901,7 +901,7 @@ class _UserDetailSheet extends ConsumerWidget {
               'وصوله إلى بريده.',
               style: TextStyle(fontSize: 12, height: 1.7),
             ),
-          ]),
+          ])),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx),
@@ -947,7 +947,7 @@ class _UserDetailSheet extends ConsumerWidget {
           textDirection: TextDirection.rtl,
           child: AlertDialog(
             title: const Text('🔐 الكلمة المؤقّتة'),
-            content: Column(mainAxisSize: MainAxisSize.min, children: [
+            content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
               const Text(
                 'تُعرَض مرّة واحدة فقط. انسخها وسلّمها للعضو، وسيُطلَب '
                 'منه تغييرها فور دخوله.',
@@ -968,7 +968,7 @@ class _UserDetailSheet extends ConsumerWidget {
                     style: const TextStyle(
                         fontSize: 11, color: Colors.orangeAccent)),
               ],
-            ]),
+            ])),
             actions: [
               TextButton(
                 onPressed: () {
@@ -1078,7 +1078,7 @@ class _ApplyDialogState extends State<_ApplyDialog> {
             Text(widget.kind.label),
           ],
         ),
-        content: Column(
+        content: SingleChildScrollView(child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1113,7 +1113,7 @@ class _ApplyDialogState extends State<_ApplyDialog> {
                   .toList(),
             ),
           ],
-        ),
+        )),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context),
