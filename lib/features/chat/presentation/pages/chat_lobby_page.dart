@@ -204,6 +204,13 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   }
   String get _roomId => widget.roomId;
 
+  /// مُعرِّفي المستعار في هذه الغرفة.
+  ///
+  /// بعد أن صار الخادم لا يكتب user_id في صفّ الرسالة المجهولة، لم يعد
+  /// بالإمكان تمييز رسائلي بمقارنة المعرّف. والعلامة لا تُبَثّ في الصفّ
+  /// لأنّه صفّ واحد يصل الجميع، فتصير «لي» عند كل من يراها.
+  String? _myAnonHandle;
+
   void _handlePublicSound(List<Map<String, dynamic>> rows) {
     final currentUid = _user?.id;
     if (currentUid == null) return;
@@ -1398,6 +1405,57 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     }
   }
 
+  /// كشف كاتب رسالة مجهولة — للمالك وحده، والخادم هو من يتحقّق.
+  Future<void> _revealAnonymousAuthor(Map<String, dynamic> row) async {
+    final id = row['id']?.toString();
+    if (id == null) return;
+    try {
+      final res = await _db.rpc('owner_reveal_anonymous_author',
+          params: {'p_message_id': id});
+      if (!mounted) return;
+      final m = res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
+      if (m['found'] != true) {
+        ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(
+            content: Text('لا سجلّ لكاتب هذه الرسالة')));
+        return;
+      }
+      final uid = m['user_id']?.toString();
+      await showDialog<void>(
+        context: context,
+        builder: (c) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('كاتب الرسالة المجهولة'),
+            content: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text('${m['display_name'] ?? m['username'] ?? 'عضو'}',
+                  style: const TextStyle(fontWeight: FontWeight.w900)),
+              const SizedBox(height: 6),
+              Text('أُرسلت: ${m['sent_at'] ?? ''}',
+                  style: const TextStyle(fontSize: 11)),
+            ]),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(c),
+                  child: const Text('إغلاق')),
+              if (uid != null)
+                FilledButton(
+                  onPressed: () {
+                    Navigator.pop(c);
+                    _openMiniProfile(uid);
+                  },
+                  child: const Text('فتح البروفايل'),
+                ),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBarSfx(SnackBar(content: Text('تعذّر الكشف: $e')));
+    }
+  }
+
   Future<void> _showMessageActions(Map<String, dynamic> row) async {
     final body = (row['body'] ?? row['message'])?.toString() ?? '';
     await showModalBottomSheet<void>(
@@ -1407,6 +1465,25 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       builder: (sheetContext) => SafeArea(
         child: Wrap(
           children: [
+            // المالك يرى ويتحكّم بكل شيء: الهوية خلف الرسالة المجهولة
+            // محفوظة خادميًّا، وكشفها حكرٌ عليه ويُسجَّل كل كشف.
+            if (_isPlatformOwner &&
+                row['metadata'] is Map &&
+                (row['metadata'] as Map)['anonymous_chat'] == true) ...[
+              ListTile(
+                leading: const Icon(Icons.visibility_rounded,
+                    color: Color(0xFFFFD166)),
+                title: const Text('كشف هوية المُرسِل',
+                    style: TextStyle(color: Color(0xFFFFD166))),
+                subtitle: const Text('يُسجَّل باسمك في سجلّ التدقيق',
+                    style: TextStyle(fontSize: 11, color: Colors.white54)),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  unawaited(_revealAnonymousAuthor(row));
+                },
+              ),
+              const Divider(height: 1, color: Colors.white12),
+            ],
             ListTile(
               leading: const Icon(Icons.reply, color: Colors.white),
               title: const Text('رد', style: TextStyle(color: Colors.white)),
@@ -1635,6 +1712,16 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   Future<void> _loadRoomControls() async {
     final user = _user;
     if (user == null) return;
+    // فشله صامت: تمييز رسائلي تحسينٌ بصري لا يُعطَّل لأجله الشات.
+    unawaited(() async {
+      try {
+        final h = await _db.rpc('my_anon_handle', params: {'p_room_id': _roomId});
+        final v = h?.toString();
+        if (mounted && v != null && v.isNotEmpty) {
+          setState(() => _myAnonHandle = v);
+        }
+      } catch (_) {}
+    }());
     try {
       Map<String, dynamic> controls = <String, dynamic>{};
       try {
@@ -2154,7 +2241,12 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                                       row: row,
                                       messageFrameIndex: (row['_message_frame_index'] as int?) ?? -1,
                                       mine: row['user_id']?.toString() ==
-                                          _user?.id,
+                                              _user?.id ||
+                                          (_myAnonHandle != null &&
+                                              row['metadata'] is Map &&
+                                              (row['metadata']
+                                                      as Map)['anon_handle'] ==
+                                                  _myAnonHandle),
                                       mentionFrameColor: _mentionFrameColor,
                                       onAvatarTap: () => _openMiniProfile(
                                           row['user_id']?.toString()),

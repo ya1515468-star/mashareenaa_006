@@ -399,6 +399,15 @@ class _ChatMessageRow extends ConsumerWidget {
     // الحقيقي عند الضغط على الأفاتار — وهو تسريب للهوية رغم إخفاء الاسم.
     final isAnonymous = row['metadata'] is Map &&
         (row['metadata'] as Map)['anonymous_chat'] == true;
+    // المُعرِّف المستعار يأتي من الخادم: رمز مبهم ثابت لكل (عضو، غرفة)
+    // لا يدلّ على هوية. بدونه يظهر كل المجهولين بالاسم نفسه فلا يُعرف
+    // من يحدّث من في نقاش فيه أكثر من مجهول.
+    final anonHandle = isAnonymous && row['metadata'] is Map
+        ? ((row['metadata'] as Map)['anon_handle']?.toString() ?? '')
+        : '';
+    final anonLabel = anonHandle.length >= 4
+        ? 'عضو مجهول · ${anonHandle.substring(0, 4)}'
+        : 'عضو مجهول';
     final displayName = row['display_name']?.toString().trim();
     final username = row['username']?.toString().trim();
     final avatarName = (displayName != null && displayName.isNotEmpty)
@@ -417,6 +426,7 @@ class _ChatMessageRow extends ConsumerWidget {
             onTap: isAnonymous ? null : onNameTap,
             sizeMultiplier: 1.0,
             anonymous: isAnonymous,
+            anonLabel: anonLabel,
           );
 
     final createdAt = DateTime.tryParse(row['created_at']?.toString() ?? '');
@@ -452,7 +462,7 @@ class _ChatMessageRow extends ConsumerWidget {
             url: isAnonymous ? null : row['avatar_url']?.toString(),
             // بلا uid للمجهول: شارة الرتبة وأي استعلام هوية يكشف صاحبها.
             rowUid: isAnonymous ? null : row['user_id']?.toString(),
-            name: isAnonymous ? 'عضو مجهول' : avatarName,
+            name: isAnonymous ? anonLabel : avatarName,
             roomId: roomId,
             frameKey: isAnonymous
                 ? null
@@ -695,6 +705,7 @@ class _ChatIdentityHeader extends StatelessWidget {
   final int revision;
   final VoidCallback? onTap;
   final bool anonymous;
+  final String anonLabel;
   final double sizeMultiplier;
 
   const _ChatIdentityHeader({
@@ -704,6 +715,7 @@ class _ChatIdentityHeader extends StatelessWidget {
     this.revision = 0,
     this.onTap,
     this.anonymous = false,
+    this.anonLabel = 'عضو مجهول',
     this.sizeMultiplier = 1.0,
   });
 
@@ -711,7 +723,7 @@ class _ChatIdentityHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     if (anonymous || uid == null || uid!.trim().isEmpty) {
       return Text(
-        '${anonymous ? 'عضو مجهول' : fallbackName} :',
+        '${anonymous ? anonLabel : fallbackName} :',
         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
       );
     }
