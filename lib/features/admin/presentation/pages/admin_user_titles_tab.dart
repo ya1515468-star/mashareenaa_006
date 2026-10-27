@@ -95,7 +95,7 @@ class _AdminUserTitlesTabState extends ConsumerState<AdminUserTitlesTab> {
         'p_request_id': const Uuid().v4(),
       });
       if (mounted) {
-        _message('تم تعيين اللقب للمستخدم المحدد خادميًا.');
+        _message('تم تعيين اللقب ✓');
         await _lookupExactIdentity();
       }
     } catch (e) {

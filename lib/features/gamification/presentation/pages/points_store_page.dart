@@ -223,7 +223,7 @@ class _StoreIntroBar extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: const Text(
-        'كل عناصر المتجر  • 250 منتجًا • معاينة تفاعلية • شراء خادمي',
+        'كل عناصر المتجر  • 250 منتجًا • معاينة تفاعلية',
         style: TextStyle(
           color: Colors.white,
           fontSize: 11,

@@ -526,7 +526,7 @@ class MiniProfilePopup extends ConsumerWidget {
         builder: (dialogContext) => AlertDialog(
           title: const Text('تم التحويل بنجاح'),
           content: Text(
-            'تم تحويل $amount ${currency == 'points' ? 'نقطة' : 'جوهرة'} إلى ${result['to_name'] ?? 'العضو'}، وتم تسجيل العملية خادميًا.\n\nالرصيد بعد التحويل: ${result['sender_balance'] ?? '—'}',
+            'تم تحويل $amount ${currency == 'points' ? 'نقطة' : 'جوهرة'} إلى ${result['to_name'] ?? 'العضو'}.\n\nالرصيد بعد التحويل: ${result['sender_balance'] ?? '—'}',
             textDirection: TextDirection.rtl,
           ),
           actions: [

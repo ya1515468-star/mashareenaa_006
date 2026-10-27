@@ -416,7 +416,7 @@ class _FriendsWallPageState extends ConsumerState<FriendsWallPage> {
                 }
               },
               icon: saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.save_rounded),
-              label: Text(saving ? 'جارٍ الحفظ' : 'حفظ خادمي'),
+              label: Text(saving ? 'جارٍ الحفظ' : 'حفظ'),
             ),
           ],
         ),

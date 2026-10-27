@@ -820,7 +820,7 @@ class _ProfileVipSurface extends ConsumerWidget {
       }
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBarSfx(
-          const SnackBar(content: Text('تم إرسال دعم المنشئ وتسجيل العملية خادميًا ✓')),
+          const SnackBar(content: Text('تم إرسال دعم المنشئ ✓')),
         );
       }
     } catch (e) {

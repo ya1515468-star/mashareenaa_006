@@ -698,7 +698,7 @@ class _ProfilePremiumServicesTabState
           'p_idempotency_key': const Uuid().v4(),
         });
         if (raw is! Map || raw['ok'] != true) throw StateError('لم يؤكد الخادم نجاح الدعم.');
-        if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم إرسال دعم المنشئ وتسجيل العملية خادميًا ✓')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم إرسال دعم المنشئ ✓')));
       } catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e))));
       }
