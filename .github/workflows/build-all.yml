@@ -99,6 +99,41 @@ jobs:
           EOF2
           chmod 600 android/app/mashareena-upload.jks android/key.properties
 
+      # بصمتا شهادة التوقيع. كلتاهما معلومة عامّة ولا تكشفان المفتاح الخاص:
+      #   SHA-1    → يلزم عميل Google OAuth لأندرويد، وبدونه يفشل الدخول
+      #              بالخطأ 10 (DEVELOPER_ERROR).
+      #   SHA-256  → بصيغة base64url بلا حشو، وهي الصيغة التي يُعيدها بها
+      #              Play Integrity في certificateSha256Digest. تُضبط في سرّ
+      #              Supabase باسم ANDROID_CERT_SHA256 ليكشف الخادم أيّ نسخة
+      #              أُعيد توقيعها بمفتاح آخر — بديلنا عن PLAY_RECOGNIZED في
+      #              التوزيع خارج Google Play.
+      - name: Print signing certificate fingerprints
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -o pipefail
+          keytool -list -v -keystore android/app/mashareena-upload.jks \
+                  -alias "$KEY_ALIAS" -storepass "$KEYSTORE_PASSWORD" > ks.txt
+          SHA1=$(grep -m1 'SHA1:'   ks.txt | sed 's/.*SHA1: *//'   | tr -d ' \r')
+          SHA256HEX=$(grep -m1 'SHA256:' ks.txt | sed 's/.*SHA256: *//' | tr -d ' \r')
+          # hex بفواصل نقطتين → بايتات → base64url بلا حشو
+          B64URL=$(printf '%s' "$SHA256HEX" | tr -d ':' | xxd -r -p | base64 \
+                   | tr '+/' '-_' | tr -d '=\n')
+          {
+            echo '## بصمات شهادة التوقيع'
+            echo ''
+            echo '| الحقل | القيمة |'
+            echo '|---|---|'
+            echo "| SHA-1 (لعميل Google OAuth) | \`$SHA1\` |"
+            echo "| SHA-256 hex | \`$SHA256HEX\` |"
+            echo "| **ANDROID_CERT_SHA256** (base64url) | \`$B64URL\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          # تُطبع كتعليقات أيضًا لأنّ الملخّص غير متاح عبر الواجهة البرمجية
+          echo "::warning::SHA1=$SHA1"
+          echo "::warning::CERT_SHA256_B64URL=$B64URL"
+          rm -f ks.txt
+
       # ① Google Play — حزمة AAB هي الصيغة التي يقبلها متجر Play حصرًا.
       # --obfuscate يُعيد تسمية رموز Dart في الملف الثنائي. منطق التطبيق
       # كله بـDart، فبدونه يمكن استخراج أسماء الدوال والأصناف ومسارات
