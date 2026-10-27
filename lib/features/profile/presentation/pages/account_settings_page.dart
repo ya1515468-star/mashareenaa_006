@@ -10,7 +10,9 @@ import 'dart:typed_data';
 import 'package:audio_meta/audio_meta.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../../core/services/media_upload_service.dart';
+import '../../../../core/config/legal_links.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/safe_launch.dart';
 import '../../../friends/presentation/pages/friends_list_page.dart';
 import '../../../gamification/presentation/pages/points_gems_exchange_page.dart';
 import '../../../social_graph/presentation/pages/blocked_users_page.dart';
@@ -370,6 +372,43 @@ class AccountSettingsContent extends ConsumerWidget {
         trailing: const Icon(Icons.chevron_left, color: AppColors.textMuted),
         onTap: () => Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => AccountSecurityPage(profile: liveProfile))),
+      ),
+      const Divider(height: 28, color: AppColors.textMuted),
+      // مطلب متجر: روابط قانونية ظاهرة داخل التطبيق. الصفحات تخدمها دالة
+      // legal العامة على الخادم، ولم تكن مربوطة في أي شاشة قبل الآن.
+      const Padding(
+        padding: EdgeInsets.fromLTRB(16, 4, 16, 6),
+        child: Text('قانوني',
+            style: TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800)),
+      ),
+      ListTile(
+        leading: const Icon(Icons.privacy_tip_outlined, color: AppColors.gold),
+        title: const Text('سياسة الخصوصية'),
+        trailing: const Icon(Icons.open_in_new, color: AppColors.textMuted, size: 18),
+        onTap: () => safeLaunch(LegalLinks.privacy),
+      ),
+      ListTile(
+        leading: const Icon(Icons.gavel_outlined, color: AppColors.gold),
+        title: const Text('شروط الاستخدام'),
+        trailing: const Icon(Icons.open_in_new, color: AppColors.textMuted, size: 18),
+        onTap: () => safeLaunch(LegalLinks.terms),
+      ),
+      ListTile(
+        leading: const Icon(Icons.groups_outlined, color: AppColors.gold),
+        title: const Text('إرشادات المجتمع'),
+        trailing: const Icon(Icons.open_in_new, color: AppColors.textMuted, size: 18),
+        onTap: () => safeLaunch(LegalLinks.guidelines),
+      ),
+      ListTile(
+        leading: const Icon(Icons.delete_forever_outlined, color: Colors.redAccent),
+        title: const Text('حذف الحساب والبيانات'),
+        subtitle: const Text('صفحة الطلب على الويب',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 11.5)),
+        trailing: const Icon(Icons.open_in_new, color: AppColors.textMuted, size: 18),
+        onTap: () => safeLaunch(LegalLinks.deleteAccount),
       ),
       const SizedBox(height: 24),
     ];
