@@ -229,22 +229,18 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       } else { final effect=item.metadata['effect_key']?.toString(); if(effect==null||effect.isEmpty) throw StateError('INVALID_EFFECT'); await Supabase.instance.client.rpc('set_username_effect',params:{'p_effect':effect}); }
       ref.invalidate(profileCosmeticCatalogProvider);
       ref.invalidate(nameTemplateCatalogProvider);
-      // serverUserIdentityProvider هو .family — إبطاله بلا مُعامل
-      // (uid) لا يُبطل أي نسخة فعلية منه في Riverpod، فتبقى الهوية
-      // المخزَّنة مؤقتًا قديمة رغم نجاح الحفظ على الخادم تمامًا. هذا
-      // بالضبط سبب "تم التنفيذ لكن اللون لا يتغيّر" — يظهر فقط بعد
-      // إعادة فتح الشاشة لأن ذلك يُنشئ نسخة جديدة من المزوّد من الصفر.
+      // الغرفة تقرأ هويّة المُرسِل من serverUserIdentityInRoomProvider
+      // المفهرَس بـ(uid, roomId) معًا. إبطال نسخة واحدة من
+      // serverUserIdentityProvider لا يمسّه إطلاقًا، فيبقى اللون القديم
+      // معروضًا رغم نجاح الحفظ خادميًّا — وهذا سبب "اخترت اللون ولا يظهر".
+      //
+      // في Riverpod 2 يقبل invalidate العائلة نفسها فيُبطل كل نسخها، وهو
+      // المطلوب هنا تحديدًا: roomId المفتوحة غير معروفة في شاشة المتجر.
+      ref.invalidate(serverUserIdentityProvider);
+      ref.invalidate(serverUserIdentityInRoomProvider);
+      ref.invalidate(currentProfileProvider);
       final uid = Supabase.instance.client.auth.currentUser?.id;
-      if (uid != null) {
-        ref.invalidate(serverUserIdentityProvider(uid));
-        ref.invalidate(profileByIdProvider(uid));
-        ref.invalidate(currentProfileProvider);
-      }
-      // serverUserIdentityInRoomProvider مفهرَس بـ(uid, roomId) معًا؛
-      // roomId الحالية غير معروفة داخل شاشة المتجر، فلا سبيل لإبطال
-      // نسخة بعينها هنا. لكنه autoDispose أصلًا: يُهدَم فور إغلاق
-      // شاشة الشات ويُعاد جلبه من الصفر عند فتحها مجددًا، فلا يبقى
-      // بيانات قديمة معلَّقة لأكثر من الجلسة الحالية للغرفة المفتوحة.
+      if (uid != null) ref.invalidate(profileByIdProvider(uid));
       if (!mounted) return; ScaffoldMessenger.of(context).showSnackBarSfx(const SnackBar(content: Text('تم الحفظ وتحديث البروفايل')));
     } catch(e){ if (!mounted) return; ScaffoldMessenger.of(context).showSnackBarSfx(SnackBar(content: Text(_friendly(e)))); }
   }
@@ -2452,10 +2448,11 @@ class _MessageTextStyleSectionState
         if (bold != null) _bold = bold;
         if (italic != null) _italic = italic;
       });
-      final uid = Supabase.instance.client.auth.currentUser?.id;
-      if (uid != null) {
-        ref.invalidate(serverUserIdentityProvider(uid));
-      }
+      // العائلتان كاملتين: الغرفة تقرأ النسخة المفهرَسة بـroomId، وهي
+      // غير معروفة هنا، فإبطال نسخة الـuid وحدها يترك الغامق/المائل
+      // قديمًا في الشات حتى خروج ودخول.
+      ref.invalidate(serverUserIdentityProvider);
+      ref.invalidate(serverUserIdentityInRoomProvider);
     } catch (e) {
       messenger?.showSnackBarSfx(SnackBar(content: Text('تعذّر الحفظ: $e')));
     } finally {
@@ -2831,7 +2828,16 @@ class _ServerFontPickerState extends ConsumerState<_ServerFontPicker> {
     setState(() => _busyKey = key ?? '');
     try {
       await Supabase.instance.client.rpc('set_my_message_font', params: {'p_font_key': key});
-      if (key != null) unawaited(ServerFonts.ensure(key));
+      // يُنتظَر تنزيل الخط وتسجيله قبل الإبطال، لا unawaited: الإبطال
+      // الفوري يُعيد البناء والخط لم يُسجَّل بعد، فيسقط العرض إلى الخط
+      // الافتراضي ولا يظهر المختار إلا بعد خروج ودخول.
+      // في try منفصلة: فشل التنزيل لا يعني فشل الحفظ، والخط محفوظ خادميًّا
+      // على كل حال فيظهر لاحقًا حين ينجح التنزيل.
+      if (key != null) {
+        try {
+          await ServerFonts.ensure(key);
+        } catch (_) {}
+      }
       // الهوية مخزَّنة مؤقتًا: بدون إبطال لا يصل الخط الجديد إلى فقاعات الرسائل.
       ref.invalidate(serverUserIdentityProvider);
       ref.invalidate(serverUserIdentityInRoomProvider);
