@@ -187,8 +187,30 @@ class ServerUsernameDisplay extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 textDirection: TextDirection.rtl,
                 children: badgesBeforeName
-                    ? [badges, const SizedBox(width: 4), nameWidget()]
-                    : [nameWidget(), const SizedBox(width: 4), badges],
+                    ? [
+                        badges,
+                        const SizedBox(width: 4),
+                        Flexible(
+                          fit: FlexFit.loose,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.center,
+                            child: nameWidget(),
+                          ),
+                        ),
+                      ]
+                    : [
+                        Flexible(
+                          fit: FlexFit.loose,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.center,
+                            child: nameWidget(),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        badges,
+                      ],
               ),
             ),
             if (title != null)

@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../gamification/domain/entities/username_effect.dart';
 import '../../../gamification/presentation/widgets/username_cosmetic_name.dart';
 import '../../../profile/presentation/providers/profile_provider.dart';
+import '../../../rbac/presentation/widgets/server_user_identity_badges.dart';
 
 /// Backing catalog items. The server only honours user-chosen colors for
 /// items whose metadata sets `user_customizable`, so every selection in this
@@ -241,6 +242,10 @@ class _NameBackgroundPickerDialogState extends ConsumerState<_NameBackgroundPick
         'p_custom_color2': _hex(_mode == 'dual' ? _color2 : _color1),
       });
       ref.invalidate(currentProfileProvider);
+      // The server saved the profile fields; evict both canonical identity
+      // caches so room/chat/profile name renderers immediately fetch them.
+      ref.invalidate(serverUserIdentityProvider);
+      ref.invalidate(serverUserIdentityInRoomProvider);
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBarSfx(

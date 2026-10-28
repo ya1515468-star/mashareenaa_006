@@ -137,7 +137,7 @@ class _CosmeticCard {
 
   /// بطاقة مربّعة (إطارات، خلفيات، تأثيرات، حيوانات).
   static const double tileWidth = 124;
-  static const double tileHeight = 134;
+  static const double tileHeight = 184;
 
   /// بطاقة صفّية عريضة (ألوان الرسائل: عيّنة + اسم + سعر).
   static const double rowWidth = 196;
@@ -792,10 +792,13 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                       const SizedBox(height: 5),
                       Text(
                         item.nameAr.isEmpty ? item.key : item.nameAr,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
+                        softWrap: true,
                         style: const TextStyle(
+                          fontSize: 12.5,
+                          height: 1.15,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
@@ -1109,11 +1112,16 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
               const SizedBox(height: 3),
               Text(
                 frame.nameAr,
-                maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
-            ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                softWrap: true,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.1,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             const SizedBox(height: 2),
             Text(
               '${frame.durationMs}ms',
@@ -2291,17 +2299,29 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
       item.metadata['effect_key']?.toString(),
     );
     if (item.category == 'background') {
-      return Center(child:UsernameCosmeticName(
-        name:_previewName,
-        effect:effect,
-        fontSize:18,
-        backgroundMode:item.animationMode,
-        backgroundColor1:item.color1,
-        backgroundColor2:item.color2,
-        backgroundOpacity:((item.metadata['opacity'] as num?)?.toDouble() ?? .82),
-        externalEffect:item.metadata['outer_effect']?.toString(),
-        padding:const EdgeInsets.symmetric(horizontal:8,vertical:4),
-      ));
+      // Fit the full name-and-background composition into the thumbnail.
+      // Without a bounded FittedBox, long Arabic names wrap/overflow and
+      // the preview looks much larger than the actual in-chat name.
+      return SizedBox(
+        width: 142,
+        height: 56,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.center,
+          child: UsernameCosmeticName(
+            name: _previewName,
+            effect: effect,
+            fontSize: 16,
+            backgroundMode: item.animationMode,
+            backgroundColor1: item.color1,
+            backgroundColor2: item.color2,
+            backgroundOpacity:
+                ((item.metadata['opacity'] as num?)?.toDouble() ?? .82),
+            externalEffect: item.metadata['outer_effect']?.toString(),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          ),
+        ),
+      );
     }
     if (item.category == 'name_effect') {
       return Center(child: UsernameEffectText(name: _previewName, effect: effect, fontSize: 20));
