@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../chat/presentation/pages/chat_thread_page.dart';
 import 'currency_packages_provider.dart';
+import '../providers/store_global_presentation_settings.dart';
 
 /// ═══════════════════════════════════════════════════════════════════
 /// متجر النقاط والجواهر — قسم داخل متجر الشات
@@ -205,7 +206,7 @@ class _PackagesGrid extends ConsumerWidget {
                 crossAxisCount: 2,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
-                childAspectRatio: 0.85,
+                childAspectRatio: 0.85 / StorePresentationScope.of(context).cardScale,
               ),
               itemCount: regular.length,
               itemBuilder: (_, i) => _OwnerEditOverlay(
@@ -518,15 +519,15 @@ class _PackageIcon extends StatelessWidget {
         width: size,
         height: size,
         fit: BoxFit.contain,
-        errorWidget: (_, __, ___) => _defaultIcon(),
+        errorWidget: (_, __, ___) => _defaultIcon(context),
       );
     }
-    return _defaultIcon();
+    return _defaultIcon(context);
   }
 
-  Widget _defaultIcon() => Text(
+  Widget _defaultIcon(BuildContext context) => Text(
     type == 'points' ? '⭐' : '💎',
-    style: TextStyle(fontSize: size * 0.8),
+    style: TextStyle(fontSize: size * 0.8 * StorePresentationScope.of(context).emojiScale),
   );
 }
 
@@ -565,7 +566,7 @@ class _ShimmerCurrencyIconState extends State<_ShimmerCurrencyIcon>
       animation: _ctrl,
       builder: (_, __) => Transform.rotate(
         angle: math.sin(_ctrl.value * 2 * math.pi) * 0.1,
-        child: Text(widget.emoji, style: const TextStyle(fontSize: 28)),
+        child: Text(widget.emoji, style: TextStyle(fontSize: 28 * StorePresentationScope.of(context).emojiScale)),
       ),
     );
   }

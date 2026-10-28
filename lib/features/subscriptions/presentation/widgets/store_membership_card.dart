@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../../../store/presentation/providers/store_global_presentation_settings.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../store/presentation/widgets/store_preview.dart';
@@ -182,7 +183,7 @@ class _StoreMembershipCardState extends State<StoreMembershipCard>
 
   Widget _fallback(String emoji) => Center(
       child: Text(emoji.isEmpty ? '👑' : emoji,
-          style: const TextStyle(fontSize: 27)));
+          style: const TextStyle(fontSize: 27 * StorePresentationScope.of(context).emojiScale)));
 
   Widget _info(Color tierColor, bool active) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -276,7 +277,7 @@ class _StoreMembershipCardState extends State<StoreMembershipCard>
     }
     return SizedBox(
       width: double.infinity,
-      height: 34,
+      height: 34 * StorePresentationScope.of(context).cardScale,
       child: _smallBtn(
           active ? 'عضويتك الحالية' : 'اشترك الآن',
           active ? Icons.check_rounded : Icons.shopping_cart_rounded,

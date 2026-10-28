@@ -25,10 +25,12 @@ import '../../../core/widgets/dynamic_avatar_frame.dart';
 import '../../../core/widgets/avatar_frame_compositor.dart';
 import '../../admin/presentation/widgets/admin_gift_dialog.dart';
 import 'providers/chat_store_sections_provider.dart';
+import 'providers/store_global_presentation_settings.dart';
 import '../domain/chat_store_section_icons.dart';
 import 'widgets/message_style_preview_bar.dart';
 import 'staff_gift_page.dart';
 import 'widgets/chat_store_sections_settings_dialog.dart';
+import 'widgets/store_global_presentation_dialog.dart';
 import 'widgets/name_background_picker_dialog.dart';
 import '../../subscriptions/presentation/widgets/membership_store_tab.dart';
 import '../../../core/widgets/avatar_frame_metrics.dart';
@@ -497,6 +499,8 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(storeGlobalPresentationRealtimeProvider);
+    final presentation = ref.watch(storeGlobalPresentationSettingsProvider).valueOrNull ?? StoreGlobalPresentationSettings.defaults;
     final owner = ref.watch(chatStoreOwnerProvider).valueOrNull == true;
     final sections = ref.watch(chatStoreSectionsProvider).valueOrNull ?? const {};
     ChatStoreSection sectionFor(String key, String fallbackName, String fallbackIcon, int order) =>
@@ -555,6 +559,23 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
             ),
           if (owner)
             IconButton(
+              tooltip: 'التحكم المركزي بمظهر المتجر',
+              icon: const Icon(Icons.dashboard_customize_rounded),
+              onPressed: () async {
+                final saved = await showStoreGlobalPresentationDialog(
+                  context: context,
+                  initial: presentation,
+                );
+                if (saved == true && mounted) {
+                  ref.invalidate(storeGlobalPresentationSettingsProvider);
+                  ScaffoldMessenger.of(context).showSnackBarSfx(
+                    const SnackBar(content: Text('تم تطبيق مظهر المتجر على جميع الأقسام ✓')),
+                  );
+                }
+              },
+            ),
+          if (owner)
+            IconButton(
               tooltip: 'تخصيص الأقسام',
               icon: const Icon(Icons.tune),
               onPressed: () => showChatStoreSectionsSettingsDialog(context: context, sectionsInOrder: ordered, onSaved: () => ref.invalidate(chatStoreSectionsProvider)),
@@ -573,9 +594,21 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
               decoration: (currentBg == null || currentBg.isEmpty)
                   ? null
                   : BoxDecoration(image: DecorationImage(image: NetworkImage(currentBg), fit: BoxFit.cover, colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.55), BlendMode.darken))),
-              child: TabBarView(
-                controller: _tabs,
-                children: [
+              child: StorePresentationScope(
+                settings: presentation,
+                child: MediaQuery(
+                  data: MediaQuery.of(context).copyWith(
+                    textScaler: TextScaler.linear(
+                      MediaQuery.textScalerOf(context).scale(1.0) * presentation.fontScale,
+                    ),
+                  ),
+                  child: IconTheme(
+                    data: IconTheme.of(context).copyWith(
+                      size: (IconTheme.of(context).size ?? 24.0) * presentation.emojiScale,
+                    ),
+                    child: TabBarView(
+                      controller: _tabs,
+                      children: [
                   _framesSection(owner),
                   _simpleColoredFramesSection(),
                   _nameBackgroundSection(owner),
@@ -593,7 +626,10 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                   // الوصول إليه. كشفه فحص الملفات اليتيمة.
                   const CurrencyStoreTab(),
                   _RoleColorTab(ownerMenu: _profileCosmeticOwnerMenu),
-                ],
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -700,6 +736,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
     required String category,
     required bool owner,
   }) {
+    final presentation = ref.watch(storeGlobalPresentationSettingsProvider).valueOrNull ?? StoreGlobalPresentationSettings.defaults;
     final async = ref.watch(profileCosmeticCatalogProvider);
 
     return async.when(
@@ -747,9 +784,9 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
         return GridView.builder(
           padding: const EdgeInsets.fromLTRB(10, 10, 10, 24),
           gridDelegate:
-              const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: _CosmeticCard.tileWidth,
-            mainAxisExtent: _CosmeticCard.tileHeight,
+              SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: _CosmeticCard.tileWidth * (ref.watch(storeGlobalPresentationSettingsProvider).valueOrNull?.cardScale ?? 1.0),
+            mainAxisExtent: _CosmeticCard.tileHeight * (ref.watch(storeGlobalPresentationSettingsProvider).valueOrNull?.cardScale ?? 1.0),
             crossAxisSpacing: _CosmeticCard.gap,
             mainAxisSpacing: _CosmeticCard.gap,
           ),
@@ -781,10 +818,10 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       SizedBox(
-                        height: 66,
+                        height: 66 * presentation.previewScale,
                         child: Center(
                           child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 150, maxHeight: 68),
+                            constraints: BoxConstraints(maxWidth: 150 * presentation.previewScale, maxHeight: 68 * presentation.previewScale),
                             child: _preview(item),
                           ),
                         ),
@@ -873,13 +910,14 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
   );
 
   Widget _messageColorGrid(List<ProfileCosmeticItem> items, bool owner) {
+    final presentation = ref.watch(storeGlobalPresentationSettingsProvider).valueOrNull ?? StoreGlobalPresentationSettings.defaults;
     if (items.isEmpty) return const Padding(padding: EdgeInsets.all(12), child: Text('لا توجد ألوان حاليًا'));
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: items.length,
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: _CosmeticCard.rowWidth,
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: _CosmeticCard.rowWidth * presentation.cardScale,
           childAspectRatio: _CosmeticCard.rowAspect,
           crossAxisSpacing: _CosmeticCard.gap,
           mainAxisSpacing: _CosmeticCard.gap),
@@ -911,6 +949,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
   }
 
   Widget _simpleColoredFramesSection() {
+    final presentation = ref.watch(storeGlobalPresentationSettingsProvider).valueOrNull ?? StoreGlobalPresentationSettings.defaults;
     final catalog = ref.watch(storeCatalogProvider).valueOrNull ?? const <StoreItemEntity>[];
     final uid = Supabase.instance.client.auth.currentUser?.id;
     final owned = uid == null
@@ -926,9 +965,9 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
 
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(10, 12, 10, 90),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: _CosmeticCard.tileWidth,
-        mainAxisExtent: _CosmeticCard.tileHeight,
+      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: _CosmeticCard.tileWidth * (ref.watch(storeGlobalPresentationSettingsProvider).valueOrNull?.cardScale ?? 1.0),
+        mainAxisExtent: _CosmeticCard.tileHeight * (ref.watch(storeGlobalPresentationSettingsProvider).valueOrNull?.cardScale ?? 1.0),
         crossAxisSpacing: 9,
         mainAxisSpacing: 9,
       ),
@@ -952,7 +991,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(width: 62, height: 62, child: FittedBox(child: frame)),
+                SizedBox(width: 62 * presentation.previewScale, height: 62 * presentation.previewScale, child: FittedBox(child: frame)),
                 Text(item.nameAr, maxLines: 1, overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                         fontSize: _styleFor(ref, 'frames').item,
@@ -1005,6 +1044,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
   }
 
   Widget _framesSection(bool owner) {
+    final presentation = ref.watch(storeGlobalPresentationSettingsProvider).valueOrNull ?? StoreGlobalPresentationSettings.defaults;
     final async = ref.watch(serverAvatarFramesProvider);
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -1051,9 +1091,9 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
             else
               GridView.builder(
                 padding: const EdgeInsets.fromLTRB(10, 12, 10, 90),
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: _CosmeticCard.tileWidth,
-                  mainAxisExtent: _CosmeticCard.tileHeight,
+                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: _CosmeticCard.tileWidth * (ref.watch(storeGlobalPresentationSettingsProvider).valueOrNull?.cardScale ?? 1.0),
+                  mainAxisExtent: _CosmeticCard.tileHeight * (ref.watch(storeGlobalPresentationSettingsProvider).valueOrNull?.cardScale ?? 1.0),
                   crossAxisSpacing: _CosmeticCard.gap,
                   mainAxisSpacing: _CosmeticCard.gap,
                 ),
@@ -1081,6 +1121,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
   }
 
   Widget _remoteFrameCard(AvatarFrameDefinition frame, bool owner) {
+    final presentation = ref.watch(storeGlobalPresentationSettingsProvider).valueOrNull ?? StoreGlobalPresentationSettings.defaults;
     final owned = owner ||
         (ref.watch(myProfileCosmeticOwnershipProvider).valueOrNull?.contains(frame.key) == true);
     final current = ref.watch(currentProfileProvider).valueOrNull?.avatarFrameKey == frame.key;
@@ -1094,8 +1135,8 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
-                height: 48,
-                width: 48,
+                height: 48 * presentation.previewScale,
+                width: 48 * presentation.previewScale,
                 child: FittedBox(
                   fit: BoxFit.contain,
                   child: DynamicAvatarFrame(
@@ -1710,6 +1751,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
   }
 
   Widget _nameTemplatesSection(bool owner) {
+    final presentation = ref.watch(storeGlobalPresentationSettingsProvider).valueOrNull ?? StoreGlobalPresentationSettings.defaults;
     final async = ref.watch(nameTemplateCatalogProvider);
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -1752,7 +1794,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                 child: Padding(
                   padding: const EdgeInsets.all(8),
                   child: Column(children: [
-                    Center(child: SizedBox(width: 170, height: 50, child: FittedBox(fit: BoxFit.contain, child: NameTemplateHost(templateKey: item.key, name: _previewName, width: 145, height: 44, fontSize: 15)))),
+                    Center(child: SizedBox(width: 170 * presentation.cardScale, height: 50 * presentation.cardScale, child: FittedBox(fit: BoxFit.contain, child: NameTemplateHost(templateKey: item.key, name: _previewName, width: 145 * presentation.previewScale, height: 44 * presentation.previewScale, fontSize: 15 * presentation.previewScale)))),
                     const SizedBox(height: 2),
                     Text(item.nameAr, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900)),
                     // كان يطبع المفتاح الخام («namebg_...») تحت الاسم.
@@ -1925,6 +1967,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
   }
 
   Widget _nameAnimalsSection(bool owner, {String displayMode = 'details'}) {
+    final presentation = ref.watch(storeGlobalPresentationSettingsProvider).valueOrNull ?? StoreGlobalPresentationSettings.defaults;
     final catalog = ref.watch(nameAnimationCatalogProvider);
     final own = ref.watch(myNameAnimationOwnershipProvider).valueOrNull ?? const <String>{};
     // الافتراضي صار المقاس المضغوط نفسه؛ ومن أراد أكبر يختاره صراحةً.
@@ -1979,10 +2022,10 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                 child: GridView.builder(
                   padding: const EdgeInsets.fromLTRB(10, 4, 10, 30),
                   gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: gridExtent,
+                    maxCrossAxisExtent: gridExtent * presentation.cardScale,
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 8,
-                    mainAxisExtent: gridMainExtent,
+                    mainAxisExtent: gridMainExtent * presentation.cardScale,
                   ),
                   itemCount: animals.length + 1,
                   itemBuilder: (_, rawI) {
@@ -2025,7 +2068,7 @@ class _ProfileCosmeticStorePageState extends ConsumerState<ProfileCosmeticStoreP
                                     SizedBox(
                                       height: imageH,
                                       child: Center(
-                                        child: AnimatedNameAnimalEffect(animation: item, width: 44, height: 30),
+                                        child: AnimatedNameAnimalEffect(animation: item, width: 44 * presentation.previewScale, height: 30 * presentation.previewScale),
                                       ),
                                     ),
                                     Text(
@@ -2846,10 +2889,11 @@ class _RoleColorTabState extends State<_RoleColorTab> {
       'تم الشراء');
 
   Widget _preview({String? fx, Map<String, dynamic>? bg}) {
+    final presentation = ref.watch(storeGlobalPresentationSettingsProvider).valueOrNull ?? StoreGlobalPresentationSettings.defaults;
     const label = '👑 رتبتك';
     final Widget text = fx != null
-        ? UsernameEffectText(name: label, effect: UsernameEffectX.fromWire(fx), fontSize: 11, fontWeight: FontWeight.w900)
-        : Text(label, style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w900));
+        ? UsernameEffectText(name: label, effect: UsernameEffectX.fromWire(fx), fontSize: 11 * presentation.previewScale * presentation.emojiScale, fontWeight: FontWeight.w900)
+        : Text(label, style: TextStyle(fontSize: 11 * presentation.previewScale * presentation.emojiScale, color: Colors.white, fontWeight: FontWeight.w900));
     if (bg == null) return text;
     final c1 = _c(bg['color1']?.toString());
     final c2 = _c((bg['color2'] ?? bg['color1'])?.toString());
@@ -2912,7 +2956,7 @@ class _RoleColorTabState extends State<_RoleColorTab> {
         physics: const NeverScrollableScrollPhysics(),
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
-        childAspectRatio: .95,
+        childAspectRatio: .95 / StorePresentationScope.of(context).cardScale,
         children: children,
       );
 
