@@ -183,7 +183,7 @@ class _StoreMembershipCardState extends State<StoreMembershipCard>
 
   Widget _fallback(String emoji) => Center(
       child: Text(emoji.isEmpty ? '👑' : emoji,
-          style: const TextStyle(fontSize: 27 * StorePresentationScope.of(context).emojiScale)));
+          style: TextStyle(fontSize: 27 * StorePresentationScope.of(context).emojiScale)));
 
   Widget _info(Color tierColor, bool active) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,

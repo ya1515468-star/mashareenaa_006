@@ -2889,7 +2889,7 @@ class _RoleColorTabState extends State<_RoleColorTab> {
       'تم الشراء');
 
   Widget _preview({String? fx, Map<String, dynamic>? bg}) {
-    final presentation = ref.watch(storeGlobalPresentationSettingsProvider).valueOrNull ?? StoreGlobalPresentationSettings.defaults;
+    final presentation = StorePresentationScope.of(context);
     const label = '👑 رتبتك';
     final Widget text = fx != null
         ? UsernameEffectText(name: label, effect: UsernameEffectX.fromWire(fx), fontSize: 11 * presentation.previewScale * presentation.emojiScale, fontWeight: FontWeight.w900)
