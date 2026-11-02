@@ -12,6 +12,7 @@ import 'admin_users_tab.dart';
 import 'owner_user_control_tab.dart';
 import 'owner_reels_control_tab.dart';
 import 'owner_guest_control_tab.dart';
+import 'owner_game_stakes_tab.dart';
 import 'admin_virtual_presence_tab.dart';
 import 'admin_platform_requests_tab.dart';
 import 'admin_login_announcement_tab.dart';
@@ -42,7 +43,7 @@ class AdminDashboardPage extends ConsumerWidget {
         ),
       ),
       child: DefaultTabController(
-        length: 21,
+        length: 22,
         child: Scaffold(
           appBar: AppBar(
             title: const Text('لوحة الإدارة'),
@@ -73,6 +74,7 @@ class AdminDashboardPage extends ConsumerWidget {
                 Tab(text: '📣 الإعلانات'),
                 Tab(text: '🛒 المنتجات و VIP'),
                 Tab(text: '👤 حساب الزائر'),
+                Tab(text: '🎲 حدود الرهان'),
               ],
             ),
           ),
@@ -103,6 +105,7 @@ class AdminDashboardPage extends ConsumerWidget {
               _LazyTab(builder: () => const AdminAdsTab()),
               _LazyTab(builder: () => const OwnerContentControlPage()),
               _LazyTab(builder: () => const OwnerGuestControlTab()),
+              _LazyTab(builder: () => const OwnerGameStakesTab()),
             ],
           ),
         ),
