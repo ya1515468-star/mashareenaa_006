@@ -7,6 +7,8 @@ import '../../../profile/presentation/providers/profile_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../rbac/presentation/widgets/server_chat_inline_message.dart';
 import '../../domain/entities/chat_message_entity.dart';
+import '../../data/gif_token.dart';
+import '../../data/gif_catalog.dart';
 import 'emoji_picker_sheet.dart';
 import '../../../../core/services/server_fonts.dart';
 import '../../../../core/services/server_font_for_user.dart';
@@ -261,6 +263,18 @@ class MessageBubble extends ConsumerWidget {
     final effectiveSenderName = message.metadata?['anonymous_chat'] == true
         ? 'عضو مجهول'
         : senderName;
+    // مسارات السمايلات بترتيبها، والرموز `[gN]` في النص تُستبدَل بها
+    // بمواضعها. الرسائل الجديدة (نص + سمايلات في فقاعة واحدة) تمرّ من
+    // هنا؛ والقديمة بلا رموز تبقى على مسار ChatMediaContent كما هي.
+    final gifUrlsAll = () {
+      final raw = message.metadata?['gif_urls'];
+      if (raw is! List) return const <String>[];
+      return raw
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList(growable: false);
+    }();
+    final hasGifTokens = gifTokenPattern.hasMatch(message.text);
     if (hiddenForMe) return const SizedBox.shrink();
     // كانت تقرأ vip بصلاحيات currentUid (المُشاهد الحالي دائمًا، حسب موقع
     // استدعاء MessageBubble)، بينما chat_link_preview_plus وchat_media_plus
@@ -339,13 +353,21 @@ class MessageBubble extends ConsumerWidget {
                         ],
                       ),
                     ),
+                  // رسالة الطرف الآخر: نصّها يُرسَم هنا لا في
+                  // _PrivateMentionText. بإضافة `|| hasGifTokens` يظهر نصّ
+                  // رسالة «نص + سمايل» الواردة أيضًا — كان شرط
+                  // `!isMedia` يُسقطه فلا يُعرَض نصّ المرسِل إطلاقًا.
                   if (effectiveSenderName != null &&
-                      !deletedForEveryone && !message.type.isMedia && message.text.isNotEmpty &&
+                      !deletedForEveryone &&
+                      (!message.type.isMedia || hasGifTokens) &&
+                      message.text.isNotEmpty &&
                       !RegExp(r'^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be|tiktok\.com)\/\S+$', caseSensitive: false).hasMatch(message.text.trim()))
                     ServerChatInlineMessage(
                       uid: message.senderUid,
                       roomId: roomId,
                       fallbackName: effectiveSenderName,
+                      gifUrls: gifUrlsAll,
+                      onGifTap: onGifTap,
                       text: message.text,
                       // كانت p.textPrimary دائمًا لرسائلي هنا، متجاهلة لون
                       // الرسالة المخصَّص (myMessageColor) كليًا — والويدجت
@@ -410,9 +432,12 @@ class MessageBubble extends ConsumerWidget {
                               ),
                             ),
                     ),
+                  // `!hasGifTokens`: حين يحمل النص رموزًا تُرسَم السمايلات
+                  // داخله بمواضعها، فعرضها هنا أيضًا كان يُظهرها مرّتين.
                   if (!deletedForEveryone &&
                       message.type.isMedia &&
-                      message.mediaUrl != null)
+                      message.mediaUrl != null &&
+                      !hasGifTokens)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6),
                       child: ChatMediaContent(
@@ -438,13 +463,18 @@ class MessageBubble extends ConsumerWidget {
                             // يوتيوب يُشغَّل حصرًا عبر المشغّل العائم العام
                             // لا تضمينًا داخل الفقاعة — تيك توك يبقى كما هو.
                             routeYoutubeToFloatingPlayer: true)),
+                  // كان الشرط `!isMedia` وحده يمنع ظهور النص في أي رسالة
+                  // وسائط — ولذلك كان «نص + سمايل» يحتاج فقاعتين. الآن
+                  // رسالة الوسائط التي تحمل رموز سمايل تعرض نصّها أيضًا.
                   if (!deletedForEveryone &&
-                      !message.type.isMedia &&
+                      (!message.type.isMedia || hasGifTokens) &&
                       message.text.isNotEmpty &&
                       (isMine || effectiveSenderName == null ||
                        RegExp(r'^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be|tiktok\.com)\/\S+$', caseSensitive: false).hasMatch(message.text.trim())))
                     _PrivateMentionText(
                         text: message.text,
+                        gifUrls: gifUrlsAll,
+                        onGifTap: onGifTap,
                         // كان اللون هنا يُستخدم مباشرة بلا أي فحص تباين مع
                         // خلفية الفقاعة الفعلية (bubbleBg أدناه)، بخلاف
                         // الرسائل العامة المحمية أصلًا عبر ServerChatInline
@@ -631,6 +661,14 @@ class _PrivateMentionText extends StatelessWidget {
   final String? fontFamily;
   final Set<String> mentionNames;
   final bool showMentionBadge;
+
+  /// مسارات السمايلات المتحركة من `metadata.gif_urls`؛ الرمز `[gN]` في
+  /// النص يُستبدَل بالصورة رقم N منها فيُعرض في موضعه بين الكلمات.
+  final List<String> gifUrls;
+
+  /// الضغط على سمايل مرسَل ينسخه إلى صندوق الكتابة (لا يُرسله).
+  final ValueChanged<String>? onGifTap;
+
   const _PrivateMentionText({
     required this.text,
     required this.textColor,
@@ -638,6 +676,8 @@ class _PrivateMentionText extends StatelessWidget {
     this.fontFamily,
     this.mentionNames = const <String>{},
     this.showMentionBadge = false,
+    this.gifUrls = const <String>[],
+    this.onGifTap,
   });
   static final RegExp _mention = RegExp(r'@[\w\u0600-\u06FF._-]+');
 
@@ -653,39 +693,96 @@ class _PrivateMentionText extends StatelessWidget {
     return RegExp(r'@(?:' + escaped + r')(?![\w\u0600-\u06FF._-])', caseSensitive: false);
   }
 
+  TextStyle get _base => TextStyle(
+      color: textColor, fontFamily: fontFamily, fontSize: 14, height: 1.15);
+
   @override
   Widget build(BuildContext context) {
-    final matches = _mentionPattern(mentionNames).allMatches(text).toList();
-    if (matches.isEmpty) return Text(text, style: TextStyle(color: textColor, fontFamily: fontFamily, fontSize: 14, height: 1.15));
+    // الإشارات ورموز السمايل تُجمَع في قائمة واحدة مرتّبة بالموضع، فيُرسَم
+    // كل منهما في مكانه الصحيح من النص. رمز السمايل يُحتجَز أولًا فلا
+    // يبتلعه مطابقُ إشارةٍ، ورمزٌ بلا مسار مقابل يُعرض نصًّا كما كُتب.
+    final parts = <_PrivateSpanPart>[];
+    final taken = <int>{};
+    void claim(int start, int end, String raw, {String? gifUrl}) {
+      for (var i = start; i < end; i++) {
+        if (taken.contains(i)) return;
+      }
+      for (var i = start; i < end; i++) {
+        taken.add(i);
+      }
+      parts.add(_PrivateSpanPart(
+          start: start, end: end, raw: raw, gifUrl: gifUrl));
+    }
+
+    for (final m in gifTokenPattern.allMatches(text)) {
+      final index = int.tryParse(m.group(1) ?? '');
+      if (index == null || index < 1 || index > gifUrls.length) continue;
+      claim(m.start, m.end, m.group(0)!, gifUrl: gifUrls[index - 1]);
+    }
+    for (final m in _mentionPattern(mentionNames).allMatches(text)) {
+      claim(m.start, m.end, text.substring(m.start, m.end));
+    }
+    parts.sort((a, b) => a.start.compareTo(b.start));
+
+    if (parts.isEmpty) return Text(text, style: _base);
+
     final spans = <InlineSpan>[];
     var cursor = 0;
-    for (final match in matches) {
-      if (match.start > cursor) {
-        spans.add(TextSpan(text: text.substring(cursor, match.start), style: TextStyle(color: textColor, fontFamily: fontFamily, fontSize: 14, height: 1.15)));
+    for (final part in parts) {
+      if (part.start > cursor) {
+        spans.add(
+            TextSpan(text: text.substring(cursor, part.start), style: _base));
       }
-      final raw = text.substring(match.start, match.end);
-      spans.add(WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: showMentionBadge
-            ? ChatMentionBadge(name: raw, fontSize: 13)
-            : Text(
-                raw,
-                style: TextStyle(
-                  color: textColor,
-                  fontFamily: fontFamily,
-                  fontSize: 14,
-                  height: 1.15,
-                ),
-              ),
-      ));
-      cursor = match.end;
+      final gifUrl = part.gifUrl;
+      if (gifUrl != null) {
+        final banner = isMashareenaBannerGif(gifUrl);
+        spans.add(WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onGifTap == null ? null : () => onGifTap!(gifUrl),
+            child: SizedBox(
+              width: banner ? 150.0 : 22.0,
+              height: banner ? 47.0 : 22.0,
+              child: gifUrl.startsWith('assets/')
+                  ? Image.asset(gifUrl,
+                      fit: BoxFit.contain, gaplessPlayback: true)
+                  : Image.network(gifUrl,
+                      fit: BoxFit.contain, gaplessPlayback: true),
+            ),
+          ),
+        ));
+      } else {
+        spans.add(WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: showMentionBadge
+              ? ChatMentionBadge(name: part.raw, fontSize: 13)
+              : Text(part.raw, style: _base),
+        ));
+      }
+      cursor = part.end;
     }
-    if (cursor < text.length) spans.add(TextSpan(text: text.substring(cursor), style: TextStyle(color: textColor, fontFamily: fontFamily, fontSize: 14, height: 1.15))); 
+    if (cursor < text.length) {
+      spans.add(TextSpan(text: text.substring(cursor), style: _base));
+    }
     return RichText(
         textAlign: TextAlign.right,
         textDirection: TextDirection.rtl,
         text: TextSpan(style: TextStyle(color: textColor), children: spans));
   }
+}
+
+/// نطاق داخل نص رسالة خاصة: إشارة عضو أو رمز سمايل متحرك.
+class _PrivateSpanPart {
+  final int start;
+  final int end;
+  final String raw;
+  final String? gifUrl;
+  const _PrivateSpanPart(
+      {required this.start,
+      required this.end,
+      required this.raw,
+      this.gifUrl});
 }
 
 /// صورة مصغّرة مضغوطة (28px) بجانب كل رسالة من الطرف الآخر — تُظهر

@@ -246,7 +246,23 @@ class QuickReactionBar extends StatelessWidget {
 class EmojiPickerContent extends StatefulWidget {
   final ValueChanged<String> onSelect;
   final ScrollController? scrollController;
-  const EmojiPickerContent({super.key, required this.onSelect, this.scrollController});
+
+  /// هل يُغلق المنتقي بعد اختيار واحد؟
+  ///
+  /// true = السلوك المطلوب لردود الفعل السريعة على رسالة (EmojiPickerSheet):
+  /// الاختيار واحد ثم تُغلق الورقة بنفسها.
+  /// false = السلوك المطلوب في لوحة السمايل الداخلية (StickerAndGifPanel):
+  /// اللوحة تبقى مفتوحة فيُدرَج إيموجي بعد إيموجي في صندوق الكتابة بلا
+  /// إعادة فتحها كل مرة. كان الإغلاق مفروضًا هنا دائمًا، فكان اختيار
+  /// إيموجي واحد يُغلق اللوحة الموحَّدة كلها.
+  final bool closeOnSelect;
+
+  const EmojiPickerContent({
+    super.key,
+    required this.onSelect,
+    this.scrollController,
+    this.closeOnSelect = false,
+  });
 
   @override
   State<EmojiPickerContent> createState() => _EmojiPickerContentState();
@@ -287,7 +303,7 @@ class _EmojiPickerContentState extends State<EmojiPickerContent> {
   void _pick(String emoji) {
     _remember(emoji);
     widget.onSelect(emoji);
-    Navigator.of(context).pop();
+    if (widget.closeOnSelect) Navigator.of(context).pop();
   }
 
   List<String> get _filtered {
@@ -392,7 +408,10 @@ class EmojiPickerSheet extends StatelessWidget {
               ),
               Expanded(
                 child: EmojiPickerContent(
-                    onSelect: onSelect, scrollController: scrollController),
+                    onSelect: onSelect,
+                    scrollController: scrollController,
+                    // ورقة ردود الفعل: اختيار واحد ثم تُغلق.
+                    closeOnSelect: true),
               ),
             ],
           ),

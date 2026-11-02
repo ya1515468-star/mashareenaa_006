@@ -109,6 +109,12 @@ class _Composer extends StatelessWidget {
   final VoidCallback onSend;
   final Color? textColor;
 
+  /// تركيز الحقل — تُخفى به لوحة المفاتيح عند فتح لوحة السمايل الداخلية.
+  final FocusNode? focusNode;
+
+  /// الضغط على الحقل للكتابة يُغلق لوحة السمايل، فلا تتزاحم اللوحتان.
+  final VoidCallback? onFieldTap;
+
   const _Composer({
     required this.controller,
     required this.sending,
@@ -117,6 +123,8 @@ class _Composer extends StatelessWidget {
     required this.onVoice,
     required this.onSend,
     this.textColor,
+    this.focusNode,
+    this.onFieldTap,
   });
 
   @override
@@ -200,6 +208,8 @@ class _Composer extends StatelessWidget {
                     textDirection: direction,
                     child: TextField(
                       controller: controller,
+                      focusNode: focusNode,
+                      onTap: onFieldTap,
                       minLines: 1,
                       maxLines: 5,
                       keyboardType: TextInputType.multiline,
