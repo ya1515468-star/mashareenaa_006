@@ -422,7 +422,9 @@ class MessageBubble extends ConsumerWidget {
                                     border: Border(
                                         right: BorderSide(
                                             color: p.accent, width: 2.5))),
-                                child: Text(message.replyToPreview ?? '',
+                                child: Text(
+                                    gifTokensToPlaceholder(
+                                        message.replyToPreview ?? ''),
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(

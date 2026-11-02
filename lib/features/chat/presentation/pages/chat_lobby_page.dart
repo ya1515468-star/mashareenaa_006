@@ -1316,8 +1316,11 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       case 'file': return '📎 ملف';
       case 'gift': return '🎁 هدية';
     }
-    final body = row['body']?.toString().trim() ?? '';
-    return body.isNotEmpty ? body : (row['message']?.toString() ?? '');
+    final body =
+        gifTokensToPlaceholder(row['body']?.toString().trim() ?? '');
+    return body.isNotEmpty
+        ? body
+        : gifTokensToPlaceholder(row['message']?.toString() ?? '');
   }
 
   /// رابط الصورة/السمايل الأصلي (إن وُجد) ليُعرَض مصغّراً فعلياً داخل
@@ -2401,7 +2404,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                 icon: Icons.reply,
                 label:
                     '${_replyMode == 'quote' ? 'اقتباس من' : 'رد على'} ${_replyingTo!['display_name'] ?? 'عضو'}: '
-                    '${(_replyingTo!['body'] ?? '📎 مرفق').toString()}',
+                    '${gifTokensToPlaceholder((_replyingTo!['body'] ?? '📎 مرفق').toString())}',
                 onCancel: _cancelReply,
               ),
             // المصغّرات تُقرأ من نصّ الحقل لا من قائمة منفصلة، فترتيبها هو
