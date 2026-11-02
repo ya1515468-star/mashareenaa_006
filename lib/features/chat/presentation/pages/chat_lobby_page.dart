@@ -172,6 +172,24 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   /// يكن في الصفحة أي FocusNode قبل ذلك.
   final FocusNode _composerFocus = FocusNode();
 
+  /// معرّف أحدث صفّ عُرض — للتمرير للأسفل عند الجديد فقط.
+  String? _lastNewestRowId;
+
+  /// الصدى المحلي الفوري: رسائل أُرسلت ولم يصل صفّها من الخادم بعد.
+  ///
+  /// بلا هذا كان المستخدم يضغط السهم ثم **ينتظر** ذهاب الطلب إلى الخادم
+  /// وعودته ثم وصول البثّ الحي — فيبدو الإرسال بطيئًا على كل شبكة. الآن
+  /// تظهر رسالته فورًا بشفافية خفيفة، ويحلّ محلّها الصفّ الحقيقي حين
+  /// يصل. المطابقة بـrequest_id الذي يحفظه الخادم في metadata.
+  final List<Map<String, dynamic>> _outbox = [];
+
+  /// آخر موضع صالح للمؤشر قبل فقدان التركيز.
+  ///
+  /// `unfocus()` يُتلف `_controller.selection`: تصير صفرًا أو غير صالحة.
+  /// فكان رمز السمايل يقفز إلى بداية النص أو نهايته بدل موضع الكتابة —
+  /// وهذا ما ظهر في القاعدة: «[g1]هاي» و«هاي[g1]» لنفس الفعل.
+  int _savedCursor = -1;
+
   /// الرسالة التي يردّ عليها المستخدم حاليًا (اقتباس مضمَّن في نص
   /// الرسالة المُرسَلة، دون حاجة لعمود جديد في قاعدة البيانات).
   Map<String, dynamic>? _replyingTo;
@@ -602,13 +620,16 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     // '{}') ثم jsonb_set فوقه) — فالقائمة تُحمَل هنا بلا أي هجرة خادمية،
     // ويبقى kind='gif' وattachment_url = أول GIF لتوافق الرسائل القديمة.
     List<String>? gifUrls,
+    /// يُمرَّر من الصدى المحلي ليطابق الصفّ القادم من البثّ الحي فيُسقَط
+    /// المحلي بلا ازدواج.
+    String? requestIdOverride,
   }) async {
     final user = _user;
     final payload = (message ?? body).trim();
     if (user == null || payload.isEmpty) {
       throw const FormatException('EMPTY_MESSAGE');
     }
-    final requestId = const Uuid().v4();
+    final requestId = requestIdOverride ?? const Uuid().v4();
     // البند 10: الاقتباس يجعل صاحب الرسالة المقتبسة مَنشونًا فعليًا — اسمه
     // يظهر كمنشن ويصله تنبيه صوتي. منطق الاستقبال الموجود أصلًا يشغّل نغمة
     // المنشن حين يجد معرّف القارئ في mention_user_ids، فإضافته هنا تكفي
@@ -656,11 +677,53 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     final normalized = _gifDraft.normalize(_controller.text.trim());
     final text = normalized.text;
     final gifs = normalized.urls;
-    if (text.isEmpty || _user == null || _sending) return;
+    if (text.isEmpty || _user == null) return;
+
+    // ── الصدى المحلي الفوري ──
+    // الحقل يُفرَّغ والرسالة تظهر **قبل** أي رحلة إلى الخادم. هذا ما
+    // يجعل الإرسال يبدو لحظيًا كما في تطبيقات المحادثة المعروفة، بدل
+    // انتظار الذهاب والإياب ثم وصول البثّ الحي.
+    final requestId = const Uuid().v4();
+    final reply = _replyingTo;
+    final replyPreview = reply == null
+        ? null
+        : '${reply['display_name']?.toString().trim().isNotEmpty == true ? reply['display_name'] : 'عضو'}|${_replySourcePreviewText(reply)}|${_replySourceThumbnail(reply)}';
+    final replyModeNow = reply == null ? 'none' : _replyMode;
+    final pendingRow = <String, dynamic>{
+      'id': 'pending-$requestId',
+      'user_id': _user!.id,
+      'room_id': _roomId,
+      'display_name': _profileDisplayNameOrNull() ?? 'أنا',
+      'avatar_url': _profileAvatarUrl ?? '',
+      'message': text,
+      'body': text,
+      'kind': gifs.isEmpty ? 'text' : 'gif',
+      'attachment_url': gifs.isEmpty ? null : gifs.first,
+      'reply_to_id': reply?['id']?.toString(),
+      'reply_to_sender_uid': reply?['user_id']?.toString(),
+      'reply_to_preview': replyPreview,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'metadata': <String, dynamic>{
+        'request_id': requestId,
+        'reply_mode': replyModeNow,
+        if (gifs.isNotEmpty) 'gif_urls': gifs,
+        '_pending': true,
+      },
+    };
+
+    _controller.clear();
+    _mentionUserIds.clear();
+    _mentionUserNames.clear();
     setState(() {
-      _sending = true;
+      _outbox.add(pendingRow);
       _error = null;
+      _gifDraft.clear();
+      _stickerPanelOpen = false;
+      _replyingTo = null;
+      _replyMode = 'reply';
     });
+    _scrollToEnd();
+
     try {
       // كانت رسالتان: واحدة kind='gif' نصّها الحرفي 'GIF'، وأخرى
       // kind='text' — فينتج عن «نص + سمايل» فقاعتان. الآن رسالة واحدة:
@@ -668,13 +731,13 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       // metadata.gif_urls، والنوع gif حين توجد سمايلات (قائمة الخادم
       // البيضاء لا تقبل نوعًا جديدًا) وtext حين لا توجد.
       {
-        final reply = _replyingTo;
         await _insertPublicMessage(
           body: text,
           message: text,
           kind: gifs.isEmpty ? 'text' : 'gif',
           attachmentUrl: gifs.isEmpty ? null : gifs.first,
           gifUrls: gifs.isEmpty ? null : gifs,
+          requestIdOverride: requestId,
           replyToId: reply?['id']?.toString(),
           replyToSenderUid: reply?['user_id']?.toString(),
           // كانت تحفظ نص الرسالة الأصلية وحده بلا اسم مرسِلها؛ بطاقة
@@ -682,21 +745,11 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
           // شكل مُشفَّر بفاصل: اسم المرسل|نص المعاينة|رابط مصغّرة (قد يكون
           // فارغاً). البطاقة تعرض الصورة الفعلية حين يتوفر الرابط، لا
           // النص الوصفي وحده.
-          replyToPreview: reply == null ? null : '${reply['display_name']?.toString().trim().isNotEmpty == true ? reply['display_name'] : 'عضو'}|${_replySourcePreviewText(reply)}|${_replySourceThumbnail(reply)}',
-          replyMode: reply == null ? 'none' : _replyMode,
+          replyToPreview: replyPreview,
+          replyMode: replyModeNow,
         );
       }
       if (!mounted) return;
-      _controller.clear();
-      _mentionUserIds.clear();
-      _mentionUserNames.clear();
-      setState(() {
-        _gifDraft.clear();
-        // السهم يُرسل ويُغلق اللوحة — هذا هو زر الإغلاق الطبيعي بدل «تم».
-        _stickerPanelOpen = false;
-        _replyingTo = null;
-        _replyMode = 'reply';
-      });
       // The server awards activity XP as part of the message transaction.
       // Refresh the sender's room identity so a newly reached L-level is
       // reflected immediately on subsequent chat renders.
@@ -707,10 +760,22 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       }
       _scrollToEnd();
     } catch (e) {
-      if (mounted) setState(() => _error = _friendlyChatError(e));
-    } finally {
-      if (mounted) setState(() => _sending = false);
+      // فشل الإرسال: يُسقَط الصدى المحلي ويُعاد النص إلى الحقل ليعيد
+      // المستخدم المحاولة بلا أن يفقد ما كتبه.
+      if (!mounted) return;
+      setState(() {
+        _outbox.removeWhere(
+            (r) => (r['metadata'] as Map)['request_id'] == requestId);
+        _error = _friendlyChatError(e);
+        if (_controller.text.trim().isEmpty) _controller.text = text;
+      });
     }
+  }
+
+  String? _profileDisplayNameOrNull() {
+    final name =
+        ref.read(currentProfileProvider).valueOrNull?.displayName.trim();
+    return (name == null || name.isEmpty) ? null : name;
   }
 
   /// زر "+" يفتح لوحات داخلية في التطبيق، ولا ينقل المستخدم إلى متصفح خارجي.
@@ -1234,14 +1299,31 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   /// ويتقاسمه معه الآن السمايل المتحرك عبر رمزه — فيصير سلوك الاثنين
   /// واحدًا كما طُلب.
   void _insertAtCursor(String piece) {
-    final selection = _controller.selection;
     final text = _controller.text;
-    final insertAt = selection.isValid ? selection.start : text.length;
-    final replaceTo = selection.isValid ? selection.end : text.length;
+    final selection = _controller.selection;
+    int insertAt;
+    int replaceTo;
+    if (_composerFocus.hasFocus &&
+        selection.isValid &&
+        selection.start >= 0 &&
+        selection.end <= text.length) {
+      // الحقل مركَّز: الموضع الحيّ هو الصحيح.
+      insertAt = selection.start;
+      replaceTo = selection.end;
+    } else if (_savedCursor >= 0 && _savedCursor <= text.length) {
+      // لوحة السمايل مفتوحة والتركيز مفقود: الموضع المحفوظ قبل الإخفاء.
+      insertAt = _savedCursor;
+      replaceTo = _savedCursor;
+    } else {
+      insertAt = text.length;
+      replaceTo = text.length;
+    }
     _controller.value = TextEditingValue(
       text: text.replaceRange(insertAt, replaceTo, piece),
       selection: TextSelection.collapsed(offset: insertAt + piece.length),
     );
+    // اختيارات متتالية بلا تركيز تتقدّم بدل أن تتكدّس في الموضع نفسه.
+    _savedCursor = insertAt + piece.length;
   }
 
   /// يُدرج سمايلًا متحركًا عند موضع المؤشر. لا إرسال هنا إطلاقًا.
@@ -1255,7 +1337,12 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   void _toggleStickerPanel() {
     if (_sending) return;
     final opening = !_stickerPanelOpen;
-    if (opening) _composerFocus.unfocus();
+    if (opening) {
+      // يُلتقط الموضع **قبل** unfocus، لأنه يُتلفه.
+      final sel = _controller.selection;
+      if (sel.isValid && sel.baseOffset >= 0) _savedCursor = sel.baseOffset;
+      _composerFocus.unfocus();
+    }
     setState(() => _stickerPanelOpen = opening);
   }
 
@@ -2179,7 +2266,25 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                                   error: snapshot.error.toString());
                             }
                             final rows = snapshot.data ?? const [];
+                            // الصدى المحلي: يُسقَط منه كل ما وصل صفّه
+                            // الحقيقي (المطابقة بـrequest_id الذي يحفظه
+                            // الخادم في metadata)، ويُعرض الباقي كما هو.
+                            if (_outbox.isNotEmpty) {
+                              final arrived = <String>{};
+                              for (final r in rows) {
+                                final m = r['metadata'];
+                                if (m is Map && m['request_id'] != null) {
+                                  arrived.add(m['request_id'].toString());
+                                }
+                              }
+                              if (arrived.isNotEmpty) {
+                                _outbox.removeWhere((o) => arrived.contains(
+                                    (o['metadata'] as Map)['request_id']
+                                        .toString()));
+                              }
+                            }
                             final displayRows = <Map<String, dynamic>>[
+                              ..._outbox,
                               ...recentGlobal.map((e) => {
                                     'id': 'global-${e['id']}',
                                     'user_id': e['actor_uid'],
@@ -2230,19 +2335,45 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                               }
                             });
                             if (displayRows.isEmpty) return const _EmptyLobby();
-                            WidgetsBinding.instance
-                                .addPostFrameCallback((_) => _scrollToEnd());
+                            // كان التمرير للأسفل يُنفَّذ في **كل** إعادة بناء —
+                            // أي عند كل نبضة حالة أو تحديث خطّ — فيصارع
+                            // تمرير المستخدم ويقطّع القائمة. الآن عند وصول
+                            // رسالة أحدث فعلًا فقط.
+                            final newestId =
+                                displayRows.last['id']?.toString() ?? '';
+                            if (newestId != _lastNewestRowId) {
+                              _lastNewestRowId = newestId;
+                              WidgetsBinding.instance
+                                  .addPostFrameCallback((_) => _scrollToEnd());
+                            }
                             return ListView.builder(
                               controller: _scroll,
                               padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                               itemCount: displayRows.length,
+                              // مفتاح لكل صفّ: يسمح لـFlutter بإعادة استعمال
+                              // العناصر بدل هدم القائمة وبنائها من جديد عند
+                              // كل بثّ، وبثّ القائمة كاملة يحدث مع كل رسالة.
+                              findChildIndexCallback: (key) {
+                                if (key is! ValueKey<String>) return null;
+                                // مفاتيح الصفوف بالشكل «المعرّف#الفهرس»
+                                // (الفهرس حارس ضدّ تكرار معرّف نادر)، فيُقصّ
+                                // قبل المطابقة.
+                                final id = key.value.split('#').first;
+                                final at = displayRows.indexWhere(
+                                    (r) => r['id']?.toString() == id);
+                                return at < 0 ? null : at;
+                              },
                               itemBuilder: (_, i) {
                                 final row = displayRows[i];
                                 if (row['kind'] == 'global_event') {
-                                  return _GlobalChatEventRow(
-                                      event: (row['metadata']
-                                              as Map)['global_event']
-                                          as Map<String, dynamic>);
+                                  return KeyedSubtree(
+                                    key: ValueKey<String>(
+                                        row['id']?.toString() ?? '$i'),
+                                    child: _GlobalChatEventRow(
+                                        event: (row['metadata']
+                                                as Map)['global_event']
+                                            as Map<String, dynamic>),
+                                  );
                                 }
                                 final metadata = row['metadata'] is Map
                                     ? Map<String, dynamic>.from(row['metadata'] as Map)
@@ -2292,8 +2423,16 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                                     } else if (itemContext.mounted) {
                                       _publicMessageContexts[rowId] = itemContext;
                                     }
+                                    // الرسالة المعلَّقة (صدى محلي لم يصل
+                                    // صفّها من الخادم بعد) تُعرض بشفافية
+                                    // خفيفة: يراها المستخدم فورًا ويعرف
+                                    // أنها لم تُؤكَّد بعد.
+                                    final pending =
+                                        metadata['_pending'] == true;
                                     return KeyedSubtree(
                                       key: ValueKey(occurrenceKey),
+                                      child: Opacity(
+                                      opacity: pending ? 0.55 : 1,
                                       child: _ChatMessageRow(
                                       row: row,
                                       messageFrameIndex: (row['_message_frame_index'] as int?) ?? -1,
@@ -2333,6 +2472,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                                             _mediaExpanded = true;
                                           });
                                         },
+                                      ),
                                       ),
                                     );
                                   },

@@ -100,6 +100,9 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
 
   /// تركيز حقل الكتابة — لإخفاء لوحة المفاتيح عند فتح لوحة السمايل.
   final FocusNode _composerFocus = FocusNode();
+
+  /// آخر موضع صالح للمؤشر قبل فقدان التركيز — `unfocus()` يُتلفه.
+  int _savedCursor = -1;
   final _sound = ChatSoundService(Supabase.instance.client);
   Color _mentionFrameColor = const Color(0xFFFFD54F);
 
@@ -362,14 +365,28 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
   /// يُدرج [piece] عند موضع المؤشر (ويستبدل النص المُظلَّل إن وُجد). نفس
   /// منطق الغرفة العامة حرفيًا، فسلوك الصفحتين واحد.
   void _insertAtCursor(String piece) {
-    final selection = _textController.selection;
     final text = _textController.text;
-    final insertAt = selection.isValid ? selection.start : text.length;
-    final replaceTo = selection.isValid ? selection.end : text.length;
+    final selection = _textController.selection;
+    int insertAt;
+    int replaceTo;
+    if (_composerFocus.hasFocus &&
+        selection.isValid &&
+        selection.start >= 0 &&
+        selection.end <= text.length) {
+      insertAt = selection.start;
+      replaceTo = selection.end;
+    } else if (_savedCursor >= 0 && _savedCursor <= text.length) {
+      insertAt = _savedCursor;
+      replaceTo = _savedCursor;
+    } else {
+      insertAt = text.length;
+      replaceTo = text.length;
+    }
     _textController.value = TextEditingValue(
       text: text.replaceRange(insertAt, replaceTo, piece),
       selection: TextSelection.collapsed(offset: insertAt + piece.length),
     );
+    _savedCursor = insertAt + piece.length;
   }
 
   /// يُدرج سمايلًا متحركًا عند موضع المؤشر. لا إرسال هنا إطلاقًا.
@@ -381,7 +398,12 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
   /// زر السمايل مفتاح: ضغطة تفتح اللوحة الداخلية وضغطة تُغلقها.
   void _toggleStickerPanel() {
     final opening = !_stickerPanelOpen;
-    if (opening) _composerFocus.unfocus();
+    if (opening) {
+      // يُلتقط الموضع **قبل** unfocus، لأنه يُتلفه.
+      final sel = _textController.selection;
+      if (sel.isValid && sel.baseOffset >= 0) _savedCursor = sel.baseOffset;
+      _composerFocus.unfocus();
+    }
     setState(() => _stickerPanelOpen = opening);
   }
 
