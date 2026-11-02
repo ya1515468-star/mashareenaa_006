@@ -14,6 +14,7 @@ import '../../../../core/widgets/error_view.dart';
 import '../../../../core/widgets/loading_indicator.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/presentation/widgets/guest_widgets.dart';
+import '../widgets/complete_profile_sheet.dart';
 import '../../../gamification/presentation/providers/gamification_provider.dart';
 import '../../../rbac/presentation/widgets/server_chat_badge_above_name.dart';
 import '../../../rbac/presentation/widgets/server_username_display.dart';
@@ -127,6 +128,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
               children: [
                 // دعوة الزائر لترقية حسابه — تختفي نهائيًا بعد التسجيل.
                 const GuestUpgradeTile(),
+                // بيانات ناقصة (جوجل أو تسجيل قديم) — تختفي بعد الإكمال.
+                const CompleteProfileTile(),
                 // الغلاف العلوي + الصورة الشخصية فوقه متراكبة، ثم رمز
                 // الرتبة واسمها بخط صغير أنيق أسفل الصورة مباشرة —
                 // تمامًا كما في المواصفة. إن لم توجد صورة غلاف
