@@ -3,8 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/config/auth_otp.dart';
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/di/injection_container.dart';
+import '../../domain/usecases/check_username_available_usecase.dart';
+import '../../domain/usecases/create_username_pin_usecase.dart';
 import '../../../../core/services/snack_sfx.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/guest_auth_service.dart';
@@ -12,7 +17,7 @@ import '../providers/auth_provider.dart';
 import '../providers/guest_provider.dart';
 import '../widgets/premium/premium_button.dart';
 
-enum _Step { email, code, password, done }
+enum _Step { email, code, password, username, done }
 
 /// ترقية حساب الزائر إلى حساب دائم ببريد مؤكَّد.
 ///
@@ -41,6 +46,12 @@ class _GuestUpgradePageState extends ConsumerState<GuestUpgradePage> {
   final _emailController = TextEditingController();
   final _codeController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _pinController = TextEditingController();
+
+  /// null = لم يُفحَص بعد، true = متاح، false = مأخوذ أو غير صالح.
+  bool? _usernameAvailable;
+  Timer? _usernameDebounce;
 
   _Step _step = _Step.email;
   bool _busy = false;
@@ -55,9 +66,12 @@ class _GuestUpgradePageState extends ConsumerState<GuestUpgradePage> {
   @override
   void dispose() {
     _cooldownTimer?.cancel();
+    _usernameDebounce?.cancel();
     _emailController.dispose();
     _codeController.dispose();
     _passwordController.dispose();
+    _usernameController.dispose();
+    _pinController.dispose();
     super.dispose();
   }
 
@@ -124,7 +138,7 @@ class _GuestUpgradePageState extends ConsumerState<GuestUpgradePage> {
         if (!mounted) return;
         ref.invalidate(guestStateProvider);
         ref.invalidate(authControllerProvider);
-        setState(() => _step = _Step.done);
+        setState(() => _step = _Step.username);
       });
 
   Future<void> _resend() => _run(() async {
@@ -152,6 +166,7 @@ class _GuestUpgradePageState extends ConsumerState<GuestUpgradePage> {
               if (_step == _Step.email) ..._emailStep(p),
               if (_step == _Step.code) ..._codeStep(p),
               if (_step == _Step.password) ..._passwordStep(p),
+              if (_step == _Step.username) ..._usernameStep(p),
               if (_step == _Step.done) ..._doneStep(p),
               if (_error != null) ...[
                 const SizedBox(height: 14),
@@ -330,6 +345,105 @@ class _GuestUpgradePageState extends ConsumerState<GuestUpgradePage> {
         ),
       ];
 
+
+  void _onUsernameChanged(String value) {
+    _usernameDebounce?.cancel();
+    final name = value.trim();
+    if (name.isEmpty) {
+      setState(() => _usernameAvailable = null);
+      return;
+    }
+    _usernameDebounce = Timer(const Duration(milliseconds: 500), () async {
+      final result = await sl<CheckUsernameAvailableUseCase>()(name);
+      if (!mounted) return;
+      setState(() => _usernameAvailable =
+          result.fold((_) => false, (available) => available));
+    });
+  }
+
+  Future<void> _submitUsername() => _run(() async {
+        final uid = ref.read(authControllerProvider).valueOrNull?.uid ??
+            Supabase.instance.client.auth.currentUser?.id;
+        if (uid == null) {
+          throw const GuestAuthException('انتهت الجلسة، أعد الدخول.');
+        }
+        final result = await sl<CreateUsernamePinUseCase>()(
+          CreateUsernamePinParams(
+            uid: uid,
+            username: _usernameController.text.trim(),
+            pin: _pinController.text.trim(),
+          ),
+        );
+        final failure = result.fold<String?>((f) => f.message, (_) => null);
+        if (failure != null) throw GuestAuthException(failure);
+        if (!mounted) return;
+        setState(() => _step = _Step.done);
+      });
+
+  List<Widget> _usernameStep(dynamic p) {
+    final name = _usernameController.text.trim();
+    final pinOk = _pinController.text.trim().length == AppValidation.pinLength;
+    final ready = _usernameAvailable == true && pinOk;
+    return [
+      Text(
+        'اختر اسم مستخدم فريدًا — به يجدك الآخرون، وبه ترجع إلى حسابك '
+        'برمز PIN إن نسيت كلمة المرور. اختياري، وتستطيع تخطّيه الآن.',
+        style: TextStyle(color: p.textSecondary, fontSize: 13, height: 1.6),
+      ),
+      const SizedBox(height: 18),
+      TextField(
+        controller: _usernameController,
+        textDirection: TextDirection.ltr,
+        onChanged: _onUsernameChanged,
+        style: TextStyle(color: p.textPrimary),
+        decoration: InputDecoration(
+          labelText: 'اسم المستخدم',
+          prefixIcon: Icon(Icons.alternate_email, color: p.textMuted),
+          helperText: name.isEmpty
+              ? 'حروف إنجليزية وأرقام و _ ، من 3 إلى 20'
+              : _usernameAvailable == null
+                  ? 'جارٍ التحقق…'
+                  : _usernameAvailable == true
+                      ? 'متاح'
+                      : 'غير متاح أو غير صالح',
+          helperStyle: TextStyle(
+            color: _usernameAvailable == true
+                ? Colors.green
+                : _usernameAvailable == false
+                    ? Colors.redAccent
+                    : p.textMuted,
+          ),
+        ),
+      ),
+      const SizedBox(height: 14),
+      TextField(
+        controller: _pinController,
+        keyboardType: TextInputType.number,
+        obscureText: true,
+        maxLength: AppValidation.pinLength,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        onChanged: (_) => setState(() {}),
+        style: TextStyle(color: p.textPrimary),
+        decoration: InputDecoration(
+          labelText: 'رمز PIN (${AppValidation.pinLength} خانات)',
+          counterText: '',
+          prefixIcon: Icon(Icons.pin_outlined, color: p.textMuted),
+        ),
+      ),
+      const SizedBox(height: 20),
+      PremiumButton(
+        label: 'حفظ الاسم',
+        isLoading: _busy,
+        onPressed: (_busy || !ready) ? null : _submitUsername,
+      ),
+      const SizedBox(height: 8),
+      TextButton(
+        onPressed: _busy ? null : () => setState(() => _step = _Step.done),
+        child: const Text('تخطّي — أكمل لاحقًا من الملف الشخصي'),
+      ),
+    ];
+  }
+
   List<Widget> _doneStep(dynamic p) => [
         const SizedBox(height: 10),
         const Icon(Icons.verified_rounded, color: Colors.green, size: 64),
@@ -363,12 +477,13 @@ class _StepHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    const labels = ['البريد', 'الرمز', 'كلمة المرور'];
+    const labels = ['البريد', 'الرمز', 'كلمة المرور', 'الاسم'];
     final index = switch (step) {
       _Step.email => 0,
       _Step.code => 1,
       _Step.password => 2,
-      _Step.done => 3,
+      _Step.username => 3,
+      _Step.done => 4,
     };
     return Row(
       children: [
