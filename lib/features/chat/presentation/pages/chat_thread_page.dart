@@ -103,6 +103,11 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
 
   /// آخر موضع صالح للمؤشر قبل فقدان التركيز — `unfocus()` يُتلفه.
   int _savedCursor = -1;
+
+  /// الصدى المحلي الفوري: رسائل أُرسلت ولم يصل صفّها من الخادم بعد.
+  /// بلا هذا ينتظر المستخدم الذهاب والإياب ثم البثّ الحي قبل أن يرى
+  /// رسالته — وهو كل ما يُشعر بالبطء.
+  final List<ChatMessageEntity> _outbox = [];
   final _sound = ChatSoundService(Supabase.instance.client);
   Color _mentionFrameColor = const Color(0xFFFFD54F);
 
@@ -286,6 +291,35 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
     // والمسارات في metadata.gif_urls، والنوع gif حين توجد سمايلات.
     final replyingTo = ref.read(replyingToProvider);
     final replyMode = ref.read(replyingModeProvider);
+
+    // ── الصدى المحلي الفوري ──
+    // تظهر الرسالة ويُفرَّغ الحقل قبل أي رحلة إلى الخادم.
+    final requestId = const Uuid().v4();
+    final pending = ChatMessageEntity(
+      id: 'pending-$requestId',
+      threadId: widget.threadId,
+      senderUid: myUid,
+      type: gifs.isEmpty ? MessageType.text : MessageType.gif,
+      text: text,
+      mediaUrl: gifs.isEmpty ? null : gifs.first,
+      isRead: false,
+      status: MessageStatus.sending,
+      createdAt: DateTime.now(),
+      replyToId: replyingTo?.id,
+      replyToSenderUid: replyingTo?.senderUid,
+      metadata: <String, dynamic>{
+        'request_id': requestId,
+        if (gifs.isNotEmpty) 'gif_urls': gifs,
+      },
+    );
+    final draftText = _textController.text;
+    _textController.clear();
+    _gifDraft.clear();
+    setState(() {
+      _outbox.add(pending);
+      if (_stickerPanelOpen) _stickerPanelOpen = false;
+    });
+
     final sent = await ref.read(chatControllerProvider.notifier).sendMessage(
           fromUid: myUid,
           toUid: widget.otherUid,
@@ -293,10 +327,8 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
           type: gifs.isEmpty ? MessageType.text : MessageType.gif,
           mediaUrl: gifs.isEmpty ? null : gifs.first,
           replyTo: replyingTo,
-          metadata: (replyingTo == null && gifs.isEmpty)
-              ? null
-              : {
-                  'request_id': const Uuid().v4(),
+          metadata: {
+                  'request_id': requestId,
                   if (gifs.isNotEmpty) 'gif_urls': gifs,
                   if (replyingTo != null) ...{
                     'reply_mode': replyMode,
@@ -311,6 +343,11 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
     if (!mounted) return;
 
     if (!sent) {
+      // يُسقَط الصدى المحلي ويعود النص إلى الحقل بلا فقدان ما كُتب.
+      setState(() => _outbox.removeWhere((m) => m.id == pending.id));
+      if (_textController.text.trim().isEmpty) {
+        _textController.text = draftText;
+      }
       // يُعرض سبب الرفض الحقيقي بلا الرمز الإنجليزي: "أنت مكتوم… تبقّى…
       // السبب…" أو "هذا العضو أقفل الرسائل الخاصة" بدل رسالة عامة.
       final raw = ref.read(chatControllerProvider.notifier).lastSendError ?? '';
@@ -328,10 +365,7 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
 
     await _sound.play(ChatSoundEvent.send);
     if (!mounted) return;
-    _textController.clear();
-    _gifDraft.clear();
-    // السهم يُرسل ويُغلق اللوحة — زر الإغلاق الطبيعي بدل «تم».
-    if (_stickerPanelOpen) setState(() => _stickerPanelOpen = false);
+    // الحقل واللوحة والمسوّدة فُرّغت سلفًا مع الصدى المحلي.
     _isTyping = false;
     ref.read(replyingToProvider.notifier).state = null;
     _mentionUserIds.clear();
@@ -759,7 +793,27 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
             child: messagesAsync.when(
               loading: () => const LoadingIndicator(),
               error: (e, _) => const ErrorView(message: 'تعذر تحميل المحادثة الآن. تحقق من الاتصال ثم أعد المحاولة.'),
-              data: (messages) {
+              data: (serverMessages) {
+                // يُسقَط من الصدى كل ما وصل صفّه الحقيقي، والمطابقة
+                // بـrequest_id الذي يحفظه الخادم في metadata.
+                if (_outbox.isNotEmpty) {
+                  final arrived = <String>{};
+                  for (final m in serverMessages) {
+                    final id = m.metadata?['request_id'];
+                    if (id != null) arrived.add(id.toString());
+                  }
+                  if (arrived.isNotEmpty) {
+                    _outbox.removeWhere((o) => arrived
+                        .contains(o.metadata?['request_id']?.toString()));
+                  }
+                }
+                // القائمة معكوسة: الأحدث في الفهرس صفر، فالمعلَّق أولًا.
+                final messages = _outbox.isEmpty
+                    ? serverMessages
+                    : <ChatMessageEntity>[
+                        ..._outbox.reversed,
+                        ...serverMessages,
+                      ];
                 if (messages.isEmpty) {
                   return Center(
                     child: Text('ابدأ المحادثة الآن',
@@ -785,7 +839,11 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
                           final msg = messages[index];
                           final occurrenceKey = '${msg.id}#$index';
                           final isMine = msg.senderUid == myUid;
-                          return Builder(
+                          final isPendingEcho =
+                              msg.status == MessageStatus.sending;
+                          return Opacity(
+                            opacity: isPendingEcho ? 0.55 : 1,
+                            child: Builder(
                             builder: (itemContext) {
                               if (itemContext.mounted) {
                                 _messageContexts[msg.id] = itemContext;
@@ -850,6 +908,7 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
                                 ),
                               );
                             },
+                          ),
                           );
                         },
                       ),
