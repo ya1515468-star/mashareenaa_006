@@ -5,6 +5,7 @@ import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/mini_chat_overlay.dart';
+import '../../data/gif_token.dart';
 
 /// قائمة المحادثات الخاصة.
 ///
@@ -213,7 +214,10 @@ class _ThreadTile extends ConsumerWidget {
     final name = thread['other_name']?.toString() ?? 'عضو';
     final avatar = thread['other_avatar']?.toString() ?? '';
     final unread = (thread['unread'] as num?)?.toInt() ?? 0;
-    final last = thread['last_message_text']?.toString() ?? '';
+    // رموز السمايل `[gN]` لا تُرسَم صورًا في قائمة المحادثات، فتُستبدَل
+    // بعلامة بدل أن تظهر خامًا كآخر رسالة.
+    final last = gifTokensToPlaceholder(
+        thread['last_message_text']?.toString() ?? '');
 
     return ListTile(
       // لم يكن للصف أي onTap، فالضغط على اسم العضو لا يفعل شيئًا.

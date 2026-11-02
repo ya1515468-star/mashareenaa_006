@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'guest_entry_sheet.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/local_session_service.dart';
@@ -102,6 +104,17 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               : null,
         ),
       );
+    }
+  }
+
+  /// هل فتح المالك الدخول كزائر؟ دالة خادمية مكشوفة لـ anon لأن هذه
+  /// الصفحة بلا جلسة بعد.
+  Future<bool> _guestSignupEnabled() async {
+    try {
+      final v = await Supabase.instance.client.rpc('guest_signup_enabled');
+      return v == true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -267,6 +280,26 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         child: const Text('إنشاء حساب جديد'),
                       ),
                     ],
+                  ),
+                  // «الدخول كزائر» في صفحة الدخول أيضًا لا في إنشاء الحساب
+                  // وحدها: هو بديل عن التسجيل، فموضعه الطبيعي حيث يقرّر
+                  // المستخدم بين الدخول والإنشاء. يظهر فقط إن فتحه المالك
+                  // (feature_flags.guest_signup)، والمفتاح يُقرأ عبر دالة
+                  // مكشوفة لـ anon لأن هذه الصفحة بلا جلسة.
+                  FutureBuilder<bool>(
+                    future: _guestSignupEnabled(),
+                    builder: (context, snap) {
+                      if (snap.data != true) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: OutlinedButton.icon(
+                          onPressed: () => openGuestEntry(context),
+                          icon: const Icon(Icons.person_outline_rounded,
+                              size: 19),
+                          label: const Text('الدخول كزائر — جرّب بلا بريد'),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 18),
                   // شريط الميزات الأربع/الخمس — أيقونات فقط مع تسمية قصيرة،

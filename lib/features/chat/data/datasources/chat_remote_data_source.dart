@@ -69,7 +69,16 @@ class ChatRemoteDataSourceImpl implements ChatRemoteDataSource {
 
   @override
   Stream<List<ChatThreadModel>> watchThreads(String uid) {
-    return supabase.from('chat_threads').stream(primaryKey: ['id']).map(
+    // سياسة RLS على chat_threads هي
+    // `auth.uid()::text = ANY(participant_uids)` — فالخادم يرسل محادثات
+    // هذا المستخدم وحدها أصلًا، والتصفية أدناه حزام أمان لا أكثر.
+    // الترتيب والحدّ يمنعان بثّ قائمة بلا سقف حين تكثر المحادثات.
+    return supabase
+        .from('chat_threads')
+        .stream(primaryKey: ['id'])
+        .order('last_message_at', ascending: false)
+        .limit(100)
+        .map(
         (rows) => rows
             .map((row) => ChatThreadModel.fromMap(
                   row['id'].toString(),

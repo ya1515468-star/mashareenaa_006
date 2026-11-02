@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../chat/data/gif_catalog.dart';
+import '../../../chat/data/gif_token.dart';
 import '../../../gamification/domain/entities/username_effect.dart';
 import '../../../gamification/presentation/widgets/username_cosmetic_name.dart';
 import '../../../gamification/presentation/providers/name_animation_providers.dart';
@@ -32,6 +34,13 @@ class ServerChatInlineMessage extends ConsumerWidget {
   /// stays readable — see _readableOn below for why this exists.
   final Color? backgroundColor;
 
+  /// مسارات السمايلات المتحركة من `metadata.gif_urls`؛ الرمز `[gN]` في
+  /// النص يُستبدَل بالصورة رقم N منها فيُعرض في موضعه بين الكلمات.
+  final List<String> gifUrls;
+
+  /// الضغط على سمايل مرسَل ينسخه إلى صندوق الكتابة (لا يُرسله).
+  final ValueChanged<String>? onGifTap;
+
   const ServerChatInlineMessage({
     super.key,
     required this.uid,
@@ -46,6 +55,8 @@ class ServerChatInlineMessage extends ConsumerWidget {
     this.mentionNames = const <String>{},
     this.showMentionBadge = false,
     this.backgroundColor,
+    this.gifUrls = const <String>[],
+    this.onGifTap,
   });
 
   /// A user can pick their own message text colour as a VIP customization,
@@ -266,12 +277,55 @@ class ServerChatInlineMessage extends ConsumerWidget {
     final matches = re.allMatches(value);
     final children = <InlineSpan>[];
     var cursor = 0;
+
+    // كل مقطع نصّي عادي يمرّ من هنا: إن حمل رمز سمايل `[gN]` وُضعت صورته
+    // في موضعها بالضبط، وإلا مرّ كما كان تمامًا. رمزٌ بلا مسار مقابل
+    // يُعرض نصًّا كما كُتب (localGlyphSpans تمريرة بسيطة).
+    void addPlain(String segment) {
+      if (segment.isEmpty) return;
+      if (gifUrls.isEmpty || !gifTokenPattern.hasMatch(segment)) {
+        children.addAll(localGlyphSpans(segment, base));
+        return;
+      }
+      var inner = 0;
+      for (final m in gifTokenPattern.allMatches(segment)) {
+        final index = int.tryParse(m.group(1) ?? '');
+        if (index == null || index < 1 || index > gifUrls.length) continue;
+        if (m.start > inner) {
+          children.addAll(
+              localGlyphSpans(segment.substring(inner, m.start), base));
+        }
+        final url = gifUrls[index - 1];
+        final banner = isMashareenaBannerGif(url);
+        children.add(WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onGifTap == null ? null : () => onGifTap!(url),
+            child: SizedBox(
+              width: banner ? 150.0 : 22.0,
+              height: banner ? 47.0 : 22.0,
+              child: url.startsWith('assets/')
+                  ? Image.asset(url,
+                      fit: BoxFit.contain, gaplessPlayback: true)
+                  : Image.network(url,
+                      fit: BoxFit.contain, gaplessPlayback: true),
+            ),
+          ),
+        ));
+        inner = m.end;
+      }
+      if (inner < segment.length) {
+        children.addAll(localGlyphSpans(segment.substring(inner), base));
+      }
+    }
+
     if (matches.isEmpty) {
-      children.addAll(localGlyphSpans(value, base));
+      addPlain(value);
     } else {
       for (final match in matches) {
         if (match.start > cursor) {
-          children.addAll(localGlyphSpans(value.substring(cursor, match.start), base));
+          addPlain(value.substring(cursor, match.start));
         }
         final raw = value.substring(match.start, match.end);
         children.add(WidgetSpan(
@@ -283,7 +337,7 @@ class ServerChatInlineMessage extends ConsumerWidget {
         cursor = match.end;
       }
       if (cursor < value.length) {
-        children.addAll(localGlyphSpans(value.substring(cursor), base));
+        addPlain(value.substring(cursor));
       }
     }
     children.insert(0, TextSpan(text: ' ', style: base));

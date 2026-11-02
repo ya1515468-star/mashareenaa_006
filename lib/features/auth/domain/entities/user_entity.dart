@@ -21,14 +21,25 @@ class UserEntity extends Equatable {
   final AccountStatus status;
   final DateTime createdAt;
 
+  /// حساب زائر (مجهول) لم يُرقَّ ببريد مؤكَّد بعد.
+  ///
+  /// لماذا هنا: الزائر بلا بريد إطلاقًا، فـ[emailVerified] تساوي false
+  /// عنده دائمًا. وبوّابة تأكيد البريد في AppRouter كانت ترسله إلى شاشة
+  /// «أدخل الرمز المُرسَل إلى بريدك» — لبريد غير موجود — فيعلق هناك ولا
+  /// يصل التطبيق أبدًا. هذا الحقل يميّز «بلا بريد قصدًا» عن «بريد غير
+  /// مؤكَّد»، فتبقى البوّابة سارية على الثاني وحده.
+  final bool isGuest;
+
   const UserEntity({
     required this.uid,
     required this.email,
     required this.emailVerified,
     required this.status,
     required this.createdAt,
+    this.isGuest = false,
   });
 
   @override
-  List<Object?> get props => [uid, email, emailVerified, status, createdAt];
+  List<Object?> get props =>
+      [uid, email, emailVerified, status, createdAt, isGuest];
 }

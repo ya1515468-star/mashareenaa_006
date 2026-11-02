@@ -19,12 +19,22 @@ class _MentionRichText extends StatelessWidget {
   /// حجم الأساس قبل مقياس العضو.
   final double baseFontSize;
 
+  /// مسارات السمايلات المتحركة من `metadata.gif_urls`. الرمز `[gN]` في
+  /// النص يُستبدَل بالصورة رقم N منها، فيُعرض السمايل في موضعه بين
+  /// الكلمات بدل أن يظهر الرمز خامًا أو تتجمّع السمايلات في طرف الفقاعة.
+  final List<String> gifUrls;
+
+  /// الضغط على سمايل مرسَل: ينسخه إلى صندوق الكتابة (لا يُرسله).
+  final ValueChanged<String>? onGifTap;
+
   const _MentionRichText({
     required this.text,
     required this.style,
     this.baseFontSize = 14,
     this.mentionNames = const <String>{},
     this.showMentionBadge = false,
+    this.gifUrls = const <String>[],
+    this.onGifTap,
   });
 
   TextStyle get _ts =>
@@ -73,14 +83,25 @@ class _MentionRichText extends StatelessWidget {
     final ranges = <_MentionRange>[];
     final occupied = <int>{};
 
-    void addRange(int start, int end, String display) {
+    void addRange(int start, int end, String display, {String? gifUrl}) {
       for (var i = start; i < end; i++) {
         if (occupied.contains(i)) return;
       }
       for (var i = start; i < end; i++) {
         occupied.add(i);
       }
-      ranges.add(_MentionRange(start: start, end: end, display: display));
+      ranges.add(_MentionRange(
+          start: start, end: end, display: display, gifUrl: gifUrl));
+    }
+
+    // رموز السمايل أولًا فتحتجز مواضعها قبل مطابقة الإشارات، فلا يبتلع
+    // مطابقٌ آخر الرمز. رمز بلا مسار مقابل (قديم أو كتبه المستخدم بيده)
+    // لا يُسجَّل هنا إطلاقًا، فيُعرض نصًّا كما كُتب.
+    for (final match in gifTokenPattern.allMatches(text)) {
+      final index = int.tryParse(match.group(1) ?? '');
+      if (index == null || index < 1 || index > gifUrls.length) continue;
+      addRange(match.start, match.end, match.group(0)!,
+          gifUrl: gifUrls[index - 1]);
     }
 
     if (names.isEmpty) {
@@ -142,6 +163,30 @@ class _MentionRichText extends StatelessWidget {
       // المطابقة والبيانات كلاهما سليم. الشارة الكاملة تبقى محجوزة
       // لصاحب المنشن وحده (تنبيه شخصي)، لكن الجميع الآن يرى الاسم
       // بلون مميَّز وخلفية خفيفة فيُدرَك أنه إشارة لا نص عادي.
+      final gifUrl = match.gifUrl;
+      if (gifUrl != null) {
+        final banner = isMashareenaBannerGif(gifUrl);
+        final w = banner ? 150.0 : 25.0;
+        final h = banner ? 47.0 : 25.0;
+        spans.add(WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onGifTap == null ? null : () => onGifTap!(gifUrl),
+            child: SizedBox(
+              width: w,
+              height: h,
+              child: gifUrl.startsWith('assets/')
+                  ? Image.asset(gifUrl,
+                      fit: BoxFit.contain, gaplessPlayback: true)
+                  : Image.network(gifUrl,
+                      fit: BoxFit.contain, gaplessPlayback: true),
+            ),
+          ),
+        ));
+        cursor = match.end;
+        continue;
+      }
       spans.add(
         WidgetSpan(
           alignment: PlaceholderAlignment.middle,
@@ -185,10 +230,14 @@ class _MentionRange {
   final int end;
   final String display;
 
+  /// حين لا يكون null فالنطاق رمز سمايل متحرك لا إشارة عضو.
+  final String? gifUrl;
+
   const _MentionRange({
     required this.start,
     required this.end,
     required this.display,
+    this.gifUrl,
   });
 }
 

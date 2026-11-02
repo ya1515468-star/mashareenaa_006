@@ -11,7 +11,7 @@ import '../../../../core/services/resilient_realtime_channel.dart';
 import '../../../../core/widgets/served_ad_slot.dart';
 import '../../../../core/services/server_sounds.dart';
 import '../../../../core/services/snack_sfx.dart';
-import 'game_hub.dart' show gameErrorText;
+import 'game_hub.dart' show gameErrorText, StakePickerDialog, fetchStakeLimits;
 
 part 'trix_window.dart';
 part 'trix_screen.dart';
@@ -682,7 +682,19 @@ class _TrixLobbyState extends State<_TrixLobby> with SingleTickerProviderStateMi
       _label('نوع اللعبة'),
       _chips<String>(const ['classic', 'complex'], _variant, (v) => trixVariantName[v]!, (v) => _variant = v),
       _label('الرهان'),
-      _chips<int>(const [0, 10, 50, 100, 500, 1000], _stake, (s) => s == 0 ? 'ودّي' : '$s', (s) => _stake = s),
+      // اختصارات سريعة + زرّ لمبلغ يدوي. الحدود يضبطها المالك
+      // والخادم هو الحَكَم (validate_game_stake).
+      Row(children: [
+        Expanded(
+          child: _chips<int>(const [0, 10, 50, 100, 500, 1000], _stake,
+              (s) => s == 0 ? 'ودّي' : '$s', (s) => _stake = s),
+        ),
+        TextButton.icon(
+          onPressed: _busy ? null : _pickManualStake,
+          icon: const Icon(Icons.edit_outlined, size: 18),
+          label: Text(_stake > 0 ? '$_stake' : 'مبلغ يدوي'),
+        ),
+      ]),
       const SizedBox(height: 8),
       Text(
         vsComputer
@@ -695,6 +707,20 @@ class _TrixLobbyState extends State<_TrixLobby> with SingleTickerProviderStateMi
       const Text('🔥 الدبل: من يملك شايب الكبّة أو بنتًا يستطيع دبلها؛ آكلها يخسر الضعف وصاحب الدبل يكسب قيمتها.',
           textDirection: TextDirection.rtl, style: TextStyle(color: Colors.white54, fontSize: 11.5)),
     ]);
+  }
+
+  /// مبلغ رهان يدوي — نفس منتقي بقية الألعاب.
+  Future<void> _pickManualStake() async {
+    final limits = await fetchStakeLimits();
+    if (!mounted) return;
+    final picked = await showDialog<int>(
+      context: context,
+      builder: (c) => StakePickerDialog(
+        title: 'تركس — اختر الرهان',
+        limits: limits,
+      ),
+    );
+    if (picked != null && mounted) setState(() => _stake = picked);
   }
 
   // ───── التبويبات ─────

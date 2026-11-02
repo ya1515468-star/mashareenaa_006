@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/services.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'dart:math' as math;
 
@@ -61,27 +62,165 @@ String gameErrorText(Object e) {
 
 // ───────────────────────── الطلبات ─────────────────────────
 
-Future<int?> pickGameStake(BuildContext context, String gameType) {
-  const stakes = [0, 10, 50, 100, 500, 1000];
+/// حدود الرهان ورصيد اللاعب، كما يقرّرها الخادم.
+///
+/// كانت القائمة ثابتة في موضعين — التطبيق والخادم — فتغييرها يستلزم
+/// إصدارًا جديدًا **وهجرة** معًا. الآن المالك يضبط الحدّين، والرهان
+/// أيّ عدد صحيح بينهما.
+Future<Map<String, dynamic>> fetchStakeLimits() async {
+  try {
+    final raw = await _db.rpc('my_game_stake_limits');
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+  } catch (_) {
+    // تعذّرت القراءة: تُستعمل القيم الافتراضية، والخادم يبقى الحَكَم.
+  }
+  return const <String, dynamic>{};
+}
+
+Future<int?> pickGameStake(BuildContext context, String gameType) async {
+  final limits = await fetchStakeLimits();
+  if (!context.mounted) return null;
   return showDialog<int>(
     context: context,
-    builder: (c) => SimpleDialog(
-      title: Text('${gameTitle(gameType)} — اختر الرهان',
-          textDirection: TextDirection.rtl),
-      children: [
-        for (final s in stakes)
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(c, s),
-            child: Text(
-              s == 0
-                  ? 'ودّي (بلا نقاط)'
-                  : '$s نقطة — الفائز يربح $s من الخاسر',
-              textDirection: TextDirection.rtl,
-            ),
-          ),
-      ],
+    builder: (c) => StakePickerDialog(
+      title: '${gameTitle(gameType)} — اختر الرهان',
+      limits: limits,
     ),
   );
+}
+
+/// منتقي الرهان: اختصارات سريعة + حقل يدوي.
+///
+/// التحقق هنا راحةٌ للمستخدم لا حماية: الخادم يتحقق من الحدّين ومن
+/// الرصيد في `validate_game_stake` و`INSUFFICIENT_POINTS` قبل أن
+/// يبدأ أي شيء.
+class StakePickerDialog extends StatefulWidget {
+  final String title;
+  final Map<String, dynamic> limits;
+
+  const StakePickerDialog({
+    super.key,
+    required this.title,
+    required this.limits,
+  });
+
+  @override
+  State<StakePickerDialog> createState() => _StakePickerDialogState();
+}
+
+class _StakePickerDialogState extends State<StakePickerDialog> {
+  final _controller = TextEditingController();
+  int _selected = 0;
+  String? _error;
+
+  int get _min => (widget.limits['min'] as num?)?.toInt() ?? 0;
+  int get _max => (widget.limits['max'] as num?)?.toInt() ?? 1000000;
+  int get _balance => (widget.limits['balance'] as num?)?.toInt() ?? 0;
+  bool get _isOwner => widget.limits['is_owner'] == true;
+
+  List<int> get _quick {
+    final raw = widget.limits['quick'];
+    if (raw is List && raw.isNotEmpty) {
+      return raw.map((e) => (e as num).toInt()).toList();
+    }
+    return const [0, 10, 50, 100, 500, 1000];
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String? _validate(int value) {
+    if (value < 0) return 'الرهان لا يكون سالبًا.';
+    if (value == 0) return null;
+    if (value < _min) return 'أقل رهان مسموح هو $_min نقطة.';
+    if (value > _max) return 'أعلى رهان مسموح هو $_max نقطة.';
+    // المالك معفى من فحص الرصيد خادميًا، فلا يُمنع هنا أيضًا.
+    if (!_isOwner && value > _balance) {
+      return 'رصيدك $_balance نقطة فقط.';
+    }
+    return null;
+  }
+
+  void _confirm() {
+    final typed = _controller.text.trim();
+    final value = typed.isEmpty ? _selected : (int.tryParse(typed) ?? -1);
+    if (typed.isNotEmpty && value < 0) {
+      setState(() => _error = 'اكتب رقمًا صحيحًا.');
+      return;
+    }
+    final problem = _validate(value);
+    if (problem != null) {
+      setState(() => _error = problem);
+      return;
+    }
+    Navigator.pop(context, value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: Text(widget.title),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('رصيدك: $_balance نقطة',
+                  style: const TextStyle(fontSize: 12.5)),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final s in _quick)
+                    ChoiceChip(
+                      label: Text(s == 0 ? 'ودّي' : '$s'),
+                      selected: _controller.text.trim().isEmpty && _selected == s,
+                      onSelected: (_) => setState(() {
+                        _selected = s;
+                        _controller.clear();
+                        _error = null;
+                      }),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _controller,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                textDirection: TextDirection.ltr,
+                textAlign: TextAlign.center,
+                onChanged: (_) => setState(() => _error = null),
+                decoration: InputDecoration(
+                  labelText: 'أو اكتب مبلغًا',
+                  hintText: '10000',
+                  helperText: 'من $_min إلى $_max نقطة',
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 10),
+                Text(_error!,
+                    style: const TextStyle(
+                        color: Colors.redAccent, fontSize: 12.5)),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('إلغاء')),
+          FilledButton(onPressed: _confirm, child: const Text('تأكيد')),
+        ],
+      ),
+    );
+  }
 }
 
 /// اختيار وجه العملة (صورة/كتابة) قبل إرسال التحدي.

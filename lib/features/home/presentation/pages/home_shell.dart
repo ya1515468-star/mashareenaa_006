@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../profile/presentation/widgets/complete_profile_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/services/server_sounds.dart';
@@ -53,9 +54,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   bool _guardDialogOpen = false;
 
   @override
+  /// تُعرَض مرّة واحدة في عمر تشغيل التطبيق لا عند كل عودة للشاشة.
+  static bool _askedProfileBasics = false;
+
   void initState() {
     super.initState();
     unawaited(_loadOwnerFlag());
+    unawaited(_maybeAskProfileBasics());
     _incomingCallSubscription = ref.listenManual<AsyncValue<CallEntity?>>(
       incomingRingingCallProvider,
       (_, next) {
@@ -358,6 +363,26 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         },
       ),
     );
+  }
+
+
+  /// من دخل بجوجل لم يُسأل عن جنس ولا ميلاد إطلاقًا — يتخطّى نموذج
+  /// التسجيل كلّه. ومثله كل من سجّل قبل إضافة الحقلين. تُعرَض الورقة
+  /// مرّة، وتُتخطّى بلا إلحاح، وتبقى بطاقتها في الملف الشخصي.
+  Future<void> _maybeAskProfileBasics() async {
+    if (_HomeShellState._askedProfileBasics) return;
+    _HomeShellState._askedProfileBasics = true;
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+    if (!mounted) return;
+    try {
+      final completion = await ref.read(profileCompletionProvider.future);
+      if (!mounted) return;
+      if (completion['needs_basics'] == true) {
+        await CompleteProfileSheet.show(context);
+      }
+    } catch (_) {
+      // لا يجوز أن يمنع فحصٌ تكميلي فتح التطبيق.
+    }
   }
 
   @override

@@ -54,11 +54,18 @@ class AuthController extends AsyncNotifier<UserEntity?> {
     required String email,
     required String password,
     required String displayName,
+    String? gender,
+    DateTime? birthDate,
   }) async {
     state = const AsyncLoading();
     final useCase = sl<SignUpUseCase>();
     final result = await useCase(
-      SignUpParams(email: email, password: password, displayName: displayName),
+      SignUpParams(
+          email: email,
+          password: password,
+          displayName: displayName,
+          gender: gender,
+          birthDate: birthDate),
     );
 
     return result.fold(

@@ -119,7 +119,21 @@ class _ChatMessageRow extends ConsumerWidget {
     final type = row['kind']?.toString() ?? 'text';
     final url = row['attachment_url']?.toString() ?? '';
 
-    if (type == 'gif') {
+    // مسارات السمايلات بترتيبها. الرسائل الجديدة تحمل رموز `[gN]` في
+    // النص نفسه فتُعرض بمواضعها عبر _MentionRichText أدناه؛ والرسائل
+    // القديمة بلا رموز تمرّ على المسار القديم كما هي تمامًا.
+    final gifUrlsAll = () {
+      final raw =
+          row['metadata'] is Map ? (row['metadata'] as Map)['gif_urls'] : null;
+      if (raw is! List) return const <String>[];
+      return raw
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList(growable: false);
+    }();
+    final hasGifTokens = gifTokenPattern.hasMatch(body);
+
+    if (type == 'gif' && !hasGifTokens) {
       // البند 4: رسالة واحدة قد تحمل عدّة سمايلات في metadata.gif_urls.
       // كان هذا الموضع يقرأ attachment_url وحده (أي أول سمايل فقط)، فتُرسَل
       // الثلاثة في فقاعة واحدة ولا يظهر منها إلا واحد — وهذا ما كان ناقصًا
@@ -309,6 +323,8 @@ class _ChatMessageRow extends ConsumerWidget {
       style: msgStyle,
       baseFontSize: 14,
       showMentionBadge: showMentionBadge,
+      gifUrls: gifUrlsAll,
+      onGifTap: onGifTap,
       mentionNames: (metadata['mention_user_names'] is List)
           ? (metadata['mention_user_names'] as List<dynamic>)
               .map<String>((e) => e.toString().trim().toLowerCase())

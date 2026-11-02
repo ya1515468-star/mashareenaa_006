@@ -8,6 +8,8 @@ import '../widgets/game_hub.dart';
 import '../widgets/trix_game.dart';
 import '../../../../core/services/server_sounds.dart';
 import '../../data/gif_catalog.dart';
+import '../../data/gif_token.dart';
+import '../../../auth/presentation/widgets/guest_widgets.dart';
 import '../widgets/forward_message_sheet.dart';
 import '../widgets/voice_message_player.dart';
 import '../providers/unread_dm_provider.dart';
@@ -65,7 +67,7 @@ import 'package:uuid/uuid.dart';
 import '../../../gifts/presentation/widgets/gift_picker_sheet.dart';
 import '../../domain/lobby_directory_service.dart';
 import '../../domain/chat_visual_size_service.dart';
-import '../widgets/sticker_and_gif_sheet.dart';
+import '../widgets/sticker_and_gif_panel.dart';
 import '../widgets/mini_profile_popup.dart';
 import '../widgets/mini_chat_overlay.dart';
 import 'chat_thread_page.dart';
@@ -152,10 +154,41 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   // _roomName و_roomMemberCount حُذفا مع شريط _RoomHeader: كانا
   // يُجلبان من الخادم في كل تحديث حضور ثم لا يُقرآن أبدًا.
 
-  /// هدية/GIF مختارة من المنتقي لكنها لم تُرسَل بعد — تبقى معلَّقة
-  /// حتى يضغط المستخدم صراحة زر الإرسال (تنفيذ حرفي لبند "لا تُرسَل
-  /// السمايلات/الـGIF إلا عند اختيارها والضغط على زر الإرسال").
-  final List<String> _pendingGifs = [];
+  /// السمايلات المتحركة المعلّقة في صندوق الكتابة. لم تُرسَل بعد — تُرسَل
+  /// بزر الإرسال حصرًا (بند "لا تُرسَل السمايلات/الـGIF إلا عند اختيارها
+  /// والضغط على زر الإرسال").
+  ///
+  /// كانت `List<String> _pendingGifs` قائمةً منفصلة عن النص، فلم يكن
+  /// للسمايل موضع بين الكلمات وكانت كلها تتجمّع في طرف الفقاعة. الآن
+  /// المصدر الوحيد للترتيب هو نصّ الحقل نفسه عبر رموز `[gN]`، فالموضع
+  /// محفوظ والحذف بالـBackspace يعمل كما في الإيموجي الثابت.
+  final GifComposerDraft _gifDraft = GifComposerDraft();
+
+  /// هل لوحة السمايل الداخلية مفتوحة أسفل صندوق الكتابة؟ تحلّ محلّ ورقة
+  /// `showModalBottomSheet` التي كانت تحجب الحقل وزر الإرسال.
+  bool _stickerPanelOpen = false;
+
+  /// تركيز حقل الكتابة — لإخفاء لوحة المفاتيح عند فتح لوحة السمايل، ولم
+  /// يكن في الصفحة أي FocusNode قبل ذلك.
+  final FocusNode _composerFocus = FocusNode();
+
+  /// معرّف أحدث صفّ عُرض — للتمرير للأسفل عند الجديد فقط.
+  String? _lastNewestRowId;
+
+  /// الصدى المحلي الفوري: رسائل أُرسلت ولم يصل صفّها من الخادم بعد.
+  ///
+  /// بلا هذا كان المستخدم يضغط السهم ثم **ينتظر** ذهاب الطلب إلى الخادم
+  /// وعودته ثم وصول البثّ الحي — فيبدو الإرسال بطيئًا على كل شبكة. الآن
+  /// تظهر رسالته فورًا بشفافية خفيفة، ويحلّ محلّها الصفّ الحقيقي حين
+  /// يصل. المطابقة بـrequest_id الذي يحفظه الخادم في metadata.
+  final List<Map<String, dynamic>> _outbox = [];
+
+  /// آخر موضع صالح للمؤشر قبل فقدان التركيز.
+  ///
+  /// `unfocus()` يُتلف `_controller.selection`: تصير صفرًا أو غير صالحة.
+  /// فكان رمز السمايل يقفز إلى بداية النص أو نهايته بدل موضع الكتابة —
+  /// وهذا ما ظهر في القاعدة: «[g1]هاي» و«هاي[g1]» لنفس الفعل.
+  int _savedCursor = -1;
 
   /// الرسالة التي يردّ عليها المستخدم حاليًا (اقتباس مضمَّن في نص
   /// الرسالة المُرسَلة، دون حاجة لعمود جديد في قاعدة البيانات).
@@ -587,13 +620,16 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     // '{}') ثم jsonb_set فوقه) — فالقائمة تُحمَل هنا بلا أي هجرة خادمية،
     // ويبقى kind='gif' وattachment_url = أول GIF لتوافق الرسائل القديمة.
     List<String>? gifUrls,
+    /// يُمرَّر من الصدى المحلي ليطابق الصفّ القادم من البثّ الحي فيُسقَط
+    /// المحلي بلا ازدواج.
+    String? requestIdOverride,
   }) async {
     final user = _user;
     final payload = (message ?? body).trim();
     if (user == null || payload.isEmpty) {
       throw const FormatException('EMPTY_MESSAGE');
     }
-    final requestId = const Uuid().v4();
+    final requestId = requestIdOverride ?? const Uuid().v4();
     // البند 10: الاقتباس يجعل صاحب الرسالة المقتبسة مَنشونًا فعليًا — اسمه
     // يظهر كمنشن ويصله تنبيه صوتي. منطق الاستقبال الموجود أصلًا يشغّل نغمة
     // المنشن حين يجد معرّف القارئ في mention_user_ids، فإضافته هنا تكفي
@@ -617,7 +653,10 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       'mention_user_names': mentionNames.toList(),
       'request_id': requestId,
       if (replyToId != null && quoting) 'quoted_message_id': replyToId,
-      if (gifUrls != null && gifUrls.length > 1) 'gif_urls': gifUrls,
+      // كان الشرط `length > 1`: السمايل الواحد كان يُقرأ من attachment_url
+      // وحده. الآن كل سمايل يُقرأ بموضعه من هذه القائمة عبر رمزه `[gN]`،
+      // فسمايل واحد يحتاجها أيضًا وإلا بقي رمزه نصًّا خامًا في الفقاعة.
+      if (gifUrls != null && gifUrls.isNotEmpty) 'gif_urls': gifUrls,
     };
     await _db.rpc('send_public_chat_message_v2', params: {
       'p_room_id': _roomId,
@@ -633,32 +672,71 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   }
 
   Future<void> _sendText() async {
-    final text = _controller.text.trim();
-    final gifs = List<String>.from(_pendingGifs);
-    if ((text.isEmpty && gifs.isEmpty) || _user == null || _sending) return;
+    // الرموز تُعاد ترقيمها 1..N حسب ترتيبها في النص، فالنص المحفوظ
+    // مكتفٍ بنفسه ولا يعتمد على عدّاد العميل.
+    final normalized = _gifDraft.normalize(_controller.text.trim());
+    final text = normalized.text;
+    final gifs = normalized.urls;
+    if (text.isEmpty || _user == null) return;
+
+    // ── الصدى المحلي الفوري ──
+    // الحقل يُفرَّغ والرسالة تظهر **قبل** أي رحلة إلى الخادم. هذا ما
+    // يجعل الإرسال يبدو لحظيًا كما في تطبيقات المحادثة المعروفة، بدل
+    // انتظار الذهاب والإياب ثم وصول البثّ الحي.
+    final requestId = const Uuid().v4();
+    final reply = _replyingTo;
+    final replyPreview = reply == null
+        ? null
+        : '${reply['display_name']?.toString().trim().isNotEmpty == true ? reply['display_name'] : 'عضو'}|${_replySourcePreviewText(reply)}|${_replySourceThumbnail(reply)}';
+    final replyModeNow = reply == null ? 'none' : _replyMode;
+    final pendingRow = <String, dynamic>{
+      'id': 'pending-$requestId',
+      'user_id': _user!.id,
+      'room_id': _roomId,
+      'display_name': _profileDisplayNameOrNull() ?? 'أنا',
+      'avatar_url': _profileAvatarUrl ?? '',
+      'message': text,
+      'body': text,
+      'kind': gifs.isEmpty ? 'text' : 'gif',
+      'attachment_url': gifs.isEmpty ? null : gifs.first,
+      'reply_to_id': reply?['id']?.toString(),
+      'reply_to_sender_uid': reply?['user_id']?.toString(),
+      'reply_to_preview': replyPreview,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'metadata': <String, dynamic>{
+        'request_id': requestId,
+        'reply_mode': replyModeNow,
+        if (gifs.isNotEmpty) 'gif_urls': gifs,
+        '_pending': true,
+      },
+    };
+
+    _controller.clear();
+    _mentionUserIds.clear();
+    _mentionUserNames.clear();
     setState(() {
-      _sending = true;
+      _outbox.add(pendingRow);
       _error = null;
+      _stickerPanelOpen = false;
+      _replyingTo = null;
+      _replyMode = 'reply';
     });
+    _scrollToEnd();
+
     try {
-      // البند 4: كانت حلقة ترسل رسالة مستقلة لكل GIF، فثلاث سمايلات تنتج
-      // ثلاث فقاعات. الآن رسالة واحدة تحمل كل الروابط في metadata.gif_urls
-      // فتُعرَض في فقاعة واحدة.
-      if (gifs.isNotEmpty) {
-        await _insertPublicMessage(
-          body: gifs.first,
-          message: 'GIF',
-          kind: 'gif',
-          attachmentUrl: gifs.first,
-          gifUrls: gifs,
-        );
-      }
-      if (text.isNotEmpty) {
-        final reply = _replyingTo;
+      // كانت رسالتان: واحدة kind='gif' نصّها الحرفي 'GIF'، وأخرى
+      // kind='text' — فينتج عن «نص + سمايل» فقاعتان. الآن رسالة واحدة:
+      // النص الحقيقي (بما فيه الرموز) في body/message، والمسارات في
+      // metadata.gif_urls، والنوع gif حين توجد سمايلات (قائمة الخادم
+      // البيضاء لا تقبل نوعًا جديدًا) وtext حين لا توجد.
+      {
         await _insertPublicMessage(
           body: text,
           message: text,
-          kind: 'text',
+          kind: gifs.isEmpty ? 'text' : 'gif',
+          attachmentUrl: gifs.isEmpty ? null : gifs.first,
+          gifUrls: gifs.isEmpty ? null : gifs,
+          requestIdOverride: requestId,
           replyToId: reply?['id']?.toString(),
           replyToSenderUid: reply?['user_id']?.toString(),
           // كانت تحفظ نص الرسالة الأصلية وحده بلا اسم مرسِلها؛ بطاقة
@@ -666,18 +744,25 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
           // شكل مُشفَّر بفاصل: اسم المرسل|نص المعاينة|رابط مصغّرة (قد يكون
           // فارغاً). البطاقة تعرض الصورة الفعلية حين يتوفر الرابط، لا
           // النص الوصفي وحده.
-          replyToPreview: reply == null ? null : '${reply['display_name']?.toString().trim().isNotEmpty == true ? reply['display_name'] : 'عضو'}|${_replySourcePreviewText(reply)}|${_replySourceThumbnail(reply)}',
-          replyMode: reply == null ? 'none' : _replyMode,
+          replyToPreview: replyPreview,
+          replyMode: replyModeNow,
         );
       }
       if (!mounted) return;
-      _controller.clear();
-      _mentionUserIds.clear();
-      _mentionUserNames.clear();
-      setState(() {
-        _pendingGifs.clear();
-        _replyingTo = null;
-        _replyMode = 'reply';
+      // المسوّدة تُمسح بعد نجاح الإرسال لا قبله: لو فشل، تبقى خريطة
+      // المسارات سليمة فتعمل إعادة المحاولة بالرموز نفسها.
+      _gifDraft.clear();
+      // شبكة أمان: لو نجح الإرسال ولم يصل البثّ الحي (انقطاع شبكة)،
+      // يبقى الصدى المحلي شفافًا إلى الأبد. يُسقَط بعد عشر ثوانٍ —
+      // الرسالة محفوظة على الخادم على كل حال وستظهر عند أول تحديث.
+      Future<void>.delayed(const Duration(seconds: 10), () {
+        if (!mounted) return;
+        final still = _outbox.any((r) =>
+            (r['metadata'] as Map)['request_id'] == requestId);
+        if (still) {
+          setState(() => _outbox.removeWhere(
+              (r) => (r['metadata'] as Map)['request_id'] == requestId));
+        }
       });
       // The server awards activity XP as part of the message transaction.
       // Refresh the sender's room identity so a newly reached L-level is
@@ -689,10 +774,22 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       }
       _scrollToEnd();
     } catch (e) {
-      if (mounted) setState(() => _error = _friendlyChatError(e));
-    } finally {
-      if (mounted) setState(() => _sending = false);
+      // فشل الإرسال: يُسقَط الصدى المحلي ويُعاد النص إلى الحقل ليعيد
+      // المستخدم المحاولة بلا أن يفقد ما كتبه.
+      if (!mounted) return;
+      setState(() {
+        _outbox.removeWhere(
+            (r) => (r['metadata'] as Map)['request_id'] == requestId);
+        _error = _friendlyChatError(e);
+        if (_controller.text.trim().isEmpty) _controller.text = text;
+      });
     }
+  }
+
+  String? _profileDisplayNameOrNull() {
+    final name =
+        ref.read(currentProfileProvider).valueOrNull?.displayName.trim();
+    return (name == null || name.isEmpty) ? null : name;
   }
 
   /// زر "+" يفتح لوحات داخلية في التطبيق، ولا ينقل المستخدم إلى متصفح خارجي.
@@ -1211,26 +1308,61 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
   /// أعلى صندوق الكتابة، ولا يُرسَل إلا بالضغط الصريح على زر الإرسال
   /// (مطابقة حرفية لبند "لا تُرسَل السمايلات أو الـGIF إلا عند اختيارها
   /// والضغط على زر الإرسال").
-  Future<void> _showStickerAndGifPicker() async {
-    await StickerAndGifSheet.show(
-      context,
-      multiGif: true,
-      onEmojiSelected: (emoji) {
-        final selection = _controller.selection;
-        final text = _controller.text;
-        final insertAt = selection.isValid ? selection.start : text.length;
-        final newText = text.replaceRange(
-            insertAt, selection.isValid ? selection.end : text.length, emoji);
-        _controller.value = TextEditingValue(
-          text: newText,
-          selection: TextSelection.collapsed(offset: insertAt + emoji.length),
-        );
-      },
-      onGifSelected: (gif) {
-        if (_user == null || !mounted) return;
-        setState(() => _pendingGifs.add(gif));
-      },
+  /// يُدرج [piece] عند موضع المؤشر (ويستبدل النص المُظلَّل إن وُجد)، ثم
+  /// يُقدّم المؤشر بعده. هذا هو المنطق الذي كان خاصًّا بالإيموجي الثابت،
+  /// ويتقاسمه معه الآن السمايل المتحرك عبر رمزه — فيصير سلوك الاثنين
+  /// واحدًا كما طُلب.
+  void _insertAtCursor(String piece) {
+    final text = _controller.text;
+    final selection = _controller.selection;
+    int insertAt;
+    int replaceTo;
+    if (_composerFocus.hasFocus &&
+        selection.isValid &&
+        selection.start >= 0 &&
+        selection.end <= text.length) {
+      // الحقل مركَّز: الموضع الحيّ هو الصحيح.
+      insertAt = selection.start;
+      replaceTo = selection.end;
+    } else if (_savedCursor >= 0 && _savedCursor <= text.length) {
+      // لوحة السمايل مفتوحة والتركيز مفقود: الموضع المحفوظ قبل الإخفاء.
+      insertAt = _savedCursor;
+      replaceTo = _savedCursor;
+    } else {
+      insertAt = text.length;
+      replaceTo = text.length;
+    }
+    _controller.value = TextEditingValue(
+      text: text.replaceRange(insertAt, replaceTo, piece),
+      selection: TextSelection.collapsed(offset: insertAt + piece.length),
     );
+    // اختيارات متتالية بلا تركيز تتقدّم بدل أن تتكدّس في الموضع نفسه.
+    _savedCursor = insertAt + piece.length;
+  }
+
+  /// يُدرج سمايلًا متحركًا عند موضع المؤشر. لا إرسال هنا إطلاقًا.
+  void _insertGif(String assetPath) {
+    if (!mounted) return;
+    _insertAtCursor(_gifDraft.register(assetPath));
+  }
+
+  /// زر السمايل مفتاح: ضغطة تفتح اللوحة الداخلية، وضغطة تُغلقها. وفتحها
+  /// يُخفي لوحة المفاتيح حتى لا تتزاحم اللوحتان على أسفل الشاشة.
+  void _toggleStickerPanel() {
+    if (_sending) return;
+    final opening = !_stickerPanelOpen;
+    if (opening) {
+      // يُلتقط الموضع **قبل** unfocus، لأنه يُتلفه.
+      final sel = _controller.selection;
+      if (sel.isValid && sel.baseOffset >= 0) _savedCursor = sel.baseOffset;
+      _composerFocus.unfocus();
+    }
+    setState(() => _stickerPanelOpen = opening);
+  }
+
+  void _closeStickerPanel() {
+    if (!_stickerPanelOpen) return;
+    setState(() => _stickerPanelOpen = false);
   }
 
   /// بحث أغنية/فيديو ← لا شيء يُرسَل إلا بالضغط الصريح على زر "إرسال" داخل
@@ -1286,8 +1418,11 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
       case 'file': return '📎 ملف';
       case 'gift': return '🎁 هدية';
     }
-    final body = row['body']?.toString().trim() ?? '';
-    return body.isNotEmpty ? body : (row['message']?.toString() ?? '');
+    final body =
+        gifTokensToPlaceholder(row['body']?.toString().trim() ?? '');
+    return body.isNotEmpty
+        ? body
+        : gifTokensToPlaceholder(row['message']?.toString() ?? '');
   }
 
   /// رابط الصورة/السمايل الأصلي (إن وُجد) ليُعرَض مصغّراً فعلياً داخل
@@ -1312,7 +1447,6 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
         _replyMode = 'reply';
       });
 
-  void _removePendingGif(int i) => setState(() => _pendingGifs.removeAt(i));
 
   /// إدراج "@الاسم " في نقطة المؤشر الحالية — منشن سريع دون الحاجة
   /// لكتابة الاسم يدويًا.
@@ -1993,6 +2127,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     final mCh = _matchChannel;
     if (mCh != null) unawaited(_db.removeChannel(mCh));
     _mentionTimer?.cancel();
+    _composerFocus.dispose();
     _controller.removeListener(_refreshMentionSuggestions);
     _controller.removeListener(_handleRoomTypingChanged);
     _roomTypingHeartbeat?.cancel();
@@ -2034,7 +2169,15 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Listener(
+    return PopScope(
+      // كانت ورقة السمايل تُغلَق بزر الرجوع تلقائيًا لأنها Route. واللوحة
+      // الداخلية ليست Route، فلولا هذا لكان الرجوع يُخرج من الغرفة كلها
+      // بدل إغلاق اللوحة.
+      canPop: !_stickerPanelOpen,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _stickerPanelOpen) _closeStickerPanel();
+      },
+      child: Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: (_) => _unlockRoomAudio(),
       child: Scaffold(
@@ -2137,7 +2280,25 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                                   error: snapshot.error.toString());
                             }
                             final rows = snapshot.data ?? const [];
+                            // الصدى المحلي: يُسقَط منه كل ما وصل صفّه
+                            // الحقيقي (المطابقة بـrequest_id الذي يحفظه
+                            // الخادم في metadata)، ويُعرض الباقي كما هو.
+                            if (_outbox.isNotEmpty) {
+                              final arrived = <String>{};
+                              for (final r in rows) {
+                                final m = r['metadata'];
+                                if (m is Map && m['request_id'] != null) {
+                                  arrived.add(m['request_id'].toString());
+                                }
+                              }
+                              if (arrived.isNotEmpty) {
+                                _outbox.removeWhere((o) => arrived.contains(
+                                    (o['metadata'] as Map)['request_id']
+                                        .toString()));
+                              }
+                            }
                             final displayRows = <Map<String, dynamic>>[
+                              ..._outbox,
                               ...recentGlobal.map((e) => {
                                     'id': 'global-${e['id']}',
                                     'user_id': e['actor_uid'],
@@ -2188,19 +2349,45 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                               }
                             });
                             if (displayRows.isEmpty) return const _EmptyLobby();
-                            WidgetsBinding.instance
-                                .addPostFrameCallback((_) => _scrollToEnd());
+                            // كان التمرير للأسفل يُنفَّذ في **كل** إعادة بناء —
+                            // أي عند كل نبضة حالة أو تحديث خطّ — فيصارع
+                            // تمرير المستخدم ويقطّع القائمة. الآن عند وصول
+                            // رسالة أحدث فعلًا فقط.
+                            final newestId =
+                                displayRows.last['id']?.toString() ?? '';
+                            if (newestId != _lastNewestRowId) {
+                              _lastNewestRowId = newestId;
+                              WidgetsBinding.instance
+                                  .addPostFrameCallback((_) => _scrollToEnd());
+                            }
                             return ListView.builder(
                               controller: _scroll,
                               padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
                               itemCount: displayRows.length,
+                              // مفتاح لكل صفّ: يسمح لـFlutter بإعادة استعمال
+                              // العناصر بدل هدم القائمة وبنائها من جديد عند
+                              // كل بثّ، وبثّ القائمة كاملة يحدث مع كل رسالة.
+                              findChildIndexCallback: (key) {
+                                if (key is! ValueKey<String>) return null;
+                                // مفاتيح الصفوف بالشكل «المعرّف#الفهرس»
+                                // (الفهرس حارس ضدّ تكرار معرّف نادر)، فيُقصّ
+                                // قبل المطابقة.
+                                final id = key.value.split('#').first;
+                                final at = displayRows.indexWhere(
+                                    (r) => r['id']?.toString() == id);
+                                return at < 0 ? null : at;
+                              },
                               itemBuilder: (_, i) {
                                 final row = displayRows[i];
                                 if (row['kind'] == 'global_event') {
-                                  return _GlobalChatEventRow(
-                                      event: (row['metadata']
-                                              as Map)['global_event']
-                                          as Map<String, dynamic>);
+                                  return KeyedSubtree(
+                                    key: ValueKey<String>(
+                                        row['id']?.toString() ?? '$i'),
+                                    child: _GlobalChatEventRow(
+                                        event: (row['metadata']
+                                                as Map)['global_event']
+                                            as Map<String, dynamic>),
+                                  );
                                 }
                                 final metadata = row['metadata'] is Map
                                     ? Map<String, dynamic>.from(row['metadata'] as Map)
@@ -2250,8 +2437,16 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                                     } else if (itemContext.mounted) {
                                       _publicMessageContexts[rowId] = itemContext;
                                     }
+                                    // الرسالة المعلَّقة (صدى محلي لم يصل
+                                    // صفّها من الخادم بعد) تُعرض بشفافية
+                                    // خفيفة: يراها المستخدم فورًا ويعرف
+                                    // أنها لم تُؤكَّد بعد.
+                                    final pending =
+                                        metadata['_pending'] == true;
                                     return KeyedSubtree(
                                       key: ValueKey(occurrenceKey),
+                                      child: Opacity(
+                                      opacity: pending ? 0.55 : 1,
                                       child: _ChatMessageRow(
                                       row: row,
                                       messageFrameIndex: (row['_message_frame_index'] as int?) ?? -1,
@@ -2279,11 +2474,10 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                                               row['user_id']?.toString(),
                                               row['username']?.toString())),
                                           onGifTap: (url) {
-                                            // سلوك سمايل عادي بالضبط: يوضع في
-                                            // صندوق الإرسال بصمت (المعاينة فوق
-                                            // الحقل كافية)، ويُرسَل بالسهم — بلا
-                                            // أي رسالة تأكيد تقاطع المستخدم.
-                                            setState(() => _pendingGifs.add(url));
+                                            // نسخ لا إرسال: السمايل المرسَل
+                                            // يُدرَج عند مؤشر الحقل كأي سمايل
+                                            // مُختار من اللوحة، ويُرسَل بالسهم.
+                                            _insertGif(url);
                                           },
                                           onVideoTap: (url) {
                                           if (!mounted) return;
@@ -2292,6 +2486,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                                             _mediaExpanded = true;
                                           });
                                         },
+                                      ),
                                       ),
                                     );
                                   },
@@ -2344,19 +2539,21 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                         style: const TextStyle(
                             color: Colors.redAccent, fontSize: 11))),
               ),
+            // دعوة الزائر لترقية حسابه — قابلة للإخفاء، وتختفي نهائيًا
+            // بعد التسجيل.
+            const GuestUpgradeBanner(),
             if (_replyingTo != null)
               _PendingBar(
                 icon: Icons.reply,
                 label:
                     '${_replyMode == 'quote' ? 'اقتباس من' : 'رد على'} ${_replyingTo!['display_name'] ?? 'عضو'}: '
-                    '${(_replyingTo!['body'] ?? '📎 مرفق').toString()}',
+                    '${gifTokensToPlaceholder((_replyingTo!['body'] ?? '📎 مرفق').toString())}',
                 onCancel: _cancelReply,
               ),
-            if (_pendingGifs.isNotEmpty)
-              _PendingGifBar(
-                gifs: _pendingGifs,
-                onRemove: _removePendingGif,
-              ),
+            // لا شريط مصغّرات: الرمز `[gN]` في صندوق الكتابة هو الدلالة
+            // الوحيدة على السمايل وموضعه، والحذف بالـBackspace كالإيموجي
+            // الثابت. كان الشريط يظهر معلّقًا فوق شريط الأزرار الذهبي
+            // بعيدًا عن الحقل، فأُزيل بطلب صريح.
             if (_activeMediaUrl != null && _showMedia)
               Column(
                 children: [
@@ -2447,9 +2644,13 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
               controller: _controller,
               sending: _sending,
               onAttach: _showQuickActionsSheet,
-              onSticker: _showStickerAndGifPicker,
+              onSticker: _toggleStickerPanel,
               onVoice: _sendVoice,
               onSend: _sendText,
+              focusNode: _composerFocus,
+              // العودة إلى الكتابة تُغلق لوحة السمايل حتى لا تتزاحم مع
+              // لوحة المفاتيح على أسفل الشاشة.
+              onFieldTap: _closeStickerPanel,
               textColor: () {
                 // Same canonical profiles.message_color the sent bubble
                 // renders with — one source for composer + sent message,
@@ -2461,6 +2662,15 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                 return (v == null || v == 4294967295) ? null : Color(v);
               }(),
             ),
+            // لوحة السمايل أسفل صندوق الكتابة مكان لوحة المفاتيح: الحقل
+            // وزر السهم يبقيان ظاهرين فوقها، فلا حاجة لزر «تم» — السهم
+            // يُرسل ويُغلق، وزر السمايل مفتاح. قائمة الرسائل فوقها
+            // Expanded فتتقلّص تلقائيًا.
+            if (_stickerPanelOpen)
+              StickerAndGifPanel(
+                onEmojiSelected: _insertAtCursor,
+                onGifSelected: _insertGif,
+              ),
           ],
         ),
         // Floating private chat (mini messages) — minimize / fullscreen /
@@ -2475,6 +2685,7 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
           ],
         ),
       ),
+    ),
     ),
     );
   }

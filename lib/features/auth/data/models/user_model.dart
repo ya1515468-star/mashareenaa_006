@@ -9,6 +9,7 @@ class UserModel extends UserEntity {
     required super.emailVerified,
     required super.status,
     required super.createdAt,
+    super.isGuest,
   });
 
   factory UserModel.fromSupabaseUser(
@@ -21,6 +22,7 @@ class UserModel extends UserEntity {
       emailVerified: user.emailConfirmedAt != null,
       createdAt: DateTime.tryParse(user.createdAt) ?? DateTime.now(),
       status: status,
+      isGuest: user.isAnonymous,
     );
   }
 
@@ -31,6 +33,7 @@ class UserModel extends UserEntity {
       emailVerified: emailVerified,
       status: status,
       createdAt: createdAt,
+      isGuest: isGuest,
     );
   }
 }

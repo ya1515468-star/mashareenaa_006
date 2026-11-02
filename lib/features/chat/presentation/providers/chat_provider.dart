@@ -10,6 +10,7 @@ import '../../domain/usecases/chat_interaction_usecases.dart';
 import '../../domain/usecases/mark_thread_read_usecase.dart';
 import '../../domain/usecases/send_message_usecase.dart';
 import '../../data/datasources/chat_remote_data_source.dart';
+import '../../data/gif_token.dart';
 
 final chatThreadsProvider = StreamProvider<List<ChatThreadEntity>>((ref) {
   final user = ref.watch(authControllerProvider).valueOrNull;
@@ -145,7 +146,9 @@ class ChatController extends AsyncNotifier<void> {
         replyToId: replyTo?.id,
         replyToPreview: replyTo == null
             ? null
-            : (replyTo.text.isEmpty ? '📎 مرفق' : replyTo.text),
+            : (replyTo.text.isEmpty
+                ? '📎 مرفق'
+                : gifTokensToPlaceholder(replyTo.text)),
         replyToSenderUid: replyTo?.senderUid,
         metadata: metadata,
       ),
