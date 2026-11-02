@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import '../../../auth/presentation/providers/guest_provider.dart';
+import '../../../auth/presentation/widgets/guest_widgets.dart';
 import '../../../../core/services/snack_sfx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -47,6 +50,32 @@ void _closeAndDismiss(WidgetRef ref, String threadId) {
 /// قائمة المحادثات، نافذة العضو المصغّرة، دليل الأعمال...) يضمن سلوكًا
 /// واحدًا موحَّدًا بدل تكرار منطق التنقّل في كل شاشة على حدة.
 void openPrivateChat(
+  BuildContext context,
+  WidgetRef ref, {
+  required String threadId,
+  required String peerUid,
+  required String peerName,
+  String? peerAvatar,
+}) {
+  // نقطة الاختناق الوحيدة لفتح الخاص من كل مكان في التطبيق (الملف
+  // الشخصي، قائمة المحادثات، نافذة العضو، دليل الأعمال...). فحارس
+  // الزائر هنا يغطّيها كلها بدل ترقيعها واحدة واحدة.
+  //
+  // هذا ليس الحماية: الخادم يرفض `send_chat_message` للزائر على كل
+  // حال. هذا يوفّر عليه فتح نافذة لا يستطيع الكتابة فيها.
+  unawaited(() async {
+    final allowed = await ensureGuestAllowed(
+        context, ref, GuestFeatures.privateChat);
+    if (!allowed || !context.mounted) return;
+    _openPrivateChatNow(context, ref,
+        threadId: threadId,
+        peerUid: peerUid,
+        peerName: peerName,
+        peerAvatar: peerAvatar);
+  }());
+}
+
+void _openPrivateChatNow(
   BuildContext context,
   WidgetRef ref, {
   required String threadId,

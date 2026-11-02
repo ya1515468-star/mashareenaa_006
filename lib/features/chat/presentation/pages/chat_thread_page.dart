@@ -312,7 +312,7 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
       // السبب…" أو "هذا العضو أقفل الرسائل الخاصة" بدل رسالة عامة.
       final raw = ref.read(chatControllerProvider.notifier).lastSendError ?? '';
       final m = RegExp(
-              r'(?:CHAT_RESTRICTED|RESTRICTED_[A-Z_]+|DM_LOCKED)\s*:\s*([^,\)]+)')
+              r'(?:CHAT_RESTRICTED|RESTRICTED_[A-Z_]+|DM_LOCKED|GUEST_FEATURE_LOCKED)\s*:\s*([^,\)]+)')
           .firstMatch(raw);
       ScaffoldMessenger.of(context).showSnackBarSfx(
         SnackBar(

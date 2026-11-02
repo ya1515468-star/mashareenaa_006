@@ -9,6 +9,7 @@ import '../widgets/trix_game.dart';
 import '../../../../core/services/server_sounds.dart';
 import '../../data/gif_catalog.dart';
 import '../../data/gif_token.dart';
+import '../../../auth/presentation/widgets/guest_widgets.dart';
 import '../widgets/forward_message_sheet.dart';
 import '../widgets/voice_message_player.dart';
 import '../providers/unread_dm_provider.dart';
@@ -2384,6 +2385,9 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                         style: const TextStyle(
                             color: Colors.redAccent, fontSize: 11))),
               ),
+            // دعوة الزائر لترقية حسابه — قابلة للإخفاء، وتختفي نهائيًا
+            // بعد التسجيل.
+            const GuestUpgradeBanner(),
             if (_replyingTo != null)
               _PendingBar(
                 icon: Icons.reply,
