@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../data/guest_auth_service.dart';
 import '../providers/auth_provider.dart';
 import '../providers/guest_provider.dart';
+import '../widgets/gender_birth_fields.dart';
 
 /// «الدخول كزائر»: الاسم والجنس وتاريخ الميلاد، ثم دخول فوري بلا بريد.
 ///
@@ -41,18 +42,6 @@ class _GuestEntrySheetState extends ConsumerState<GuestEntrySheet> {
     super.dispose();
   }
 
-  Future<void> _pickBirthDate() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime(now.year - 20, now.month, now.day),
-      firstDate: DateTime(now.year - 100),
-      lastDate: now,
-      helpText: 'تاريخ الميلاد',
-    );
-    if (picked != null && mounted) setState(() => _birthDate = picked);
-  }
-
   Future<void> _enter() async {
     if (_busy) return;
     setState(() {
@@ -77,13 +66,6 @@ class _GuestEntrySheetState extends ConsumerState<GuestEntrySheet> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  String? get _birthLabel {
-    final d = _birthDate;
-    if (d == null) return null;
-    final age = DateTime.now().difference(d).inDays ~/ 365;
-    return '${d.year}/${d.month}/${d.day}  —  $age سنة';
   }
 
   @override
@@ -136,51 +118,11 @@ class _GuestEntrySheetState extends ConsumerState<GuestEntrySheet> {
                 ),
               ),
               const SizedBox(height: 14),
-              Text('الجنس', style: TextStyle(color: p.textSecondary, fontSize: 13)),
-              const SizedBox(height: 8),
-              Row(children: [
-                Expanded(
-                  child: _GenderChip(
-                    label: 'ذكر',
-                    icon: Icons.male_rounded,
-                    selected: _gender == 'male',
-                    onTap: () => setState(() => _gender = 'male'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _GenderChip(
-                    label: 'أنثى',
-                    icon: Icons.female_rounded,
-                    selected: _gender == 'female',
-                    onTap: () => setState(() => _gender = 'female'),
-                  ),
-                ),
-              ]),
-              const SizedBox(height: 14),
-              InkWell(
-                onTap: _pickBirthDate,
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: p.divider),
-                  ),
-                  child: Row(children: [
-                    Icon(Icons.cake_outlined, size: 20, color: p.textMuted),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(_birthLabel ?? 'تاريخ الميلاد',
-                          style: TextStyle(
-                              color: _birthDate == null
-                                  ? p.textMuted
-                                  : p.textPrimary)),
-                    ),
-                    Icon(Icons.chevron_left, color: p.textMuted),
-                  ]),
-                ),
+              GenderBirthFields(
+                gender: _gender,
+                birthDate: _birthDate,
+                onGender: (v) => setState(() => _gender = v),
+                onBirthDate: (d) => setState(() => _birthDate = d),
               ),
               const SizedBox(height: 16),
               // تحذير لا بدّ أن يراه قبل الضغط لا بعد أن يخسر ما جمعه:
@@ -227,45 +169,6 @@ class _GuestEntrySheetState extends ConsumerState<GuestEntrySheet> {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _GenderChip extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _GenderChip({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 13),
-        decoration: BoxDecoration(
-          color: selected ? p.accent.withValues(alpha: .18) : null,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: selected ? p.accent : p.divider),
-        ),
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 19, color: selected ? p.accent : p.textMuted),
-          const SizedBox(width: 8),
-          Text(label,
-              style: TextStyle(
-                  color: selected ? p.accent : p.textSecondary,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w400)),
-        ]),
       ),
     );
   }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../auth/presentation/providers/guest_provider.dart';
+import '../../../auth/presentation/widgets/guest_widgets.dart';
 import '../../../../core/error/failure_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -33,7 +35,12 @@ class GiftPickerSheet extends ConsumerWidget {
   const GiftPickerSheet({super.key, required this.onSelect});
 
   static Future<void> show(
-      BuildContext context, ValueChanged<GiftEntity> onSelect) {
+      BuildContext context, ValueChanged<GiftEntity> onSelect) async {
+    // نقطة الاختناق الوحيدة لفتح منتقي الهدايا من الشات والخاص ونافذة
+    // العضو. الخادم يرفض إهداء الزائر عبر تريجر gift_transactions على
+    // كل حال؛ هذا يوفّر عليه اختيار هدية ثم مفاجأته بالرفض.
+    if (!await ensureGuestAllowedDirect(context, GuestFeatures.gifts)) return;
+    if (!context.mounted) return;
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,

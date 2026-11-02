@@ -7,6 +7,8 @@ abstract class AuthRepository {
     required String email,
     required String password,
     required String displayName,
+    String? gender,
+    DateTime? birthDate,
   });
 
   /// عند تسجيل الدخول، يتحقق التطبيق من حالة الحساب (نشط/موقوف/

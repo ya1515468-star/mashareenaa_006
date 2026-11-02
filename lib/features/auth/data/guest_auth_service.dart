@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
+
+import '../../../core/services/integrity_service.dart';
 
 import '../../../core/config/auth_redirect.dart';
 
@@ -69,6 +73,17 @@ class GuestAuthService {
       if (user == null) {
         throw const GuestAuthException('تعذّر الدخول كزائر، حاول مرة أخرى.');
       }
+      // إثبات سلامة الجهاز فور إنشاء الزائر، بلا انتظار المهلة
+      // المعتادة (6 ساعات). حساب الزائر مجّاني وفوري، فهو أكثر ما
+      // يُستغَلّ آليًا — وهذا يُسجّل حكم Play Integrity للجهاز على
+      // الخادم فور الإنشاء.
+      //
+      // بصراحة: هذا **تسجيل** لا منع. لا يوجد خطّاف في Supabase يوقف
+      // signInAnonymously قبل حدوثه، فالحساب يُنشأ ثم يُقيَّم جهازه.
+      // الإيقاف يبقى بيد مسار الإنفاذ الأمني القائم عندك.
+      unawaited(IntegrityService.instance
+          .attestIfDue(minGap: Duration.zero)
+          .catchError((_) {}));
       return user;
     } on sb.AuthException catch (e) {
       // المفتاح مُطفأ في لوحة Supabase (Authentication ← Sign In /

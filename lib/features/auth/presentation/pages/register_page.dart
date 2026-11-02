@@ -20,6 +20,7 @@ import '../widgets/brand_animated_logo.dart';
 import '../widgets/premium/premium_text_field.dart';
 import '../widgets/premium/theme_picker_sheet.dart';
 import '../widgets/premium/two_factor_prompt.dart';
+import '../widgets/gender_birth_fields.dart';
 import 'email_verification_code_page.dart';
 import 'guest_entry_sheet.dart';
 
@@ -48,6 +49,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   bool _enableQuickPin = true;
   bool _wants2FA = false;
   bool _submitting = false;
+  String? _gender;
+  DateTime? _birthDate;
   _UsernameStatus _usernameStatus = _UsernameStatus.idle;
   Timer? _usernameDebounce;
 
@@ -175,6 +178,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           email: _emailController.text.trim(),
           password: _passwordController.text,
           displayName: _nameController.text.trim(),
+          gender: _gender,
+          birthDate: _birthDate,
         );
 
     if (!signedUp) {
@@ -434,6 +439,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 16),
+              // الجنس والميلاد يُجمعان هنا أيضًا لا من الزائر وحده —
+              // نفس الويدجت المشترك ونفس المسار إلى profiles.
+              GenderBirthFields(
+                gender: _gender,
+                birthDate: _birthDate,
+                onGender: (v) => setState(() => _gender = v),
+                onBirthDate: (d) => setState(() => _birthDate = d),
               ),
               const SizedBox(height: 16),
               TwoFactorPrompt(

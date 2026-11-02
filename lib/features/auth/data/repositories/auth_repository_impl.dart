@@ -18,6 +18,8 @@ class AuthRepositoryImpl implements AuthRepository {
     required String email,
     required String password,
     required String displayName,
+    String? gender,
+    DateTime? birthDate,
   }) async {
     if (!await networkInfo.isConnected) return const Left(NetworkFailure());
     try {
@@ -25,6 +27,8 @@ class AuthRepositoryImpl implements AuthRepository {
         email: email,
         password: password,
         displayName: displayName,
+        gender: gender,
+        birthDate: birthDate,
       );
       return Right(user);
     } on AuthException catch (e) {

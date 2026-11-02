@@ -31,6 +31,14 @@ class FailureText {
   /// [subject] ما كان يُحاول تحميله، ليُدمَج في الجملة: «خلفيات
   /// الإطارات»، «الرسائل». تركه فارغًا يعطي جملة عامّة سليمة.
   static String of(Object? error, {String? subject}) {
+    // قفل ميزة على الزائر: الخادم يرفعها بالشكل
+    // `GUEST_FEATURE_LOCKED: <رسالة المالك العربية>`. تُعرَض كما هي بدل
+    // تصنيفها «ممنوع» — فهي مكتوبة أصلًا للمستخدم وتقول له ما يفعل
+    // (سجّل ببريدك). وهذا الموضع المركزي يغطّي كل نقاط الشراء والإهداء
+    // والمكالمات دفعة واحدة بدل ترقيع عشرات المستدعين.
+    final guestLock = _guestLockMessage(error);
+    if (guestLock != null) return guestLock;
+
     final kind = classify(error);
     final what =
         (subject == null || subject.trim().isEmpty) ? null : subject.trim();
@@ -174,5 +182,23 @@ class FailureText {
       return FailureKind.server;
     }
     return FailureKind.unknown;
+  }
+
+  /// يستخرج رسالة قفل الزائر إن كان العطل منها، وإلا null.
+  static String? _guestLockMessage(Object? error) {
+    if (error == null) return null;
+    final raw = error.toString();
+    const marker = 'GUEST_FEATURE_LOCKED';
+    final at = raw.indexOf(marker);
+    if (at < 0) return null;
+    var rest = raw.substring(at + marker.length).trim();
+    if (rest.startsWith(':')) rest = rest.substring(1).trim();
+    // قد يأتي مغلّفًا بين أقواس أو تتبعه حقول PostgrestException.
+    final cut = RegExp(r'[,)\}]|  +').firstMatch(rest);
+    if (cut != null) rest = rest.substring(0, cut.start).trim();
+    rest = rest.replaceAll(RegExp(r'^["\x27]|["\x27]$'), '').trim();
+    return rest.isEmpty
+        ? 'سجّل ببريدك الإلكتروني لتفتح هذه الميزة.'
+        : rest;
   }
 }

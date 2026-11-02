@@ -22,6 +22,8 @@ abstract class AuthRemoteDataSource {
     required String email,
     required String password,
     required String displayName,
+    String? gender,
+    DateTime? birthDate,
   });
 
   Future<UserModel> signIn({
@@ -197,6 +199,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String email,
     required String password,
     required String displayName,
+    String? gender,
+    DateTime? birthDate,
   }) async {
     try {
       final response = await supabase.auth.signUp(
@@ -204,10 +208,18 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         password: password,
         // بدونه يحوّل رابط التأكيد إلى Site URL الافتراضي (localhost).
         emailRedirectTo: authRedirectUrl(),
+        // الجنس والميلاد يصلان في raw_user_meta_data فيلتقطهما تريجر
+        // handle_new_user ويكتبهما في profiles — نفس مسار الزائر
+        // بالضبط، فالعضو المسجَّل بالبريد لا يبقى بلا هذين الحقلين.
         data: {
           'display_name': displayName.trim().isEmpty
               ? email.split('@').first.trim()
               : displayName.trim(),
+          if (gender == 'male' || gender == 'female') 'gender': gender,
+          if (birthDate != null)
+            'birth_date': '${birthDate.year.toString().padLeft(4, '0')}-'
+                '${birthDate.month.toString().padLeft(2, '0')}-'
+                '${birthDate.day.toString().padLeft(2, '0')}',
         },
       );
 

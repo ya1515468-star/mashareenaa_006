@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../pages/guest_upgrade_page.dart';
@@ -111,6 +112,33 @@ Future<bool> ensureGuestAllowed(
   String flag,
 ) async {
   final state = await ref.read(guestStateProvider.future);
+  return _applyGuestGate(context, state, flag);
+}
+
+/// نفس الحارس بلا WidgetRef — لمن لا يملك `ref` (دوال ساكنة مثل
+/// `GiftPickerSheet.show`). يقرأ الحالة من الخادم مباشرة.
+Future<bool> ensureGuestAllowedDirect(
+  BuildContext context,
+  String flag,
+) async {
+  GuestState state;
+  try {
+    final client = Supabase.instance.client;
+    if (client.auth.currentUser == null) return true;
+    state = GuestState.fromRpc(await client.rpc('get_my_guest_state'));
+  } catch (_) {
+    // المنع الحقيقي خادمي؛ التساهل هنا لا يفتح شيئًا.
+    return true;
+  }
+  if (!context.mounted) return false;
+  return _applyGuestGate(context, state, flag);
+}
+
+Future<bool> _applyGuestGate(
+  BuildContext context,
+  GuestState state,
+  String flag,
+) async {
   if (state.allows(flag)) return true;
   if (!context.mounted) return false;
   await showModalBottomSheet<void>(

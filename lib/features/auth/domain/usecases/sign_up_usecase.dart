@@ -13,14 +13,25 @@ class SignUpParams extends Equatable {
   final String password;
   final String displayName;
 
+  /// 'male' أو 'female' أو null. يُمرَّر إلى raw_user_meta_data فيلتقطه
+  /// تريجر handle_new_user ويكتبه في profiles.gender.
+  final String? gender;
+
+  /// تاريخ الميلاد لا العمر: العمر رقم يصدأ، ويُحسب خادميًا عبر
+  /// public.profile_age().
+  final DateTime? birthDate;
+
   const SignUpParams({
     required this.email,
     required this.password,
     required this.displayName,
+    this.gender,
+    this.birthDate,
   });
 
   @override
-  List<Object?> get props => [email, password, displayName];
+  List<Object?> get props =>
+      [email, password, displayName, gender, birthDate];
 }
 
 /// أهم نقطة ترابط في الأساس: عند إنشاء حساب بنجاح، يتم تلقائيًا
@@ -42,6 +53,8 @@ class SignUpUseCase {
       email: params.email,
       password: params.password,
       displayName: params.displayName,
+      gender: params.gender,
+      birthDate: params.birthDate,
     );
 
     if (signUpResult.isLeft()) {
