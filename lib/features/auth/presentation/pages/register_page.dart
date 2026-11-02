@@ -21,6 +21,7 @@ import '../widgets/premium/premium_text_field.dart';
 import '../widgets/premium/theme_picker_sheet.dart';
 import '../widgets/premium/two_factor_prompt.dart';
 import 'email_verification_code_page.dart';
+import 'guest_entry_sheet.dart';
 
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key});
@@ -113,6 +114,17 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         ),
       );
     });
+  }
+
+  /// هل فتح المالك الدخول كزائر؟ دالة خادمية مكشوفة لـ anon لأن هذه
+  /// الصفحة بلا جلسة بعد.
+  Future<bool> _guestSignupEnabled() async {
+    try {
+      final v = await Supabase.instance.client.rpc('guest_signup_enabled');
+      return v == true;
+    } catch (_) {
+      return false;
+    }
   }
 
   String? _usernameHintText() {
@@ -444,6 +456,35 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                     child: const Text('تسجيل الدخول'),
                   ),
                 ],
+              ),
+              // «الدخول كزائر»: يظهر فقط إن فتحه المالك
+              // (feature_flags.guest_signup). المفتاح يُقرأ عبر دالة
+              // مكشوفة لـ anon لأن هذه الصفحة بلا جلسة، والفرض الحقيقي
+              // خادمي داخل تريجر handle_new_user لا هنا.
+              FutureBuilder<bool>(
+                future: _guestSignupEnabled(),
+                builder: (context, snap) {
+                  if (snap.data != true) return const SizedBox.shrink();
+                  return Column(children: [
+                    const SizedBox(height: 4),
+                    Row(children: [
+                      Expanded(child: Divider(color: p.divider)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Text('أو',
+                            style: TextStyle(
+                                color: p.textMuted, fontSize: 12)),
+                      ),
+                      Expanded(child: Divider(color: p.divider)),
+                    ]),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: () => openGuestEntry(context),
+                      icon: const Icon(Icons.person_outline_rounded, size: 19),
+                      label: const Text('الدخول كزائر — جرّب بلا بريد'),
+                    ),
+                  ]);
+                },
               ),
             ],
           ),
