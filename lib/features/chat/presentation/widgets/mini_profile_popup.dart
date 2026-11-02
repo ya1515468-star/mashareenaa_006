@@ -430,18 +430,15 @@ class MiniProfilePopup extends ConsumerWidget {
   }
 
   Future<void> _sendDiceChallenge(BuildContext context) async {
+    // نفس منتقي بقية الألعاب: اختصارات سريعة + حقل يدوي، والحدود
+    // من الخادم لا مكتوبة هنا.
+    final limits = await fetchStakeLimits();
+    if (!context.mounted) return;
     final stake = await showDialog<int>(
       context: context,
-      builder: (c) => SimpleDialog(
-        title: const Text('تحدي النرد — اختر الرهان'),
-        children: [
-          for (final v in const [0, 10, 50, 100, 500, 1000])
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(c, v),
-              child: Text(v == 0 ? 'ودّي (بلا نقاط)' : '$v نقطة',
-                  textDirection: TextDirection.rtl),
-            ),
-        ],
+      builder: (c) => StakePickerDialog(
+        title: 'تحدي النرد — اختر الرهان',
+        limits: limits,
       ),
     );
     if (stake == null || !context.mounted) return;
