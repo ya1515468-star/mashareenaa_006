@@ -314,7 +314,6 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
     );
     final draftText = _textController.text;
     _textController.clear();
-    _gifDraft.clear();
     setState(() {
       _outbox.add(pending);
       if (_stickerPanelOpen) _stickerPanelOpen = false;
@@ -365,7 +364,16 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
 
     await _sound.play(ChatSoundEvent.send);
     if (!mounted) return;
-    // الحقل واللوحة والمسوّدة فُرّغت سلفًا مع الصدى المحلي.
+    // المسوّدة تُمسح بعد النجاح لا قبله، فتبقى خريطة المسارات سليمة
+    // لو فشل الإرسال وعاد النص إلى الحقل.
+    _gifDraft.clear();
+    // شبكة أمان ضدّ صدى عالق لو لم يصل البثّ الحي.
+    Future<void>.delayed(const Duration(seconds: 10), () {
+      if (!mounted) return;
+      if (_outbox.any((m) => m.id == pending.id)) {
+        setState(() => _outbox.removeWhere((m) => m.id == pending.id));
+      }
+    });
     _isTyping = false;
     ref.read(replyingToProvider.notifier).state = null;
     _mentionUserIds.clear();

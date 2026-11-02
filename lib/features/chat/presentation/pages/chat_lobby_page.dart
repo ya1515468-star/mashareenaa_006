@@ -717,7 +717,6 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
     setState(() {
       _outbox.add(pendingRow);
       _error = null;
-      _gifDraft.clear();
       _stickerPanelOpen = false;
       _replyingTo = null;
       _replyMode = 'reply';
@@ -750,6 +749,21 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
         );
       }
       if (!mounted) return;
+      // المسوّدة تُمسح بعد نجاح الإرسال لا قبله: لو فشل، تبقى خريطة
+      // المسارات سليمة فتعمل إعادة المحاولة بالرموز نفسها.
+      _gifDraft.clear();
+      // شبكة أمان: لو نجح الإرسال ولم يصل البثّ الحي (انقطاع شبكة)،
+      // يبقى الصدى المحلي شفافًا إلى الأبد. يُسقَط بعد عشر ثوانٍ —
+      // الرسالة محفوظة على الخادم على كل حال وستظهر عند أول تحديث.
+      Future<void>.delayed(const Duration(seconds: 10), () {
+        if (!mounted) return;
+        final still = _outbox.any((r) =>
+            (r['metadata'] as Map)['request_id'] == requestId);
+        if (still) {
+          setState(() => _outbox.removeWhere(
+              (r) => (r['metadata'] as Map)['request_id'] == requestId));
+        }
+      });
       // The server awards activity XP as part of the message transaction.
       // Refresh the sender's room identity so a newly reached L-level is
       // reflected immediately on subsequent chat renders.
