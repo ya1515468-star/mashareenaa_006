@@ -1345,21 +1345,6 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
         _replyMode = 'reply';
       });
 
-  /// حذف مصغّرة بعينها = حذف رمزها من النص، فيبقى النص هو المصدر الوحيد
-  /// للترتيب ولا تنشأ قائمتان قد تختلفان.
-  void _removePendingGif(int i) {
-    final text = _controller.text;
-    final updated = _gifDraft.removeOccurrence(text, i);
-    if (updated == text) return;
-    final offset = _controller.selection.baseOffset;
-    _controller.value = TextEditingValue(
-      text: updated,
-      selection: TextSelection.collapsed(
-          offset: offset < 0 || offset > updated.length
-              ? updated.length
-              : offset),
-    );
-  }
 
   /// إدراج "@الاسم " في نقطة المؤشر الحالية — منشن سريع دون الحاجة
   /// لكتابة الاسم يدويًا.
@@ -2407,20 +2392,10 @@ class _ChatLobbyPageState extends ConsumerState<ChatLobbyPage> {
                     '${gifTokensToPlaceholder((_replyingTo!['body'] ?? '📎 مرفق').toString())}',
                 onCancel: _cancelReply,
               ),
-            // المصغّرات تُقرأ من نصّ الحقل لا من قائمة منفصلة، فترتيبها هو
-            // ترتيب الرموز بين الكلمات بالضبط، وحذف رمز بالـBackspace
-            // يُسقط مصغّرته فورًا بلا أي مزامنة.
-            ValueListenableBuilder<TextEditingValue>(
-              valueListenable: _controller,
-              builder: (context, value, _) {
-                final pending = _gifDraft.pathsInTextOrder(value.text);
-                if (pending.isEmpty) return const SizedBox.shrink();
-                return _PendingGifBar(
-                  gifs: pending,
-                  onRemove: _removePendingGif,
-                );
-              },
-            ),
+            // لا شريط مصغّرات: الرمز `[gN]` في صندوق الكتابة هو الدلالة
+            // الوحيدة على السمايل وموضعه، والحذف بالـBackspace كالإيموجي
+            // الثابت. كان الشريط يظهر معلّقًا فوق شريط الأزرار الذهبي
+            // بعيدًا عن الحقل، فأُزيل بطلب صريح.
             if (_activeMediaUrl != null && _showMedia)
               Column(
                 children: [

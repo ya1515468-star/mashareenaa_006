@@ -390,20 +390,6 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
     setState(() => _stickerPanelOpen = false);
   }
 
-  /// حذف مصغّرة بعينها = حذف رمزها من النص.
-  void _removePendingGif(int index) {
-    final text = _textController.text;
-    final updated = _gifDraft.removeOccurrence(text, index);
-    if (updated == text) return;
-    final offset = _textController.selection.baseOffset;
-    _textController.value = TextEditingValue(
-      text: updated,
-      selection: TextSelection.collapsed(
-          offset: offset < 0 || offset > updated.length
-              ? updated.length
-              : offset),
-    );
-  }
 
   // `_sendEmoji` حُذفت: كانت ترسل الإيموجي فورًا رسالةً مستقلة نوعها
   // `emoji` — بخلاف الغرفة العامة التي تُدرجه في صندوق الكتابة. التوحيد
@@ -858,69 +844,9 @@ class _ChatThreadPageState extends ConsumerState<ChatThreadPage> {
               onCancel: () =>
                   ref.read(replyingToProvider.notifier).state = null,
             ),
-          // معاينة السمايلات المعلّقة فوق صندوق الكتابة بترتيب رموزها في
-          // النص، كل واحدة قابلة للحذف قبل الإرسال؛ تُرسَل كلها في فقاعة
-          // واحدة مع النص. المصدر هو نصّ الحقل لا قائمة منفصلة، فحذف رمز
-          // بالـBackspace يُسقط مصغّرته فورًا.
-          ValueListenableBuilder<TextEditingValue>(
-            valueListenable: _textController,
-            builder: (context, value, _) {
-              final pending = _gifDraft.pathsInTextOrder(value.text);
-              if (pending.isEmpty) return const SizedBox.shrink();
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                decoration: BoxDecoration(
-                  color: p.surfaceElevated,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: p.divider),
-                ),
-                child: Row(children: [
-                  Icon(Icons.emoji_emotions_outlined,
-                      size: 16, color: p.textMuted),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (var i = 0; i < pending.length; i++)
-                          Stack(clipBehavior: Clip.none, children: [
-                            SizedBox(
-                              width: 28,
-                              height: 28,
-                              child: pending[i].startsWith('assets/')
-                                  ? Image.asset(pending[i],
-                                      fit: BoxFit.contain)
-                                  : Image.network(pending[i],
-                                      fit: BoxFit.contain),
-                            ),
-                            Positioned(
-                              top: -6,
-                              left: -6,
-                              child: GestureDetector(
-                                onTap: () => _removePendingGif(i),
-                                child: Container(
-                                  decoration: const BoxDecoration(
-                                      color: Colors.black54,
-                                      shape: BoxShape.circle),
-                                  padding: const EdgeInsets.all(1),
-                                  child: const Icon(Icons.close_rounded,
-                                      size: 11, color: Colors.white),
-                                ),
-                              ),
-                            ),
-                          ]),
-                      ],
-                    ),
-                  ),
-                  Text('${pending.length}',
-                      style: TextStyle(color: p.textMuted, fontSize: 11)),
-                ]),
-              );
-            },
-          ),
+          // لا شريط مصغّرات: الرمز `[gN]` في صندوق الكتابة هو الدلالة
+          // الوحيدة على السمايل وموضعه، والحذف بالـBackspace كالإيموجي
+          // الثابت — مطابق للغرفة العامة.
           if (_mentionSuggestions.isNotEmpty)
             Container(
                 height: 54,

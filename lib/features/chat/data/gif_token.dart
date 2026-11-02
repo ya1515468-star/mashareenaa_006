@@ -40,25 +40,6 @@ class GifComposerDraft {
     return gifToken(id);
   }
 
-  /// المسارات بترتيب ظهور رموزها في [text] — لشريط المصغّرات فوق الحقل.
-  List<String> pathsInTextOrder(String text) {
-    final out = <String>[];
-    for (final m in gifTokenPattern.allMatches(text)) {
-      final path = _paths[int.parse(m.group(1)!)];
-      if (path != null) out.add(path);
-    }
-    return out;
-  }
-
-  /// يحذف الرمز رقم [occurrence] (0-based حسب ترتيب الظهور) من [text] —
-  /// لزر الحذف على مصغّرة بعينها.
-  String removeOccurrence(String text, int occurrence) {
-    final matches = gifTokenPattern.allMatches(text).toList();
-    if (occurrence < 0 || occurrence >= matches.length) return text;
-    final m = matches[occurrence];
-    return text.replaceRange(m.start, m.end, '');
-  }
-
   /// يُعيد ترقيم الرموز 1..N حسب ترتيبها في النص، فتصبح الرسالة المحفوظة
   /// مكتفية بنفسها: الرمز `[gi]` يقابل `gif_urls[i-1]` دائمًا، بلا اعتماد
   /// على عدّاد العميل الذي لا يعرفه المستقبِل.
